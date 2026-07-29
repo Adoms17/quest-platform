@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import MapPicker from '../components/MapPicker'
 import Loader from '../components/Loader'
+import toast from 'react-hot-toast'
 
 export default function QuestEdit({ session }) {
   const { id } = useParams()
@@ -108,21 +109,21 @@ export default function QuestEdit({ session }) {
   function validateCoords(lat, lng) {
     if (!lat && !lng) return true // оба пустые — ок
     if (!lat || !lng) {
-      alert('Если указываете координаты, заполните оба поля')
+      toast.error('Если указываете координаты, заполните оба поля')
       return false
     }
     const latNum = parseFloat(lat)
     const lngNum = parseFloat(lng)
     if (isNaN(latNum) || isNaN(lngNum)) {
-      alert('Координаты должны быть числами')
+      toast.error('Координаты должны быть числами')
       return false
     }
     if (latNum < -90 || latNum > 90) {
-      alert('Широта должна быть в диапазоне -90..90')
+      toast.error('Широта должна быть в диапазоне -90..90')
       return false
     }
     if (lngNum < -180 || lngNum > 180) {
-      alert('Долгота должна быть в диапазоне -180..180')
+      toast.error('Долгота должна быть в диапазоне -180..180')
       return false
     }
     return true
@@ -132,7 +133,7 @@ export default function QuestEdit({ session }) {
 async function handleSaveTask(e) {
   e.preventDefault()
   if (!taskForm.title.trim()) {
-    alert('Введите название задания')
+    toast.error('Введите название задания')
     return
   }
 
@@ -177,9 +178,10 @@ async function handleSaveTask(e) {
     } else {
       setTasks([...tasks, result.data[0]])
     }
+    toast.success(editingTask ? 'Задание обновлено' : 'Задание добавлено')
     resetForm() // Очищаем форму
   } catch (err) {
-    alert('Ошибка сохранения: ' + err.message)
+    toast.error('Ошибка сохранения: ' + err.message)
   } finally {
     setSaving(false)
   }
@@ -189,8 +191,12 @@ async function handleSaveTask(e) {
   async function deleteTask(taskId) {
     if (!confirm('Удалить задание?')) return
     const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-    if (error) alert('Ошибка удаления')
-    else setTasks(tasks.filter(t => t.id !== taskId))
+    if (error) toast.error('Ошибка удаления')
+    else {
+      toast.success('Задание удалено')
+      setTasks(tasks.filter(t => t.id !== taskId))
+    }
+  
   }
 
   // Обработчик выбора координат с карты

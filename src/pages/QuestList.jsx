@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Link } from 'react-router-dom'
 import Loader from '../components/Loader'
+import toast from 'react-hot-toast'
 
 export default function QuestList({ session }) {
   const [quests, setQuests] = useState([])
@@ -22,7 +23,7 @@ export default function QuestList({ session }) {
 
     if (error) {
       console.error('Ошибка загрузки квестов:', error)
-      alert('Не удалось загрузить квесты')
+      toast.error('Не удалось загрузить квесты')
     } else {
       setQuests(data || [])
     }
@@ -32,8 +33,11 @@ export default function QuestList({ session }) {
   async function handleDelete(id) {
     if (!confirm('Удалить квест?')) return
     const { error } = await supabase.from('quests').delete().eq('id', id)
-    if (error) alert('Ошибка удаления')
-    else fetchQuests()
+    if (error) toast.error('Ошибка удаления')
+    else {
+      toast.success('Квест удалён')
+      fetchQuests()
+    }
   }
 
   if (loading) return <Loader text="Загрузка списка квестов..." />
@@ -72,6 +76,22 @@ export default function QuestList({ session }) {
                 >
                   Редактировать
                 </Link>
+                <Link
+                  to={`/quests/${quest.id}/stats`}
+                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-sm"
+                >
+                  Статистика
+                </Link>
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}/play/${quest.id}`
+                    navigator.clipboard.writeText(url)
+                    toast.success('Ссылка скопирована!')
+                  }}
+                  className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600 text-sm"
+                >
+                  Поделиться
+                </button>
                 <button
                   onClick={() => handleDelete(quest.id)}
                   className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"

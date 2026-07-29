@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import MapPicker from '../components/MapPicker'
 import Loader from '../components/Loader'
+import toast from 'react-hot-toast'
 
 export default function QuestPlay({ session }) {
   const { id } = useParams()
@@ -81,7 +82,7 @@ export default function QuestPlay({ session }) {
   // Проверка GPS
   function checkLocation() {
     if (!navigator.geolocation) {
-      alert('Ваш браузер не поддерживает геолокацию')
+      toast.error('Ваш браузер не поддерживает геолокацию')
       return
     }
     if (!currentTask.gps_point || !currentTask.gps_point.coordinates) {
@@ -97,9 +98,9 @@ export default function QuestPlay({ session }) {
         const distance = getDistance(lat, lng, userLat, userLng)
         if (distance <= 50) {
           setLocationVerified(true)
-          alert(`✅ Вы на месте! Расстояние ${Math.round(distance)} м`)
+          toast.success(`✅ Вы на месте! Расстояние ${Math.round(distance)} м`)
         } else {
-          alert(`❌ Вы слишком далеко (${Math.round(distance)} м). Подойдите ближе (в радиусе 50 м)`)
+          toast.error(`❌ Вы слишком далеко (${Math.round(distance)} м). Подойдите ближе (в радиусе 50 м)`)
         }
       },
       (err) => {
@@ -130,9 +131,9 @@ export default function QuestPlay({ session }) {
     }
     if (codeInput.trim().toUpperCase() === currentTask.static_code.trim().toUpperCase()) {
       setCodeVerified(true)
-      alert('✅ Код верен!')
+      toast.success('✅ Код верен!')
     } else {
-      alert('❌ Неверный код, попробуйте ещё раз')
+      toast.error('❌ Неверный код, попробуйте ещё раз')
     }
   }
 
@@ -143,10 +144,10 @@ export default function QuestPlay({ session }) {
       return true
     }
     if (answerInput.trim().toLowerCase() === currentTask.correct_answer.trim().toLowerCase()) {
-      alert('✅ Правильный ответ!')
+      toast.success('✅ Правильный ответ!')
       return true
     } else {
-      alert('❌ Неправильный ответ, попробуйте ещё раз')
+      toast.error('❌ Неправильный ответ, попробуйте ещё раз')
       return false
     }
   }
@@ -161,11 +162,11 @@ export default function QuestPlay({ session }) {
     const hasAnswer = currentTask.correct_answer && currentTask.correct_answer.trim() !== ''
 
     if (hasGps && !locationVerified) {
-      alert('Сначала подтвердите нахождение на месте')
+      toast.error('Сначала подтвердите нахождение на месте')
       return
     }
     if (hasCode && !codeVerified) {
-      alert('Сначала введите правильный код')
+      toast.error('Сначала введите правильный код')
       return
     }
     if (hasAnswer) {
@@ -199,7 +200,7 @@ export default function QuestPlay({ session }) {
         }, 500)
       }
     } catch (err) {
-      alert('Ошибка сохранения: ' + err.message)
+      toast.error('Ошибка сохранения: ' + err.message)
     }
   }
 
@@ -231,6 +232,12 @@ export default function QuestPlay({ session }) {
         <p className="text-gray-600">
           Задание {currentTaskIndex + 1} из {tasks.length}
         </p>
+        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+          <div
+              className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+              style={{ width: `${((currentTaskIndex) / tasks.length) * 100}%` }}
+            />
+          </div>
         <p className="text-sm text-gray-500">⏱️ {elapsedSeconds} сек</p>
       </div>
 

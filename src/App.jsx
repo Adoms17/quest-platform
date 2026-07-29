@@ -5,8 +5,11 @@ import Login from './pages/Login'
 import QuestList from './pages/QuestList'
 import QuestCreate from './pages/QuestCreate'
 import QuestEdit from './pages/QuestEdit'
+import QuestPlay from './pages/QuestPlay'
+import QuestStats from './pages/QuestStats'
 import ProtectedRoute from './components/ProtectedRoute'
-import Loader from './components/Loader'
+import AppToaster from './components/Toaster'
+import Navbar from './components/Navbar'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -25,17 +28,32 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (loading) return <Loader text="Вход в систему..." />
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Загрузка...</div>
+  }
+
+  // Обёртка для страниц с навигацией
+  function Layout({ children }) {
+    return (
+      <>
+        <Navbar session={session} />
+        <main>{children}</main>
+      </>
+    )
+  }
 
   return (
     <BrowserRouter>
+      <AppToaster />
       <Routes>
         <Route path="/login" element={<Login setSession={setSession} />} />
         <Route
           path="/quests"
           element={
             <ProtectedRoute session={session}>
-              <QuestList session={session} />
+              <Layout>
+                <QuestList session={session} />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -43,7 +61,9 @@ function App() {
           path="/quests/new"
           element={
             <ProtectedRoute session={session}>
-              <QuestCreate session={session} />
+              <Layout>
+                <QuestCreate session={session} />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -51,7 +71,29 @@ function App() {
           path="/quests/:id/edit"
           element={
             <ProtectedRoute session={session}>
-              <QuestEdit session={session} />
+              <Layout>
+                <QuestEdit session={session} />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quests/:id/stats"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout>
+                <QuestStats session={session} />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/play/:id"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout>
+                <QuestPlay session={session} />
+              </Layout>
             </ProtectedRoute>
           }
         />

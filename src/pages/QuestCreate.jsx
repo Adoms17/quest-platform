@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import toast from 'react-hot-toast'
 
 export default function QuestCreate({ session }) {
   const navigate = useNavigate()
@@ -12,7 +13,7 @@ export default function QuestCreate({ session }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!title.trim()) {
-      alert('Введите название')
+      toast.error('Введите название')
       return
     }
 
@@ -29,8 +30,9 @@ export default function QuestCreate({ session }) {
 
     if (error) {
       console.error(error)
-      alert('Ошибка создания квеста: ' + error.message)
+      toast.error('Ошибка создания: ' + error.message)
     } else {
+      toast.success('Квест создан!')
       navigate(`/quests/${data[0].id}/edit`) // сразу на редактирование
     }
     setLoading(false)

@@ -1,7 +1,10 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'  // ← добавить
 import { supabase } from '../supabaseClient'
+import toast from 'react-hot-toast'
 
 export default function Login({ setSession }) {
+  const navigate = useNavigate()  // ← добавить
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -9,17 +12,19 @@ export default function Login({ setSession }) {
   const handleSignUp = async () => {
     setLoading(true)
     const { data, error } = await supabase.auth.signUp({ email, password })
-    if (error) alert(error.message)
-    else alert('Проверьте почту или войдите сразу (если подтверждение отключено)')
+    if (error) toast.error(error.message)
+    else toast.success('Проверьте почту или войдите сразу (если подтверждение отключено)')
     setLoading(false)
   }
 
   const handleSignIn = async () => {
     setLoading(true)
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) alert(error.message)
-    else {
+    if (error) {
+      toast.error(error.message)
+    } else {
       setSession(data.session)
+      navigate('/quests')  // ← явный редирект
     }
     setLoading(false)
   }
