@@ -1,3 +1,10 @@
+/* Leaflet */
+@import 'leaflet/dist/leaflet.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+.leaflet-control-container .leaflet-routing-container-hide {
+  display: none;
+}
