@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import MapPicker from '../components/MapPicker'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 
@@ -15,9 +14,9 @@ export default function QuestPlay({ session }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Состояния для текущего задания
   const [locationVerified, setLocationVerified] = useState(false)
   const [codeVerified, setCodeVerified] = useState(false)
+  const [selectedOption, setSelectedOption] = useState('')
   const [answerInput, setAnswerInput] = useState('')
   const [codeInput, setCodeInput] = useState('')
   const [taskCompleted, setTaskCompleted] = useState(false)
@@ -25,12 +24,11 @@ export default function QuestPlay({ session }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [finished, setFinished] = useState(false)
 
-  // Загружаем квест и задания
+  // Загрузка
   useEffect(() => {
     async function fetchQuestAndTasks() {
       setLoading(true)
       try {
-        // 1. Загружаем квест
         const { data: questData, error: questError } = await supabase
           .from('quests')
           .select('*')
@@ -39,7 +37,6 @@ export default function QuestPlay({ session }) {
         if (questError) throw new Error('Квест не найден')
         setQuest(questData)
 
-        // 2. Загружаем задания
         const { data: tasksData, error: tasksError } = await supabase
           .from('tasks')
           .select('*')
@@ -50,7 +47,6 @@ export default function QuestPlay({ session }) {
         setStartTime(Date.now())
       } catch (err) {
         setError(err.message)
-        console.error(err)
       } finally {
         setLoading(false)
       }
@@ -74,10 +70,21 @@ export default function QuestPlay({ session }) {
   useEffect(() => {
     setLocationVerified(false)
     setCodeVerified(false)
+    setSelectedOption('')
     setAnswerInput('')
     setCodeInput('')
     setTaskCompleted(false)
   }, [currentTaskIndex])
+
+  // Определяем тип медиа по расширению
+  function getMediaType(url) {
+    if (!url) return null
+    const ext = url.split('.').pop().toLowerCase()
+    if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return 'image'
+    if (['mp4','webm','ogg'].includes(ext)) return 'video'
+    if (['mp3','wav','aac'].includes(ext)) return 'audio'
+    return 'image' // по умолчанию
+  }
 
   // Проверка GPS
   function checkLocation() {
@@ -89,7 +96,6 @@ export default function QuestPlay({ session }) {
       setLocationVerified(true)
       return
     }
-
     const [lng, lat] = currentTask.gps_point.coordinates
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -100,27 +106,22 @@ export default function QuestPlay({ session }) {
           setLocationVerified(true)
           toast.success(`✅ Вы на месте! Расстояние ${Math.round(distance)} м`)
         } else {
-          toast.error(`❌ Вы слишком далеко (${Math.round(distance)} м). Подойдите ближе (в радиусе 50 м)`)
+          toast.error(`❌ Вы слишком далеко (${Math.round(distance)} м). Подойдите ближе`)
         }
       },
       (err) => {
-        alert('Не удалось определить местоположение: ' + err.message)
+        toast.error('Не удалось определить местоположение: ' + err.message)
       },
       { enableHighAccuracy: true }
     )
   }
 
-  // Расчёт расстояния (формула гаверсинуса)
   function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000 // радиус Земли в метрах
+    const R = 6371000
     const dLat = (lat2 - lat1) * Math.PI / 180
     const dLon = (lon2 - lon1) * Math.PI / 180
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return R * c
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
   }
 
   // Проверка кода
@@ -133,30 +134,27 @@ export default function QuestPlay({ session }) {
       setCodeVerified(true)
       toast.success('✅ Код верен!')
     } else {
-      toast.error('❌ Неверный код, попробуйте ещё раз')
+      toast.error('❌ Неверный код')
     }
   }
 
-  // Проверка ответа
-  function checkAnswer() {
-    if (!currentTask.correct_answer) {
-      // Если ответ не задан, засчитываем автоматически
-      return true
-    }
-    if (answerInput.trim().toLowerCase() === currentTask.correct_answer.trim().toLowerCase()) {
-      toast.success('✅ Правильный ответ!')
-      return true
+  // Проверка ответа (с учётом вариантов или текстового ввода)
+  function isAnswerCorrect() {
+    const correct = currentTask.correct_answer?.trim()?.toLowerCase() || ''
+    if (!correct) return true // если ответ не задан, считаем верным
+    if (currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0) {
+      // Множественный выбор: сравниваем выбранный вариант
+      return selectedOption.trim().toLowerCase() === correct
     } else {
-      toast.error('❌ Неправильный ответ, попробуйте ещё раз')
-      return false
+      // Текстовый ввод
+      return answerInput.trim().toLowerCase() === correct
     }
   }
 
-  // Завершение текущего задания
+  // Завершение задания
   async function completeTask() {
     if (taskCompleted) return
 
-    // Проверяем, что все условия выполнены
     const hasGps = currentTask.gps_point && currentTask.gps_point.coordinates
     const hasCode = currentTask.static_code && currentTask.static_code.trim() !== ''
     const hasAnswer = currentTask.correct_answer && currentTask.correct_answer.trim() !== ''
@@ -170,13 +168,16 @@ export default function QuestPlay({ session }) {
       return
     }
     if (hasAnswer) {
-      const ok = checkAnswer()
-      if (!ok) return
+      if (!isAnswerCorrect()) {
+        toast.error('❌ Неправильный ответ, попробуйте ещё раз')
+        return
+      } else {
+        toast.success('✅ Правильный ответ!')
+      }
     }
 
-    // Записываем результат в БД
     try {
-      const timeSpent = elapsedSeconds // примерное время от начала квеста
+      const timeSpent = elapsedSeconds
       const { error } = await supabase
         .from('attempts')
         .insert({
@@ -190,14 +191,10 @@ export default function QuestPlay({ session }) {
 
       setTaskCompleted(true)
 
-      // Если это последнее задание — финиш
       if (isLastTask) {
         setFinished(true)
       } else {
-        // Переход к следующему
-        setTimeout(() => {
-          setCurrentTaskIndex(prev => prev + 1)
-        }, 500)
+        setTimeout(() => setCurrentTaskIndex(prev => prev + 1), 500)
       }
     } catch (err) {
       toast.error('Ошибка сохранения: ' + err.message)
@@ -226,19 +223,29 @@ export default function QuestPlay({ session }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <div className="mb-4">
+    <div className="max-w-3xl mx-auto p-6">
+      {/* Кнопка выхода из прохождения */}
+      <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">{quest.title}</h1>
-        <p className="text-gray-600">
-          Задание {currentTaskIndex + 1} из {tasks.length}
-        </p>
-        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-          <div
-              className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-              style={{ width: `${((currentTaskIndex) / tasks.length) * 100}%` }}
-            />
-          </div>
-        <p className="text-sm text-gray-500">⏱️ {elapsedSeconds} сек</p>
+        <button
+          onClick={() => navigate('/quests')}
+          className="text-red-500 hover:text-red-700 text-sm border border-red-500 px-3 py-1 rounded hover:bg-red-50"
+        >
+          ✕ Выйти из квеста
+        </button>
+      </div>
+
+      <div className="flex justify-between items-center mb-2 text-sm text-gray-600">
+        <span>Задание {currentTaskIndex + 1} из {tasks.length}</span>
+        <span>⏱️ {elapsedSeconds} сек</span>
+      </div>
+
+      {/* Прогресс-бар */}
+      <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+        <div
+          className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+          style={{ width: `${((currentTaskIndex) / tasks.length) * 100}%` }}
+        />
       </div>
 
       <div className="bg-white shadow rounded p-6">
@@ -249,6 +256,25 @@ export default function QuestPlay({ session }) {
             <summary className="text-blue-500 cursor-pointer">Подсказка</summary>
             <p className="mt-2 text-gray-600 bg-gray-100 p-2 rounded">{currentTask.hint}</p>
           </details>
+        )}
+
+        {/* Медиа-контент */}
+        {currentTask.media_url && (
+          <div className="mb-4">
+            {getMediaType(currentTask.media_url) === 'image' && (
+              <img src={currentTask.media_url} alt="Медиа" className="max-w-full h-auto rounded" />
+            )}
+            {getMediaType(currentTask.media_url) === 'video' && (
+              <video controls className="max-w-full h-auto rounded">
+                <source src={currentTask.media_url} type={`video/${currentTask.media_url.split('.').pop()}`} />
+              </video>
+            )}
+            {getMediaType(currentTask.media_url) === 'audio' && (
+              <audio controls className="w-full">
+                <source src={currentTask.media_url} type={`audio/${currentTask.media_url.split('.').pop()}`} />
+              </audio>
+            )}
+          </div>
         )}
 
         {/* GPS */}
@@ -274,7 +300,7 @@ export default function QuestPlay({ session }) {
               type="text"
               placeholder="Введите код"
               value={codeInput}
-              onChange={(e) => setCodeInput(e.target.value)}
+              onChange={e => setCodeInput(e.target.value)}
               disabled={codeVerified}
               className="border p-2 rounded flex-1"
             />
@@ -288,21 +314,39 @@ export default function QuestPlay({ session }) {
           </div>
         )}
 
-        {/* Ответ на вопрос */}
+        {/* Ответ: варианты или текстовое поле */}
         {currentTask.correct_answer && currentTask.correct_answer.trim() !== '' && (
-          <div className="mb-4 flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Ваш ответ"
-              value={answerInput}
-              onChange={(e) => setAnswerInput(e.target.value)}
-              disabled={taskCompleted}
-              className="border p-2 rounded flex-1"
-            />
+          <div className="mb-4">
+            {currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0 ? (
+              // Множественный выбор
+              <div className="space-y-2">
+                <p className="font-medium">Выберите правильный вариант:</p>
+                {currentTask.options.map((opt, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedOption(opt)}
+                    className={`block w-full text-left p-2 border rounded transition ${
+                      selectedOption === opt ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              // Текстовый ввод
+              <input
+                type="text"
+                placeholder="Введите ваш ответ"
+                value={answerInput}
+                onChange={e => setAnswerInput(e.target.value)}
+                disabled={taskCompleted}
+                className="w-full border p-2 rounded"
+              />
+            )}
           </div>
         )}
 
-        {/* Кнопка завершения задания */}
         <button
           onClick={completeTask}
           disabled={taskCompleted}
