@@ -3,6 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
+import { MapContainer, TileLayer, Marker } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+
+// Исправление иконок маркера
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+})
 
 export default function QuestPlay({ session }) {
   const { id } = useParams()
@@ -251,6 +262,48 @@ export default function QuestPlay({ session }) {
       <div className="bg-white shadow rounded p-6">
         <h2 className="text-xl font-semibold mb-2">{currentTask.title}</h2>
         <p className="text-gray-700 mb-4">{currentTask.description}</p>
+        {/* Блок описания места */}
+        {(currentTask.gps_point?.coordinates || currentTask.location_text || currentTask.location_image_url) && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            <h4 className="font-semibold text-blue-700 mb-1">📍 Место задания</h4>
+            
+            {currentTask.gps_point?.coordinates && (
+              <>
+                <p className="text-sm text-gray-600">
+                  Координаты: {currentTask.gps_point.coordinates[1].toFixed(6)}, {currentTask.gps_point.coordinates[0].toFixed(6)}
+                </p>
+                <div className="h-48 w-full mt-2 rounded overflow-hidden border">
+                  <MapContainer
+                    center={[currentTask.gps_point.coordinates[1], currentTask.gps_point.coordinates[0]]}
+                    zoom={15}
+                    scrollWheelZoom={false}
+                    dragging={false}
+                    zoomControl={false}
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <Marker position={[currentTask.gps_point.coordinates[1], currentTask.gps_point.coordinates[0]]} />
+                  </MapContainer>
+                </div>
+              </>
+            )}
+            
+            {currentTask.location_text && (
+              <p className="text-sm text-gray-700 mt-1">{currentTask.location_text}</p>
+            )}
+            
+            {currentTask.location_image_url && (
+              <img
+                src={currentTask.location_image_url}
+                alt="Место"
+                className="mt-2 max-w-full h-auto rounded max-h-40 object-cover"
+              />
+            )}
+          </div>
+        )}
         {currentTask.hint && (
           <details className="mb-4">
             <summary className="text-blue-500 cursor-pointer">Подсказка</summary>

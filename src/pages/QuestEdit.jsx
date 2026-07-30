@@ -12,8 +12,13 @@ export default function QuestEdit({ session }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-
   const [editingTask, setEditingTask] = useState(null)
+  const [editMode, setEditMode] = useState(false)
+  const [questTitle, setQuestTitle] = useState('')
+  const [questDescription, setQuestDescription] = useState('')
+
+  // Опции места, выбранные для квеста
+  const [locationOptions, setLocationOptions] = useState(['gps']) // по умолчанию
 
   const [taskForm, setTaskForm] = useState({
     title: '',
@@ -23,8 +28,10 @@ export default function QuestEdit({ session }) {
     gps_lng: '',
     static_code: '',
     correct_answer: '',
-    options: '',          // строка, разделённая запятыми
+    options: '',
     media_url: '',
+    location_text: '',
+    location_image_url: '',
     order_index: 0,
   })
 
@@ -47,6 +54,12 @@ export default function QuestEdit({ session }) {
         return
       }
       setQuest(questData)
+      setQuestTitle(questData.title)
+      setQuestDescription(questData.description || '')
+
+      // Загружаем опции места (если нет, ставим по умолчанию)
+      const opts = Array.isArray(questData.location_options) ? questData.location_options : ['gps']
+      setLocationOptions(opts)
 
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
@@ -63,6 +76,47 @@ export default function QuestEdit({ session }) {
     }
   }
 
+  // Сохранение опций места при изменении
+  async function updateLocationOptions(newOpts) {
+    setLocationOptions(newOpts)
+    try {
+      const { error } = await supabase
+        .from('quests')
+        .update({ location_options: newOpts })
+        .eq('id', id)
+      if (error) throw error
+      toast.success('Настройки места обновлены')
+    } catch (err) {
+      toast.error('Ошибка сохранения настроек: ' + err.message)
+    }
+  }
+
+  async function updateQuest() {
+    if (!questTitle.trim()) {
+      toast.error('Название не может быть пустым')
+      return
+    }
+    try {
+      const { error } = await supabase
+        .from('quests')
+        .update({
+          title: questTitle.trim(),
+          description: questDescription.trim() || null,
+        })
+        .eq('id', id)
+      if (error) throw error
+      setQuest((prev) => ({
+        ...prev,
+        title: questTitle.trim(),
+        description: questDescription.trim() || null,
+      }))
+      setEditMode(false)
+      toast.success('Квест обновлён')
+    } catch (err) {
+      toast.error('Ошибка обновления: ' + err.message)
+    }
+  }
+
   function resetForm() {
     setTaskForm({
       title: '',
@@ -74,6 +128,8 @@ export default function QuestEdit({ session }) {
       correct_answer: '',
       options: '',
       media_url: '',
+      location_text: '',
+      location_image_url: '',
       order_index: 0,
     })
     setEditingTask(null)
@@ -86,7 +142,6 @@ export default function QuestEdit({ session }) {
       lng = task.gps_point.coordinates[0].toString()
       lat = task.gps_point.coordinates[1].toString()
     }
-    // Если options — массив, объединяем в строку через запятую
     const optionsStr = Array.isArray(task.options) ? task.options.join(', ') : ''
     setTaskForm({
       title: task.title || '',
@@ -98,6 +153,8 @@ export default function QuestEdit({ session }) {
       correct_answer: task.correct_answer || '',
       options: optionsStr,
       media_url: task.media_url || '',
+      location_text: task.location_text || '',
+      location_image_url: task.location_image_url || '',
       order_index: task.order_index || 0,
     })
     setEditingTask(task)
@@ -133,15 +190,30 @@ export default function QuestEdit({ session }) {
       return
     }
 
-    const { gps_lat, gps_lng, options, correct_answer, media_url } = taskForm
-    if (!validateCoords(gps_lat, gps_lng)) return
+    // Проверяем обязательность полей в зависимости от опций места
+    const opts = locationOptions
+    const { gps_lat, gps_lng, location_text, location_image_url } = taskForm
+
+    if (opts.includes('gps') && !gps_lat && !gps_lng) {
+      toast.error('Для этого квеста обязательно указать GPS-координаты')
+      return
+    }
+    if (opts.includes('gps') && !validateCoords(gps_lat, gps_lng)) return
+
+    if (opts.includes('text') && !location_text.trim()) {
+      toast.error('Для этого квеста обязательно указать текстовое описание места')
+      return
+    }
+    if (opts.includes('image') && !location_image_url.trim()) {
+      toast.error('Для этого квеста обязательно указать изображение места')
+      return
+    }
 
     setSaving(true)
 
-    // Преобразуем строку options в массив
     let optionsArray = null
-    if (options.trim()) {
-      optionsArray = options.split(',').map(s => s.trim()).filter(s => s.length > 0)
+    if (taskForm.options.trim()) {
+      optionsArray = taskForm.options.split(',').map(s => s.trim()).filter(s => s.length > 0)
       if (optionsArray.length === 0) optionsArray = null
     }
 
@@ -154,9 +226,11 @@ export default function QuestEdit({ session }) {
         ? `POINT(${parseFloat(gps_lng)} ${parseFloat(gps_lat)})`
         : null,
       static_code: taskForm.static_code.trim() || null,
-      correct_answer: correct_answer.trim() || null,
+      correct_answer: taskForm.correct_answer.trim() || null,
       options: optionsArray,
-      media_url: media_url.trim() || null,
+      media_url: taskForm.media_url.trim() || null,
+      location_text: taskForm.location_text.trim() || null,
+      location_image_url: taskForm.location_image_url.trim() || null,
       order_index: taskForm.order_index || 0,
     }
 
@@ -209,14 +283,112 @@ export default function QuestEdit({ session }) {
     }))
   }
 
+  // Переключатели для опций места
+  function toggleOption(opt) {
+    let newOpts
+    if (locationOptions.includes(opt)) {
+      if (locationOptions.length <= 1) {
+        toast.error('Должна быть выбрана как минимум одна опция')
+        return
+      }
+      newOpts = locationOptions.filter(o => o !== opt)
+    } else {
+      newOpts = [...locationOptions, opt]
+    }
+    updateLocationOptions(newOpts)
+  }
+
   if (loading) return <Loader text="Загрузка квеста..." />
   if (!quest) return <div className="p-8 text-center text-red-500">Квест не найден</div>
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2">Редактирование квеста</h1>
-      <h2 className="text-xl text-gray-700 mb-6">{quest.title}</h2>
+      {/* Редактирование названия и описания квеста */}
+      <div className="flex items-start gap-2 mb-6">
+        {editMode ? (
+          <div className="flex-1 space-y-2">
+            <input
+              type="text"
+              value={questTitle}
+              onChange={(e) => setQuestTitle(e.target.value)}
+              className="w-full border p-2 rounded text-xl font-bold"
+              placeholder="Название квеста"
+            />
+            <textarea
+              value={questDescription}
+              onChange={(e) => setQuestDescription(e.target.value)}
+              className="w-full border p-2 rounded"
+              rows="2"
+              placeholder="Описание квеста"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={updateQuest}
+                className="bg-green-500 text-white px-4 py-1 rounded hover:bg-green-600"
+              >
+                Сохранить
+              </button>
+              <button
+                onClick={() => {
+                  setEditMode(false)
+                  setQuestTitle(quest.title)
+                  setQuestDescription(quest.description || '')
+                }}
+                className="bg-gray-300 text-gray-700 px-4 py-1 rounded hover:bg-gray-400"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">{quest.title}</h1>
+            {quest.description && <p className="text-gray-600">{quest.description}</p>}
+          </div>
+        )}
+        <button
+          onClick={() => setEditMode(true)}
+          className="text-blue-500 hover:text-blue-700 text-sm"
+          title="Редактировать квест"
+        >
+          ✏️
+        </button>
+      </div>
 
+
+      {/* Блок выбора опций места */}
+      <div className="bg-gray-50 p-4 rounded mb-6 border">
+        <h3 className="font-semibold mb-2">Как будет описано место каждого задания?</h3>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={locationOptions.includes('gps')}
+              onChange={() => toggleOption('gps')}
+            />
+            📍 GPS-координаты
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={locationOptions.includes('text')}
+              onChange={() => toggleOption('text')}
+            />
+            📝 Текстовое описание
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={locationOptions.includes('image')}
+              onChange={() => toggleOption('image')}
+            />
+            🖼️ Изображение
+          </label>
+        </div>
+        <p className="text-sm text-gray-500 mt-2">Выберите хотя бы один вариант. Эти настройки будут применены ко всем заданиям квеста.</p>
+      </div>
+
+      {/* Список заданий */}
       <div className="mb-8">
         <h3 className="text-lg font-semibold mb-2">Задания ({tasks.length})</h3>
         {tasks.length === 0 ? (
@@ -232,12 +404,14 @@ export default function QuestEdit({ session }) {
                       📍 {task.gps_point.coordinates[1].toFixed(6)}, {task.gps_point.coordinates[0].toFixed(6)}
                     </span>
                   )}
+                  {task.location_text && <span className="text-xs text-blue-500 ml-2">📝 {task.location_text.substring(0, 20)}...</span>}
+                  {task.location_image_url && <span className="text-xs text-green-500 ml-2">🖼️ есть фото</span>}
                   {task.static_code && <span className="text-xs text-gray-500 ml-2">🔑 {task.static_code}</span>}
-                  {task.correct_answer && <span className="text-xs text-blue-500 ml-2">✔ {task.correct_answer}</span>}
+                  {task.correct_answer && <span className="text-xs text-purple-500 ml-2">✔ {task.correct_answer}</span>}
                   {task.options && Array.isArray(task.options) && task.options.length > 0 && (
-                    <span className="text-xs text-purple-500 ml-2">📋 варианты: {task.options.length}</span>
+                    <span className="text-xs text-indigo-500 ml-2">📋 варианты: {task.options.length}</span>
                   )}
-                  {task.media_url && <span className="text-xs text-green-500 ml-2">🎬 медиа</span>}
+                  {task.media_url && <span className="text-xs text-red-500 ml-2">🎬 медиа</span>}
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => startEdit(task)} className="text-blue-500 hover:text-blue-700 text-sm">Изменить</button>
@@ -249,6 +423,7 @@ export default function QuestEdit({ session }) {
         )}
       </div>
 
+      {/* Форма добавления/редактирования задания */}
       <div className="border-t pt-4">
         <h3 className="text-lg font-semibold mb-3">
           {editingTask ? 'Редактировать задание' : 'Добавить задание'}
@@ -276,27 +451,58 @@ export default function QuestEdit({ session }) {
             onChange={e => setTaskForm({...taskForm, hint: e.target.value})}
             className="w-full border p-2 rounded"
           />
-          <div className="flex gap-2">
+
+          {/* Динамические поля места в зависимости от опций */}
+          {locationOptions.includes('gps') && (
+            <>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Широта"
+                  value={taskForm.gps_lat}
+                  onChange={e => setTaskForm({...taskForm, gps_lat: e.target.value})}
+                  className="w-1/2 border p-2 rounded"
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="Долгота"
+                  value={taskForm.gps_lng}
+                  onChange={e => setTaskForm({...taskForm, gps_lng: e.target.value})}
+                  className="w-1/2 border p-2 rounded"
+                  required
+                />
+              </div>
+              <MapPicker
+                initialLat={taskForm.gps_lat ? parseFloat(taskForm.gps_lat) : null}
+                initialLng={taskForm.gps_lng ? parseFloat(taskForm.gps_lng) : null}
+                onSelect={handleMapSelect}
+              />
+            </>
+          )}
+
+          {locationOptions.includes('text') && (
+            <textarea
+              placeholder="Текстовое описание места *"
+              value={taskForm.location_text}
+              onChange={e => setTaskForm({...taskForm, location_text: e.target.value})}
+              className="w-full border p-2 rounded"
+              rows="2"
+              required
+            />
+          )}
+
+          {locationOptions.includes('image') && (
             <input
               type="text"
-              placeholder="Широта"
-              value={taskForm.gps_lat}
-              onChange={e => setTaskForm({...taskForm, gps_lat: e.target.value})}
-              className="w-1/2 border p-2 rounded"
+              placeholder="Ссылка на изображение места *"
+              value={taskForm.location_image_url}
+              onChange={e => setTaskForm({...taskForm, location_image_url: e.target.value})}
+              className="w-full border p-2 rounded"
+              required
             />
-            <input
-              type="text"
-              placeholder="Долгота"
-              value={taskForm.gps_lng}
-              onChange={e => setTaskForm({...taskForm, gps_lng: e.target.value})}
-              className="w-1/2 border p-2 rounded"
-            />
-          </div>
-          <MapPicker
-            initialLat={taskForm.gps_lat ? parseFloat(taskForm.gps_lat) : null}
-            initialLng={taskForm.gps_lng ? parseFloat(taskForm.gps_lng) : null}
-            onSelect={handleMapSelect}
-          />
+          )}
+
           <input
             type="text"
             placeholder="Статический код (например, ABC123)"
@@ -313,7 +519,7 @@ export default function QuestEdit({ session }) {
           />
           <input
             type="text"
-            placeholder="Варианты ответа (через запятую, например: Москва, Санкт-Петербург, Новосибирск)"
+            placeholder="Варианты ответа (через запятую)"
             value={taskForm.options}
             onChange={e => setTaskForm({...taskForm, options: e.target.value})}
             className="w-full border p-2 rounded"
