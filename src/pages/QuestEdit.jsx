@@ -17,6 +17,7 @@ export default function QuestEdit({ session }) {
   const [questTitle, setQuestTitle] = useState('')
   const [questDescription, setQuestDescription] = useState('')
   const [verificationOptions, setVerificationOptions] = useState(['gps'])
+  const [maxAttempts, setMaxAttempts] = useState(0)
 
   // Опции места, выбранные для квеста
   const [locationOptions, setLocationOptions] = useState(['gps']) // по умолчанию
@@ -55,6 +56,7 @@ export default function QuestEdit({ session }) {
         return
       }
       setQuest(questData)
+      setMaxAttempts(questData.max_attempts || 0)
       setQuestTitle(questData.title)
       setQuestDescription(questData.description || '')
 
@@ -143,6 +145,21 @@ export default function QuestEdit({ session }) {
       }))
       setEditMode(false)
       toast.success('Квест обновлён')
+    } catch (err) {
+      toast.error('Ошибка обновления: ' + err.message)
+    }
+  }
+
+  async function updateMaxAttempts(value) {
+    const num = parseInt(value, 10) || 0
+    setMaxAttempts(num)
+    try {
+      const { error } = await supabase
+        .from('quests')
+        .update({ max_attempts: num })
+        .eq('id', id)
+      if (error) throw error
+      toast.success('Лимит попыток обновлён')
     } catch (err) {
       toast.error('Ошибка обновления: ' + err.message)
     }
@@ -352,6 +369,17 @@ export default function QuestEdit({ session }) {
               rows="2"
               placeholder="Описание квеста"
             />
+            <div>
+              <label className="block font-medium mb-1">Лимит попыток на ответ</label>
+              <input
+                type="number"
+                min="0"
+                value={maxAttempts}
+                onChange={(e) => updateMaxAttempts(e.target.value)}
+                className="w-full border p-2 rounded"
+              />
+              <p className="text-sm text-gray-500 mt-1">0 — неограниченно</p>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={updateQuest}

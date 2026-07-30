@@ -9,6 +9,7 @@ export default function QuestCreate({ session }) {
   const [description, setDescription] = useState('')
   const [isPublic, setIsPublic] = useState(false)
   const [verificationOptions, setVerificationOptions] = useState(['gps'])
+  const [maxAttempts, setMaxAttempts] = useState(0)
   const [loading, setLoading] = useState(false)
 
   function toggleOption(opt) {
@@ -39,7 +40,8 @@ export default function QuestCreate({ session }) {
         description: description.trim() || null,
         is_public: isPublic,
         verification_options: verificationOptions,
-        location_options: ['gps'], // по умолчанию, можно будет изменить позже
+        location_options: ['gps'],
+        max_attempts: parseInt(maxAttempts, 10) || 0,
       })
       .select()
 
@@ -97,6 +99,18 @@ export default function QuestCreate({ session }) {
             </label>
           </div>
           <p className="text-sm text-gray-500 mt-1">Выберите хотя бы один вариант.</p>
+        </div>
+
+        <div>
+          <label className="block font-medium mb-1">Лимит попыток на ответ</label>
+          <input
+            type="number"
+            min="0"
+            value={maxAttempts}
+            onChange={(e) => setMaxAttempts(e.target.value)}
+            className="w-full border p-2 rounded"
+          />
+          <p className="text-sm text-gray-500 mt-1">0 — неограниченно. Если указано число, то при исчерпании попыток задание засчитывается как невыполненное.</p>
         </div>
 
         <div className="flex items-center gap-2">

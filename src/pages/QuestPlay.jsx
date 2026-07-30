@@ -7,6 +7,7 @@ import 'leaflet/dist/leaflet.css'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 
+// Фикс иконок Leaflet
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -24,21 +25,33 @@ export default function QuestPlay({ session }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const [questAttemptId, setQuestAttemptId] = useState(null)
+  const [totalTasks, setTotalTasks] = useState(0)
+  const [completedTasks, setCompletedTasks] = useState(0)
+  const [failedTasks, setFailedTasks] = useState(0)
+  const [totalAttempts, setTotalAttempts] = useState(0)
+  const [totalTime, setTotalTime] = useState(0)
+  const [startTime, setStartTime] = useState(null)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
   const [locationVerified, setLocationVerified] = useState(false)
   const [codeVerified, setCodeVerified] = useState(false)
   const [codeInput, setCodeInput] = useState('')
   const [isLocationPhase, setIsLocationPhase] = useState(true)
-
   const [selectedOption, setSelectedOption] = useState('')
   const [answerInput, setAnswerInput] = useState('')
   const [taskCompleted, setTaskCompleted] = useState(false)
-  const [startTime, setStartTime] = useState(null)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [taskFailed, setTaskFailed] = useState(false)
+  const [taskAttemptsUsed, setTaskAttemptsUsed] = useState(0)
+  const [taskStartTime, setTaskStartTime] = useState(null)
+  const [taskAttemptId, setTaskAttemptId] = useState(null)
   const [finished, setFinished] = useState(false)
 
   const currentTask = tasks[currentTaskIndex] || null
   const isLastTask = currentTaskIndex === tasks.length - 1
+  const maxAttempts = quest?.max_attempts || 0
 
+  // 1. Загрузка квеста и создание quest_attempt
   useEffect(() => {
     async function fetchQuestAndTasks() {
       setLoading(true)
@@ -58,16 +71,31 @@ export default function QuestPlay({ session }) {
           .order('order_index', { ascending: true })
         if (tasksError) throw tasksError
         setTasks(tasksData || [])
+        setTotalTasks(tasksData.length)
+
+        const { data: attemptData, error: attemptError } = await supabase
+          .from('quest_attempts')
+          .insert({
+            quest_id: id,
+            user_id: session.user.id,
+            total_tasks: tasksData.length,
+          })
+          .select()
+        if (attemptError) throw attemptError
+        setQuestAttemptId(attemptData[0].id)
         setStartTime(Date.now())
+        setElapsedSeconds(0)
       } catch (err) {
         setError(err.message)
+        toast.error('Ошибка загрузки: ' + err.message)
       } finally {
         setLoading(false)
       }
     }
     fetchQuestAndTasks()
-  }, [id])
+  }, [id, session])
 
+  // 2. Таймер
   useEffect(() => {
     if (!startTime || finished) return
     const interval = setInterval(() => {
@@ -76,34 +104,73 @@ export default function QuestPlay({ session }) {
     return () => clearInterval(interval)
   }, [startTime, finished])
 
+  // 3. Инициализация задания (сброс состояний и создание task_attempt)
   useEffect(() => {
-    setLocationVerified(false)
-    setCodeVerified(false)
-    setCodeInput('')
-    setSelectedOption('')
-    setAnswerInput('')
-    setTaskCompleted(false)
-    setIsLocationPhase(true)
-  }, [currentTaskIndex])
+    if (!currentTask || !questAttemptId) return
 
-  // ✅ Основное исправление: при изменении состояний проверки пытаемся открыть задание
+    const initTask = async () => {
+      // Сброс
+      setLocationVerified(false)
+      setCodeVerified(false)
+      setCodeInput('')
+      setSelectedOption('')
+      setAnswerInput('')
+      setTaskCompleted(false)
+      setTaskFailed(false)
+      setTaskAttemptsUsed(0)
+      setIsLocationPhase(true)
+      setTaskStartTime(Date.now())
+
+      // Создаём task_attempt
+      try {
+        const { data, error } = await supabase
+          .from('task_attempts')
+          .insert({
+            quest_attempt_id: questAttemptId,
+            task_id: currentTask.id,
+            opened: false,
+            attempts_used: 0,
+            completed: false,
+            failed: false,
+            time_spent: 0,
+          })
+          .select()
+        if (error) throw error
+        setTaskAttemptId(data[0].id)
+      } catch (err) {
+        toast.error('Ошибка создания записи задания: ' + err.message)
+      }
+    }
+
+    initTask()
+  }, [currentTaskIndex, currentTask, questAttemptId])
+
+  // 4. Автооткрытие задания при успешной проверке места
   useEffect(() => {
-    if (isLocationPhase) {
+    if (isLocationPhase && taskAttemptId) {
       tryOpenTask()
     }
-  }, [locationVerified, codeVerified, isLocationPhase])
+  }, [locationVerified, codeVerified, isLocationPhase, taskAttemptId])
 
   function tryOpenTask() {
     const opts = quest?.verification_options || ['gps']
     let allVerified = true
     if (opts.includes('gps') && !locationVerified) allVerified = false
     if (opts.includes('code') && !codeVerified) allVerified = false
-    if (allVerified && isLocationPhase) {
+    if (allVerified && isLocationPhase && taskAttemptId) {
       setIsLocationPhase(false)
+      supabase
+        .from('task_attempts')
+        .update({ opened: true })
+        .eq('id', taskAttemptId)
+        .then(({ error }) => {
+          if (error) console.error('Ошибка обновления opened:', error)
+        })
       toast.success('🔓 Задание открыто!')
     }
   }
 
+  // 5. Проверка GPS
   function checkLocation() {
     if (!navigator.geolocation) {
       toast.error('Ваш браузер не поддерживает геолокацию')
@@ -137,10 +204,15 @@ export default function QuestPlay({ session }) {
     const R = 6371000
     const dLat = (lat2 - lat1) * Math.PI / 180
     const dLon = (lon2 - lon1) * Math.PI / 180
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   }
 
+  // 6. Проверка кода
   function checkCode() {
     if (!currentTask.static_code) {
       setCodeVerified(true)
@@ -154,6 +226,7 @@ export default function QuestPlay({ session }) {
     }
   }
 
+  // 7. Проверка правильности ответа
   function isAnswerCorrect() {
     const correct = currentTask.correct_answer?.trim()?.toLowerCase() || ''
     if (!correct) return true
@@ -164,51 +237,126 @@ export default function QuestPlay({ session }) {
     }
   }
 
+  // 8. Завершение задания (с обязательным ответом)
   async function completeTask() {
-    if (taskCompleted) return
+    if (taskCompleted || taskFailed) return
+
     const hasAnswer = currentTask.correct_answer && currentTask.correct_answer.trim() !== ''
     if (hasAnswer) {
-      if (!isAnswerCorrect()) {
-        toast.error('❌ Неправильный ответ, попробуйте ещё раз')
+      // Проверяем, что ответ выбран/введён
+      let answerProvided = false
+      if (currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0) {
+        answerProvided = selectedOption.trim() !== ''
+      } else {
+        answerProvided = answerInput.trim() !== ''
+      }
+      if (!answerProvided) {
+        toast.error('Пожалуйста, выберите вариант или введите ответ перед завершением')
         return
-      } else {
+      }
+
+      // Увеличиваем счётчик попыток
+      const newAttempts = taskAttemptsUsed + 1
+      setTaskAttemptsUsed(newAttempts)
+      await supabase
+        .from('task_attempts')
+        .update({ attempts_used: newAttempts })
+        .eq('id', taskAttemptId)
+
+      // Проверяем правильность
+      if (isAnswerCorrect()) {
         toast.success('✅ Правильный ответ!')
-      }
-    }
-    try {
-      const timeSpent = elapsedSeconds
-      const { error } = await supabase
-        .from('attempts')
-        .insert({
-          participant_id: session.user.id,
-          task_id: currentTask.id,
-          is_completed: true,
-          time_spent: timeSpent,
-          submitted_at: new Date().toISOString(),
-        })
-      if (error) throw error
-      setTaskCompleted(true)
-      if (isLastTask) {
-        setFinished(true)
+        await finishTask(true)
       } else {
-        setTimeout(() => setCurrentTaskIndex(prev => prev + 1), 500)
+        if (maxAttempts > 0 && newAttempts >= maxAttempts) {
+          toast.error(`❌ Исчерпаны все ${maxAttempts} попыток. Задание не засчитано.`)
+          await finishTask(false)
+        } else {
+          toast.error('❌ Неправильный ответ, попробуйте ещё раз')
+        }
       }
-    } catch (err) {
-      toast.error('Ошибка сохранения: ' + err.message)
+    } else {
+      // Если ответа нет – просто завершаем
+      await finishTask(true)
     }
   }
 
+  // 9. Финализация задания
+  async function finishTask(success) {
+    const timeSpent = Math.floor((Date.now() - taskStartTime) / 1000)
+
+    // Обновляем task_attempts
+    await supabase
+      .from('task_attempts')
+      .update({
+        completed: success,
+        failed: !success,
+        time_spent: timeSpent,
+      })
+      .eq('id', taskAttemptId)
+
+    // Обновляем статистику quest_attempt
+    let newCompleted = completedTasks
+    let newFailed = failedTasks
+    if (success) newCompleted++
+    else newFailed++
+    setCompletedTasks(newCompleted)
+    setFailedTasks(newFailed)
+    setTotalTime(totalTime + timeSpent)
+    setTotalAttempts(totalAttempts + taskAttemptsUsed + 1)
+
+    if (success) setTaskCompleted(true)
+    else setTaskFailed(true)
+
+    await supabase
+      .from('quest_attempts')
+      .update({
+        completed_tasks: newCompleted,
+        failed_tasks: newFailed,
+        total_attempts: totalAttempts + taskAttemptsUsed + 1,
+        total_time: totalTime + timeSpent,
+        percent_success: totalTasks > 0 ? (newCompleted / totalTasks) * 100 : 0,
+      })
+      .eq('id', questAttemptId)
+
+    if (isLastTask) {
+      await supabase
+        .from('quest_attempts')
+        .update({ finished_at: new Date().toISOString() })
+        .eq('id', questAttemptId)
+      setFinished(true)
+    } else {
+      setTimeout(() => {
+        setCurrentTaskIndex(prev => prev + 1)
+      }, 500)
+    }
+  }
+
+  // 10. Определение типа медиа
+  function getMediaType(url) {
+    if (!url) return null
+    const ext = url.split('.').pop().toLowerCase()
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'image'
+    if (['mp4', 'webm', 'ogg'].includes(ext)) return 'video'
+    if (['mp3', 'wav', 'aac'].includes(ext)) return 'audio'
+    return 'image'
+  }
+
+  // ========== Рендеринг ==========
   if (loading) return <Loader text="Загрузка квеста..." />
   if (error) return <div className="p-8 text-red-500">Ошибка: {error}</div>
   if (!quest || tasks.length === 0) {
     return <div className="p-8">В этом квесте пока нет заданий</div>
   }
   if (finished) {
+    const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-green-50 p-8">
-        <h1 className="text-4xl font-bold text-green-600">🎉 Квест завершён!</h1>
-        <p className="text-xl mt-4">Вы прошли все {tasks.length} заданий!</p>
-        <p className="text-lg mt-2">⏱️ Время: {elapsedSeconds} секунд</p>
+        <h1 className="text-4xl font-bold text-green-600">🏁 Квест завершён!</h1>
+        <p className="text-xl mt-4">Вы прошли {completedTasks} из {totalTasks} заданий</p>
+        <p className="text-lg mt-2">✅ Успешно: {completedTasks} | ❌ Неуспешно: {failedTasks}</p>
+        <p className="text-lg">⏱️ Время: {elapsedSeconds} секунд</p>
+        <p className="text-lg">🎯 Процент успеха: {percent}%</p>
         <button
           onClick={() => navigate('/')}
           className="mt-6 bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600"
@@ -307,7 +455,7 @@ export default function QuestPlay({ session }) {
                   type="text"
                   placeholder="Введите код доступа"
                   value={codeInput}
-                  onChange={e => setCodeInput(e.target.value)}
+                  onChange={(e) => setCodeInput(e.target.value)}
                   disabled={codeVerified}
                   className="border p-2 rounded flex-1"
                 />
@@ -372,32 +520,34 @@ export default function QuestPlay({ session }) {
                     type="text"
                     placeholder="Введите ваш ответ"
                     value={answerInput}
-                    onChange={e => setAnswerInput(e.target.value)}
-                    disabled={taskCompleted}
+                    onChange={(e) => setAnswerInput(e.target.value)}
+                    disabled={taskCompleted || taskFailed}
                     className="w-full border p-2 rounded"
                   />
+                )}
+                {maxAttempts > 0 && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Попыток: {taskAttemptsUsed} / {maxAttempts}
+                  </p>
                 )}
               </div>
             )}
             <button
               onClick={completeTask}
-              disabled={taskCompleted}
-              className={`w-full py-3 rounded text-white ${taskCompleted ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'}`}
+              disabled={taskCompleted || taskFailed}
+              className={`w-full py-3 rounded text-white ${
+                taskCompleted ? 'bg-green-500' :
+                taskFailed ? 'bg-red-500' :
+                'bg-green-500 hover:bg-green-600'
+              }`}
             >
-              {taskCompleted ? '✅ Задание выполнено' : 'Завершить задание'}
+              {taskCompleted ? '✅ Задание выполнено' :
+               taskFailed ? '❌ Попытки исчерпаны' :
+               'Завершить задание'}
             </button>
           </div>
         )}
       </div>
     </div>
   )
-}
-
-function getMediaType(url) {
-  if (!url) return null
-  const ext = url.split('.').pop().toLowerCase()
-  if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return 'image'
-  if (['mp4','webm','ogg'].includes(ext)) return 'video'
-  if (['mp3','wav','aac'].includes(ext)) return 'audio'
-  return 'image'
 }

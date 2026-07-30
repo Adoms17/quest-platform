@@ -10,12 +10,14 @@ export default function QuestStats({ session }) {
   const [quest, setQuest] = useState(null)
   const [attempts, setAttempts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [sortField, setSortField] = useState('percent_success')
+  const [sortDirection, setSortDirection] = useState('desc')
+  const [clearing, setClearing] = useState(false)
 
   useEffect(() => {
     async function fetchStats() {
       setLoading(true)
       try {
-        // Получаем квест
         const { data: questData, error: questError } = await supabase
           .from('quests')
           .select('*')
@@ -29,33 +31,23 @@ export default function QuestStats({ session }) {
         }
         setQuest(questData)
 
-        // Получаем все попытки для заданий этого квеста
-        const { data: tasksData, error: tasksError } = await supabase
-          .from('tasks')
-          .select('id, title')
-          .eq('quest_id', id)
-        if (tasksError) throw tasksError
-
-        const taskIds = tasksData.map(t => t.id)
-        if (taskIds.length === 0) {
-          setAttempts([])
-          setLoading(false)
-          return
-        }
-
-        // Получаем попытки с данными участников
         const { data: attemptsData, error: attemptsError } = await supabase
-          .from('attempts')
+          .from('quest_attempts')
           .select(`
-            id,
-            is_completed,
-            time_spent,
-            submitted_at,
-            task_id,
-            profiles:participant_id (id, username)
+            *,
+            profiles:user_id (id, username),
+            task_attempts (
+              id,
+              opened,
+              attempts_used,
+              completed,
+              failed,
+              time_spent,
+              tasks:task_id (id, title)
+            )
           `)
-          .in('task_id', taskIds)
-          .order('submitted_at', { ascending: false })
+          .eq('quest_id', id)
+          .order('created_at', { ascending: false })
 
         if (attemptsError) throw attemptsError
         setAttempts(attemptsData || [])
@@ -69,90 +61,171 @@ export default function QuestStats({ session }) {
     fetchStats()
   }, [id, session, navigate])
 
+  // Функция очистки статистики
+  async function clearStats() {
+    if (!window.confirm('Вы уверены, что хотите удалить всю статистику по этому квесту? Это действие необратимо.')) return
+
+    setClearing(true)
+    try {
+      // Удаляем все quest_attempts для этого квеста (каскадное удаление task_attempts настроено в БД)
+      const { error } = await supabase
+        .from('quest_attempts')
+        .delete()
+        .eq('quest_id', id)
+
+      if (error) throw error
+      toast.success('Статистика очищена')
+      setAttempts([]) // очищаем локальное состояние
+    } catch (err) {
+      toast.error('Ошибка очистки: ' + err.message)
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  // Функция сортировки
+  function handleSort(field) {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+
+  const sortedAttempts = [...attempts].sort((a, b) => {
+    let aVal = a[sortField] ?? 0
+    let bVal = b[sortField] ?? 0
+    if (sortField === 'username') {
+      aVal = a.profiles?.username || 'Аноним'
+      bVal = b.profiles?.username || 'Аноним'
+      return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+    }
+    if (sortField === 'percent_success') {
+      aVal = a.total_tasks > 0 ? (a.completed_tasks / a.total_tasks) * 100 : 0
+      bVal = b.total_tasks > 0 ? (b.completed_tasks / b.total_tasks) * 100 : 0
+    }
+    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
+  })
+
   if (loading) return <Loader text="Загрузка статистики..." />
   if (!quest) return <div>Квест не найден</div>
 
-  // Группируем по участникам
-  const grouped = attempts.reduce((acc, att) => {
-    const key = att.profiles.id
-    if (!acc[key]) {
-      acc[key] = {
-        username: att.profiles.username || 'Аноним',
-        tasks: [],
-        total_time: 0,
-      }
-    }
-    acc[key].tasks.push({
-      task_id: att.task_id,
-      is_completed: att.is_completed,
-      time_spent: att.time_spent,
-    })
-    if (att.time_spent) acc[key].total_time += att.time_spent
-    return acc
-  }, {})
-
-  const participants = Object.entries(grouped).map(([userId, data]) => ({
-    userId,
-    ...data,
-    completed: data.tasks.filter(t => t.is_completed).length,
-    total: data.tasks.length,
-  }))
-
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2">Статистика квеста</h1>
-      <h2 className="text-xl text-gray-700 mb-6">{quest.title}</h2>
+    <div className="p-8 max-w-6xl mx-auto">
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-2xl font-bold mb-2">Статистика квеста</h1>
+          <h2 className="text-xl text-gray-700">{quest.title}</h2>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/quests')}
+            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+          >
+            ← К списку квестов
+          </button>
+          <button
+            onClick={clearStats}
+            disabled={clearing || attempts.length === 0}
+            className={`px-4 py-2 rounded text-white ${
+              clearing || attempts.length === 0
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-red-500 hover:bg-red-600'
+            }`}
+          >
+            {clearing ? 'Очистка...' : '🗑️ Очистить статистику'}
+          </button>
+        </div>
+      </div>
 
-      {participants.length === 0 ? (
+      {sortedAttempts.length === 0 ? (
         <p className="text-gray-500">Пока никто не проходил этот квест.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full bg-white border">
             <thead>
               <tr className="bg-gray-100">
-                <th className="py-2 px-4 border">Участник</th>
-                <th className="py-2 px-4 border">Выполнено заданий</th>
-                <th className="py-2 px-4 border">Общее время (сек)</th>
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('username')}>
+                  Пользователь {sortField === 'username' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('started_at')}>
+                  Начало {sortField === 'started_at' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('finished_at')}>
+                  Завершение {sortField === 'finished_at' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('completed_tasks')}>
+                  ✅ Успешно {sortField === 'completed_tasks' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('failed_tasks')}>
+                  ❌ Неуспешно {sortField === 'failed_tasks' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('total_attempts')}>
+                  Попыток {sortField === 'total_attempts' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('total_time')}>
+                  Время (сек) {sortField === 'total_time' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('percent_success')}>
+                  % успеха {sortField === 'percent_success' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
                 <th className="py-2 px-4 border">Детали</th>
               </tr>
             </thead>
             <tbody>
-              {participants.map((p) => (
-                <tr key={p.userId} className="hover:bg-gray-50">
-                  <td className="py-2 px-4 border">{p.username}</td>
-                  <td className="py-2 px-4 border">{p.completed} / {p.total}</td>
-                  <td className="py-2 px-4 border">{p.total_time || 0}</td>
-                  <td className="py-2 px-4 border">
-                    <details>
-                      <summary className="text-blue-500 cursor-pointer">Подробнее</summary>
-                      <ul className="mt-1 text-sm">
-                        {p.tasks.map((t, idx) => (
-                          <li key={idx}>
-                            Задание #{idx+1}: {t.is_completed ? '✅' : '❌'} {t.time_spent ? `${t.time_spent} сек` : '—'}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  </td>
-                </tr>
-              ))}
+              {sortedAttempts.map((attempt) => {
+                const percent = attempt.total_tasks > 0
+                  ? Math.round((attempt.completed_tasks / attempt.total_tasks) * 100)
+                  : 0
+                const taskDetails = attempt.task_attempts || []
+                return (
+                  <tr key={attempt.id} className="hover:bg-gray-50">
+                    <td className="py-2 px-4 border">{attempt.profiles?.username || 'Аноним'}</td>
+                    <td className="py-2 px-4 border">{new Date(attempt.started_at).toLocaleString()}</td>
+                    <td className="py-2 px-4 border">
+                      {attempt.finished_at ? new Date(attempt.finished_at).toLocaleString() : '—'}
+                    </td>
+                    <td className="py-2 px-4 border">{attempt.completed_tasks}</td>
+                    <td className="py-2 px-4 border">{attempt.failed_tasks}</td>
+                    <td className="py-2 px-4 border">{attempt.total_attempts || 0}</td>
+                    <td className="py-2 px-4 border">{attempt.total_time || 0}</td>
+                    <td className="py-2 px-4 border font-semibold">{percent}%</td>
+                    <td className="py-2 px-4 border">
+                      <details>
+                        <summary className="text-blue-500 cursor-pointer">Показать задания</summary>
+                        <ul className="mt-2 text-sm space-y-1">
+                          {taskDetails.map((t) => (
+                            <li key={t.id} className="border-b pb-1">
+                              <span className="font-medium">{t.tasks?.title || 'Без названия'}</span>
+                              <br />
+                              <span className="text-xs">
+                                {t.opened ? '🔓 открыто' : '🔒 закрыто'} |
+                                попыток: {t.attempts_used || 0} |
+                                {t.completed && ' ✅ успешно'} {t.failed && ' ❌ неуспешно'} |
+                                время: {t.time_spent || 0} сек
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       )}
-      <div className="flex gap-2">
+
+      <div className="mt-4 flex gap-2">
         <button
           onClick={() => navigate(`/quests/${id}/edit`)}
-          className="mt-6 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
         >
           ← Назад к редактированию
         </button>
-        <button
-          onClick={() => navigate(`/quests`)}
-          className="mt-6 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-        >
-          ← Назад к списку
-        </button>
+        {/* Дополнительная кнопка "Назад к списку" уже есть вверху */}
       </div>
     </div>
   )
