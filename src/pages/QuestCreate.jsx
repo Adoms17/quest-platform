@@ -8,7 +8,20 @@ export default function QuestCreate({ session }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [isPublic, setIsPublic] = useState(false)
+  const [verificationOptions, setVerificationOptions] = useState(['gps'])
   const [loading, setLoading] = useState(false)
+
+  function toggleOption(opt) {
+    if (verificationOptions.includes(opt)) {
+      if (verificationOptions.length <= 1) {
+        toast.error('Должна быть выбрана как минимум одна опция')
+        return
+      }
+      setVerificationOptions(verificationOptions.filter(o => o !== opt))
+    } else {
+      setVerificationOptions([...verificationOptions, opt])
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -25,15 +38,16 @@ export default function QuestCreate({ session }) {
         title: title.trim(),
         description: description.trim() || null,
         is_public: isPublic,
+        verification_options: verificationOptions,
+        location_options: ['gps'], // по умолчанию, можно будет изменить позже
       })
       .select()
 
     if (error) {
-      console.error(error)
       toast.error('Ошибка создания: ' + error.message)
     } else {
       toast.success('Квест создан!')
-      navigate(`/quests/${data[0].id}/edit`) // сразу на редактирование
+      navigate(`/quests/${data[0].id}/edit`)
     }
     setLoading(false)
   }
@@ -61,6 +75,30 @@ export default function QuestCreate({ session }) {
             rows="3"
           />
         </div>
+
+        <div>
+          <label className="block font-medium mb-1">Как проверять нахождение на месте?</label>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={verificationOptions.includes('gps')}
+                onChange={() => toggleOption('gps')}
+              />
+              📍 GPS-координаты
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={verificationOptions.includes('code')}
+                onChange={() => toggleOption('code')}
+              />
+              🔑 Код доступа
+            </label>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">Выберите хотя бы один вариант.</p>
+        </div>
+
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -68,8 +106,9 @@ export default function QuestCreate({ session }) {
             onChange={(e) => setIsPublic(e.target.checked)}
             id="isPublic"
           />
-          <label htmlFor="isPublic">Публичный квест (доступен всем)</label>
+          <label htmlFor="isPublic">Публичный квест</label>
         </div>
+
         <div className="flex gap-2">
           <button
             type="submit"

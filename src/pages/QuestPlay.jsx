@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import Loader from '../components/Loader'
-import toast from 'react-hot-toast'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import Loader from '../components/Loader'
+import toast from 'react-hot-toast'
 
-// Исправление иконок маркера
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -27,15 +26,19 @@ export default function QuestPlay({ session }) {
 
   const [locationVerified, setLocationVerified] = useState(false)
   const [codeVerified, setCodeVerified] = useState(false)
+  const [codeInput, setCodeInput] = useState('')
+  const [isLocationPhase, setIsLocationPhase] = useState(true)
+
   const [selectedOption, setSelectedOption] = useState('')
   const [answerInput, setAnswerInput] = useState('')
-  const [codeInput, setCodeInput] = useState('')
   const [taskCompleted, setTaskCompleted] = useState(false)
   const [startTime, setStartTime] = useState(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [finished, setFinished] = useState(false)
 
-  // Загрузка
+  const currentTask = tasks[currentTaskIndex] || null
+  const isLastTask = currentTaskIndex === tasks.length - 1
+
   useEffect(() => {
     async function fetchQuestAndTasks() {
       setLoading(true)
@@ -65,7 +68,6 @@ export default function QuestPlay({ session }) {
     fetchQuestAndTasks()
   }, [id])
 
-  // Таймер
   useEffect(() => {
     if (!startTime || finished) return
     const interval = setInterval(() => {
@@ -74,30 +76,34 @@ export default function QuestPlay({ session }) {
     return () => clearInterval(interval)
   }, [startTime, finished])
 
-  const currentTask = tasks[currentTaskIndex] || null
-  const isLastTask = currentTaskIndex === tasks.length - 1
-
-  // Сброс состояний при смене задания
   useEffect(() => {
     setLocationVerified(false)
     setCodeVerified(false)
+    setCodeInput('')
     setSelectedOption('')
     setAnswerInput('')
-    setCodeInput('')
     setTaskCompleted(false)
+    setIsLocationPhase(true)
   }, [currentTaskIndex])
 
-  // Определяем тип медиа по расширению
-  function getMediaType(url) {
-    if (!url) return null
-    const ext = url.split('.').pop().toLowerCase()
-    if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return 'image'
-    if (['mp4','webm','ogg'].includes(ext)) return 'video'
-    if (['mp3','wav','aac'].includes(ext)) return 'audio'
-    return 'image' // по умолчанию
+  // ✅ Основное исправление: при изменении состояний проверки пытаемся открыть задание
+  useEffect(() => {
+    if (isLocationPhase) {
+      tryOpenTask()
+    }
+  }, [locationVerified, codeVerified, isLocationPhase])
+
+  function tryOpenTask() {
+    const opts = quest?.verification_options || ['gps']
+    let allVerified = true
+    if (opts.includes('gps') && !locationVerified) allVerified = false
+    if (opts.includes('code') && !codeVerified) allVerified = false
+    if (allVerified && isLocationPhase) {
+      setIsLocationPhase(false)
+      toast.success('🔓 Задание открыто!')
+    }
   }
 
-  // Проверка GPS
   function checkLocation() {
     if (!navigator.geolocation) {
       toast.error('Ваш браузер не поддерживает геолокацию')
@@ -135,7 +141,6 @@ export default function QuestPlay({ session }) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
   }
 
-  // Проверка кода
   function checkCode() {
     if (!currentTask.static_code) {
       setCodeVerified(true)
@@ -149,35 +154,19 @@ export default function QuestPlay({ session }) {
     }
   }
 
-  // Проверка ответа (с учётом вариантов или текстового ввода)
   function isAnswerCorrect() {
     const correct = currentTask.correct_answer?.trim()?.toLowerCase() || ''
-    if (!correct) return true // если ответ не задан, считаем верным
+    if (!correct) return true
     if (currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0) {
-      // Множественный выбор: сравниваем выбранный вариант
       return selectedOption.trim().toLowerCase() === correct
     } else {
-      // Текстовый ввод
       return answerInput.trim().toLowerCase() === correct
     }
   }
 
-  // Завершение задания
   async function completeTask() {
     if (taskCompleted) return
-
-    const hasGps = currentTask.gps_point && currentTask.gps_point.coordinates
-    const hasCode = currentTask.static_code && currentTask.static_code.trim() !== ''
     const hasAnswer = currentTask.correct_answer && currentTask.correct_answer.trim() !== ''
-
-    if (hasGps && !locationVerified) {
-      toast.error('Сначала подтвердите нахождение на месте')
-      return
-    }
-    if (hasCode && !codeVerified) {
-      toast.error('Сначала введите правильный код')
-      return
-    }
     if (hasAnswer) {
       if (!isAnswerCorrect()) {
         toast.error('❌ Неправильный ответ, попробуйте ещё раз')
@@ -186,7 +175,6 @@ export default function QuestPlay({ session }) {
         toast.success('✅ Правильный ответ!')
       }
     }
-
     try {
       const timeSpent = elapsedSeconds
       const { error } = await supabase
@@ -199,9 +187,7 @@ export default function QuestPlay({ session }) {
           submitted_at: new Date().toISOString(),
         })
       if (error) throw error
-
       setTaskCompleted(true)
-
       if (isLastTask) {
         setFinished(true)
       } else {
@@ -235,7 +221,6 @@ export default function QuestPlay({ session }) {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      {/* Кнопка выхода из прохождения */}
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">{quest.title}</h1>
         <button
@@ -251,7 +236,6 @@ export default function QuestPlay({ session }) {
         <span>⏱️ {elapsedSeconds} сек</span>
       </div>
 
-      {/* Прогресс-бар */}
       <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
         <div
           className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
@@ -261,12 +245,11 @@ export default function QuestPlay({ session }) {
 
       <div className="bg-white shadow rounded p-6">
         <h2 className="text-xl font-semibold mb-2">{currentTask.title}</h2>
-        <p className="text-gray-700 mb-4">{currentTask.description}</p>
-        {/* Блок описания места */}
+
+        {/* Блок места */}
         {(currentTask.gps_point?.coordinates || currentTask.location_text || currentTask.location_image_url) && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
             <h4 className="font-semibold text-blue-700 mb-1">📍 Место задания</h4>
-            
             {currentTask.gps_point?.coordinates && (
               <>
                 <p className="text-sm text-gray-600">
@@ -290,11 +273,9 @@ export default function QuestPlay({ session }) {
                 </div>
               </>
             )}
-            
             {currentTask.location_text && (
               <p className="text-sm text-gray-700 mt-1">{currentTask.location_text}</p>
             )}
-            
             {currentTask.location_image_url && (
               <img
                 src={currentTask.location_image_url}
@@ -304,110 +285,119 @@ export default function QuestPlay({ session }) {
             )}
           </div>
         )}
-        {currentTask.hint && (
-          <details className="mb-4">
-            <summary className="text-blue-500 cursor-pointer">Подсказка</summary>
-            <p className="mt-2 text-gray-600 bg-gray-100 p-2 rounded">{currentTask.hint}</p>
-          </details>
-        )}
 
-        {/* Медиа-контент */}
-        {currentTask.media_url && (
-          <div className="mb-4">
-            {getMediaType(currentTask.media_url) === 'image' && (
-              <img src={currentTask.media_url} alt="Медиа" className="max-w-full h-auto rounded" />
-            )}
-            {getMediaType(currentTask.media_url) === 'video' && (
-              <video controls className="max-w-full h-auto rounded">
-                <source src={currentTask.media_url} type={`video/${currentTask.media_url.split('.').pop()}`} />
-              </video>
-            )}
-            {getMediaType(currentTask.media_url) === 'audio' && (
-              <audio controls className="w-full">
-                <source src={currentTask.media_url} type={`audio/${currentTask.media_url.split('.').pop()}`} />
-              </audio>
-            )}
-          </div>
-        )}
-
-        {/* GPS */}
-        {currentTask.gps_point && currentTask.gps_point.coordinates && (
-          <div className="mb-4">
-            <button
-              onClick={checkLocation}
-              disabled={locationVerified}
-              className={`px-4 py-2 rounded ${locationVerified ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-            >
-              {locationVerified ? '✅ На месте' : '📍 Я на месте'}
-            </button>
-            <p className="text-xs text-gray-500 mt-1">
-              Координаты: {currentTask.gps_point.coordinates[1].toFixed(6)}, {currentTask.gps_point.coordinates[0].toFixed(6)}
-            </p>
-          </div>
-        )}
-
-        {/* Код */}
-        {currentTask.static_code && currentTask.static_code.trim() !== '' && (
-          <div className="mb-4 flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Введите код"
-              value={codeInput}
-              onChange={e => setCodeInput(e.target.value)}
-              disabled={codeVerified}
-              className="border p-2 rounded flex-1"
-            />
-            <button
-              onClick={checkCode}
-              disabled={codeVerified}
-              className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
-            >
-              {codeVerified ? '✅ Код принят' : 'Проверить код'}
-            </button>
-          </div>
-        )}
-
-        {/* Ответ: варианты или текстовое поле */}
-        {currentTask.correct_answer && currentTask.correct_answer.trim() !== '' && (
-          <div className="mb-4">
-            {currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0 ? (
-              // Множественный выбор
-              <div className="space-y-2">
-                <p className="font-medium">Выберите правильный вариант:</p>
-                {currentTask.options.map((opt, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedOption(opt)}
-                    className={`block w-full text-left p-2 border rounded transition ${
-                      selectedOption === opt ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                ))}
+        {/* Фаза проверки места */}
+        {isLocationPhase && (
+          <div className="border-t border-blue-200 pt-4 mt-4">
+            <p className="text-gray-700 mb-3">Для доступа к заданию необходимо подтвердить нахождение на месте:</p>
+            {quest.verification_options.includes('gps') && (
+              <div className="mb-3">
+                <button
+                  onClick={checkLocation}
+                  disabled={locationVerified}
+                  className={`px-4 py-2 rounded ${locationVerified ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                >
+                  {locationVerified ? '✅ На месте' : '📍 Я на месте'}
+                </button>
               </div>
-            ) : (
-              // Текстовый ввод
-              <input
-                type="text"
-                placeholder="Введите ваш ответ"
-                value={answerInput}
-                onChange={e => setAnswerInput(e.target.value)}
-                disabled={taskCompleted}
-                className="w-full border p-2 rounded"
-              />
+            )}
+            {quest.verification_options.includes('code') && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Введите код доступа"
+                  value={codeInput}
+                  onChange={e => setCodeInput(e.target.value)}
+                  disabled={codeVerified}
+                  className="border p-2 rounded flex-1"
+                />
+                <button
+                  onClick={checkCode}
+                  disabled={codeVerified}
+                  className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                >
+                  {codeVerified ? '✅ Код принят' : 'Проверить код'}
+                </button>
+              </div>
             )}
           </div>
         )}
 
-        <button
-          onClick={completeTask}
-          disabled={taskCompleted}
-          className={`w-full py-3 rounded text-white ${taskCompleted ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'}`}
-        >
-          {taskCompleted ? '✅ Задание выполнено' : 'Завершить задание'}
-        </button>
+        {/* Полное задание (открывается после проверки) */}
+        {!isLocationPhase && (
+          <div className="border-t border-gray-200 pt-4 mt-4">
+            {currentTask.description && <p className="text-gray-700 mb-2">{currentTask.description}</p>}
+            {currentTask.media_url && (
+              <div className="mb-3">
+                {getMediaType(currentTask.media_url) === 'image' && (
+                  <img src={currentTask.media_url} alt="Медиа" className="max-w-full h-auto rounded" />
+                )}
+                {getMediaType(currentTask.media_url) === 'video' && (
+                  <video controls className="max-w-full h-auto rounded">
+                    <source src={currentTask.media_url} type={`video/${currentTask.media_url.split('.').pop()}`} />
+                  </video>
+                )}
+                {getMediaType(currentTask.media_url) === 'audio' && (
+                  <audio controls className="w-full">
+                    <source src={currentTask.media_url} type={`audio/${currentTask.media_url.split('.').pop()}`} />
+                  </audio>
+                )}
+              </div>
+            )}
+            {currentTask.hint && (
+              <details className="mb-3">
+                <summary className="text-blue-500 cursor-pointer">Подсказка</summary>
+                <p className="mt-1 text-gray-600 bg-gray-100 p-2 rounded">{currentTask.hint}</p>
+              </details>
+            )}
+            {currentTask.correct_answer && currentTask.correct_answer.trim() !== '' && (
+              <div className="mb-3">
+                {currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="font-medium">Выберите правильный вариант:</p>
+                    {currentTask.options.map((opt, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedOption(opt)}
+                        className={`block w-full text-left p-2 border rounded transition ${
+                          selectedOption === opt ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Введите ваш ответ"
+                    value={answerInput}
+                    onChange={e => setAnswerInput(e.target.value)}
+                    disabled={taskCompleted}
+                    className="w-full border p-2 rounded"
+                  />
+                )}
+              </div>
+            )}
+            <button
+              onClick={completeTask}
+              disabled={taskCompleted}
+              className={`w-full py-3 rounded text-white ${taskCompleted ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'}`}
+            >
+              {taskCompleted ? '✅ Задание выполнено' : 'Завершить задание'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+function getMediaType(url) {
+  if (!url) return null
+  const ext = url.split('.').pop().toLowerCase()
+  if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return 'image'
+  if (['mp4','webm','ogg'].includes(ext)) return 'video'
+  if (['mp3','wav','aac'].includes(ext)) return 'audio'
+  return 'image'
 }

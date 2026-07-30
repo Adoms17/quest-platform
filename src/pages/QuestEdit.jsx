@@ -16,6 +16,7 @@ export default function QuestEdit({ session }) {
   const [editMode, setEditMode] = useState(false)
   const [questTitle, setQuestTitle] = useState('')
   const [questDescription, setQuestDescription] = useState('')
+  const [verificationOptions, setVerificationOptions] = useState(['gps'])
 
   // Опции места, выбранные для квеста
   const [locationOptions, setLocationOptions] = useState(['gps']) // по умолчанию
@@ -61,6 +62,9 @@ export default function QuestEdit({ session }) {
       const opts = Array.isArray(questData.location_options) ? questData.location_options : ['gps']
       setLocationOptions(opts)
 
+      const optsVer = Array.isArray(questData.verification_options) ? questData.verification_options : ['gps']
+      setVerificationOptions(optsVer)
+
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
         .select('*')
@@ -88,6 +92,33 @@ export default function QuestEdit({ session }) {
       toast.success('Настройки места обновлены')
     } catch (err) {
       toast.error('Ошибка сохранения настроек: ' + err.message)
+    }
+  }
+
+  async function updateVerificationOptions(newOpts) {
+    setVerificationOptions(newOpts)
+    try {
+      const { error } = await supabase
+        .from('quests')
+        .update({ verification_options: newOpts })
+        .eq('id', id)
+      if (error) throw error
+      toast.success('Настройки проверки обновлены')
+    } catch (err) {
+      toast.error('Ошибка сохранения: ' + err.message)
+    }
+  }
+
+  function toggleVerificationOption(opt) {
+    if (verificationOptions.includes(opt)) {
+      if (verificationOptions.length <= 1) {
+        toast.error('Должна быть выбрана как минимум одна опция')
+        return
+      }
+      const newOpts = verificationOptions.filter(o => o !== opt)
+      updateVerificationOptions(newOpts)
+    } else {
+      updateVerificationOptions([...verificationOptions, opt])
     }
   }
 
@@ -388,6 +419,30 @@ export default function QuestEdit({ session }) {
         <p className="text-sm text-gray-500 mt-2">Выберите хотя бы один вариант. Эти настройки будут применены ко всем заданиям квеста.</p>
       </div>
 
+      {/* Блок выбора опций проверки */}
+      <div className="bg-gray-50 p-4 rounded mb-6 border">
+        <h3 className="font-semibold mb-2">Как проверять нахождение на месте?</h3>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={verificationOptions.includes('gps')}
+              onChange={() => toggleVerificationOption('gps')}
+            />
+            📍 GPS-координаты
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={verificationOptions.includes('code')}
+              onChange={() => toggleVerificationOption('code')}
+            />
+            🔑 Код доступа
+          </label>
+        </div>
+        <p className="text-sm text-gray-500 mt-2">Выберите хотя бы один вариант. Участник должен будет подтвердить нахождение по выбранным условиям.</p>
+      </div>
+
       {/* Список заданий */}
       <div className="mb-8">
         <h3 className="text-lg font-semibold mb-2">Задания ({tasks.length})</h3>
@@ -446,9 +501,30 @@ export default function QuestEdit({ session }) {
           />
           <input
             type="text"
+            placeholder="Ссылка на медиа (изображение, аудио, видео)"
+            value={taskForm.media_url}
+            onChange={e => setTaskForm({...taskForm, media_url: e.target.value})}
+            className="w-full border p-2 rounded"
+          />
+          <input
+            type="text"
             placeholder="Подсказка"
             value={taskForm.hint}
             onChange={e => setTaskForm({...taskForm, hint: e.target.value})}
+            className="w-full border p-2 rounded"
+          />
+          <input
+            type="text"
+            placeholder="Варианты ответа (через запятую)"
+            value={taskForm.options}
+            onChange={e => setTaskForm({...taskForm, options: e.target.value})}
+            className="w-full border p-2 rounded"
+          />
+          <input
+            type="text"
+            placeholder="Правильный ответ (текст)"
+            value={taskForm.correct_answer}
+            onChange={e => setTaskForm({...taskForm, correct_answer: e.target.value})}
             className="w-full border p-2 rounded"
           />
 
@@ -510,27 +586,8 @@ export default function QuestEdit({ session }) {
             onChange={e => setTaskForm({...taskForm, static_code: e.target.value})}
             className="w-full border p-2 rounded"
           />
-          <input
-            type="text"
-            placeholder="Правильный ответ (текст)"
-            value={taskForm.correct_answer}
-            onChange={e => setTaskForm({...taskForm, correct_answer: e.target.value})}
-            className="w-full border p-2 rounded"
-          />
-          <input
-            type="text"
-            placeholder="Варианты ответа (через запятую)"
-            value={taskForm.options}
-            onChange={e => setTaskForm({...taskForm, options: e.target.value})}
-            className="w-full border p-2 rounded"
-          />
-          <input
-            type="text"
-            placeholder="Ссылка на медиа (изображение, аудио, видео)"
-            value={taskForm.media_url}
-            onChange={e => setTaskForm({...taskForm, media_url: e.target.value})}
-            className="w-full border p-2 rounded"
-          />
+          
+
           <div className="flex gap-2">
             <button type="submit" disabled={saving} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
               {saving ? 'Сохранение...' : editingTask ? 'Обновить задание' : 'Добавить задание'}
