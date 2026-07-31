@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 export default function QuestList({ session }) {
   const [quests, setQuests] = useState([])
   const [loading, setLoading] = useState(true)
+  const [copying, setCopying] = useState(null) // id квеста, который копируется
 
   useEffect(() => {
     if (!session) return
@@ -40,6 +41,75 @@ export default function QuestList({ session }) {
     }
   }
 
+  async function copyQuest(questId) {
+    if (!confirm('Создать копию этого квеста со всеми заданиями?')) return
+    setCopying(questId)
+    try {
+      // 1. Получаем исходный квест
+      const { data: original, error: fetchError } = await supabase
+        .from('quests')
+        .select('*')
+        .eq('id', questId)
+        .single()
+      if (fetchError) throw fetchError
+
+      // 2. Создаём новый квест (копия)
+      const newQuest = {
+        creator_id: session.user.id,
+        title: original.title + ' (копия)',
+        description: original.description,
+        is_public: original.is_public,
+        verification_options: original.verification_options,
+        location_options: original.location_options,
+        max_attempts: original.max_attempts,
+        is_open: original.is_open,
+        start_at: original.start_at,
+        end_at: original.end_at,
+      }
+      const { data: newQuestData, error: insertError } = await supabase
+        .from('quests')
+        .insert(newQuest)
+        .select()
+      if (insertError) throw insertError
+      const newQuestId = newQuestData[0].id
+
+      // 3. Копируем задания
+      const { data: tasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('quest_id', questId)
+      if (tasksError) throw tasksError
+
+      if (tasks && tasks.length > 0) {
+        const newTasks = tasks.map(task => ({
+          quest_id: newQuestId,
+          title: task.title,
+          description: task.description,
+          hint: task.hint,
+          gps_point: task.gps_point,
+          static_code: task.static_code,
+          correct_answer: task.correct_answer,
+          options: task.options,
+          media_url: task.media_url,
+          location_text: task.location_text,
+          location_image_url: task.location_image_url,
+          order_index: task.order_index,
+        }))
+        const { error: insertTasksError } = await supabase
+          .from('tasks')
+          .insert(newTasks)
+        if (insertTasksError) throw insertTasksError
+      }
+
+      toast.success('Квест скопирован!')
+      fetchQuests() // обновляем список
+    } catch (err) {
+      toast.error('Ошибка копирования: ' + err.message)
+    } finally {
+      setCopying(null)
+    }
+  }
+
   if (loading) return <Loader text="Загрузка списка квестов..." />
 
   return (
@@ -69,6 +139,21 @@ export default function QuestList({ session }) {
                   Создан: {new Date(quest.created_at).toLocaleDateString()}
                 </p>
               </div>
+              <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
+                <span className={`px-2 py-1 rounded ${quest.is_open ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {quest.is_open ? '✅ Открыт' : '❌ Закрыт'}
+                </span>
+                {quest.start_at && (
+                  <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                    🕐 Начало: {new Date(quest.start_at).toLocaleString()}
+                  </span>
+                )}
+                {quest.end_at && (
+                  <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                    ⏰ Окончание: {new Date(quest.end_at).toLocaleString()}
+                  </span>
+                )}
+              </div>
               <div className="flex gap-2">
                 <Link
                   to={`/quests/${quest.id}/edit`}
@@ -91,6 +176,13 @@ export default function QuestList({ session }) {
                   className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600 text-sm"
                 >
                   Поделиться
+                </button>
+                <button
+                  onClick={() => copyQuest(quest.id)}
+                  disabled={copying === quest.id}
+                  className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm"
+                >
+                  {copying === quest.id ? '...' : '📋 Копировать'}
                 </button>
                 <button
                   onClick={() => handleDelete(quest.id)}

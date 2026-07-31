@@ -18,6 +18,9 @@ export default function QuestEdit({ session }) {
   const [questDescription, setQuestDescription] = useState('')
   const [verificationOptions, setVerificationOptions] = useState(['gps'])
   const [maxAttempts, setMaxAttempts] = useState(0)
+  const [isOpen, setIsOpen] = useState(true)
+  const [startAt, setStartAt] = useState('')
+  const [endAt, setEndAt] = useState('')
 
   // Опции места, выбранные для квеста
   const [locationOptions, setLocationOptions] = useState(['gps']) // по умолчанию
@@ -59,6 +62,9 @@ export default function QuestEdit({ session }) {
       setMaxAttempts(questData.max_attempts || 0)
       setQuestTitle(questData.title)
       setQuestDescription(questData.description || '')
+      setIsOpen(questData.is_open !== undefined ? questData.is_open : true)
+      setStartAt(questData.start_at ? new Date(questData.start_at).toISOString().slice(0, 16) : '')
+      setEndAt(questData.end_at ? new Date(questData.end_at).toISOString().slice(0, 16) : '')
 
       // Загружаем опции места (если нет, ставим по умолчанию)
       const opts = Array.isArray(questData.location_options) ? questData.location_options : ['gps']
@@ -66,6 +72,9 @@ export default function QuestEdit({ session }) {
 
       const optsVer = Array.isArray(questData.verification_options) ? questData.verification_options : ['gps']
       setVerificationOptions(optsVer)
+
+      setStartAt(questData.start_at ? new Date(questData.start_at).toLocaleString('sv', { hour12: false }).replace(' ', 'T') : '')
+      setEndAt(questData.end_at ? new Date(questData.end_at).toLocaleString('sv', { hour12: false }).replace(' ', 'T') : '')
 
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
@@ -160,6 +169,40 @@ export default function QuestEdit({ session }) {
         .eq('id', id)
       if (error) throw error
       toast.success('Лимит попыток обновлён')
+    } catch (err) {
+      toast.error('Ошибка обновления: ' + err.message)
+    }
+  }
+
+  async function updateAvailability(field, value) {
+    let finalValue = value
+    if ((field === 'start_at' || field === 'end_at') && value) {
+      finalValue = new Date(value).toISOString()
+    }
+
+    try {
+      const { error } = await supabase
+        .from('quests')
+        .update({ [field]: finalValue })
+        .eq('id', id)
+      if (error) throw error
+
+      // Обновляем локальные состояния
+      if (field === 'is_open') {
+        setIsOpen(value)
+      } else if (field === 'start_at') {
+        setStartAt(value || '')
+      } else if (field === 'end_at') {
+        setEndAt(value || '')
+      }
+
+      // Также обновляем объект quest
+      setQuest(prev => ({
+        ...prev,
+        [field]: finalValue
+      }))
+
+      toast.success('Настройки доступности обновлены')
     } catch (err) {
       toast.error('Ошибка обновления: ' + err.message)
     }
@@ -369,6 +412,49 @@ export default function QuestEdit({ session }) {
               rows="2"
               placeholder="Описание квеста"
             />
+            {/* Доступность и время */}
+            <div className="mt-6 border-t pt-4">
+              <h3 className="font-semibold mb-3">Доступность квеста</h3>
+              <div className="space-y-3">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isOpen}
+                    onChange={(e) => {
+                      setIsOpen(e.target.checked)
+                      updateAvailability('is_open', e.target.checked)
+                    }}
+                  />
+                  Квест открыт для прохождения
+                </label>
+
+                <div>
+                  <label className="block text-sm font-medium">Дата и время начала (опционально)</label>
+                  <input
+                    type="datetime-local"
+                    value={startAt}
+                    onChange={(e) => {
+                      setStartAt(e.target.value)
+                      updateAvailability('start_at', e.target.value || null)
+                    }}
+                    className="w-full border p-2 rounded"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium">Дата и время завершения (опционально)</label>
+                  <input
+                    type="datetime-local"
+                    value={endAt}
+                    onChange={(e) => {
+                      setEndAt(e.target.value)
+                      updateAvailability('end_at', e.target.value || null)
+                    }}
+                    className="w-full border p-2 rounded"
+                  />
+                </div>
+              </div>
+            </div>
             <div>
               <label className="block font-medium mb-1">Лимит попыток на ответ</label>
               <input
@@ -403,7 +489,16 @@ export default function QuestEdit({ session }) {
           <div className="flex-1">
             <h1 className="text-2xl font-bold">{quest.title}</h1>
             {quest.description && <p className="text-gray-600">{quest.description}</p>}
+            <div className="mt-4 p-3 bg-gray-50 border rounded">
+              <h4 className="font-semibold text-sm">Текущие настройки доступности:</h4>
+              <ul className="text-sm text-gray-700 mt-1">
+                <li>Статус: <span className={quest.is_open ? 'text-green-600' : 'text-red-600'}>{quest.is_open ? 'Открыт' : 'Закрыт'}</span></li>
+                {quest.start_at && <li>Начало: {new Date(quest.start_at).toLocaleString()}</li>}
+                {quest.end_at && <li>Окончание: {new Date(quest.end_at).toLocaleString()}</li>}
+              </ul>
+            </div>
           </div>
+          
         )}
         <button
           onClick={() => setEditMode(true)}
@@ -413,7 +508,8 @@ export default function QuestEdit({ session }) {
           ✏️
         </button>
       </div>
-
+      {/* Блок текущего состояния доступности */}
+      
 
       {/* Блок выбора опций места */}
       <div className="bg-gray-50 p-4 rounded mb-6 border">

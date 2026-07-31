@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { MapContainer, TileLayer, Marker } from 'react-leaflet'
@@ -25,6 +25,7 @@ export default function QuestPlay({ session }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // Состояния прохождения квеста
   const [questAttemptId, setQuestAttemptId] = useState(null)
   const [totalTasks, setTotalTasks] = useState(0)
   const [completedTasks, setCompletedTasks] = useState(0)
@@ -33,7 +34,10 @@ export default function QuestPlay({ session }) {
   const [totalTime, setTotalTime] = useState(0)
   const [startTime, setStartTime] = useState(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [questStarted, setQuestStarted] = useState(false)
+  const [finished, setFinished] = useState(false)
 
+  // Состояния для текущего задания
   const [locationVerified, setLocationVerified] = useState(false)
   const [codeVerified, setCodeVerified] = useState(false)
   const [codeInput, setCodeInput] = useState('')
@@ -45,13 +49,17 @@ export default function QuestPlay({ session }) {
   const [taskAttemptsUsed, setTaskAttemptsUsed] = useState(0)
   const [taskStartTime, setTaskStartTime] = useState(null)
   const [taskAttemptId, setTaskAttemptId] = useState(null)
-  const [finished, setFinished] = useState(false)
+
+  // Доступность квеста
+  const [isAvailable, setIsAvailable] = useState(false)
+  const [availabilityMessage, setAvailabilityMessage] = useState('')
+  const [timeUntilStart, setTimeUntilStart] = useState(null) // секунд до открытия
 
   const currentTask = tasks[currentTaskIndex] || null
   const isLastTask = currentTaskIndex === tasks.length - 1
   const maxAttempts = quest?.max_attempts || 0
 
-  // 1. Загрузка квеста и создание quest_attempt
+  // --- Загрузка квеста и заданий ---
   useEffect(() => {
     async function fetchQuestAndTasks() {
       setLoading(true)
@@ -72,19 +80,6 @@ export default function QuestPlay({ session }) {
         if (tasksError) throw tasksError
         setTasks(tasksData || [])
         setTotalTasks(tasksData.length)
-
-        const { data: attemptData, error: attemptError } = await supabase
-          .from('quest_attempts')
-          .insert({
-            quest_id: id,
-            user_id: session.user.id,
-            total_tasks: tasksData.length,
-          })
-          .select()
-        if (attemptError) throw attemptError
-        setQuestAttemptId(attemptData[0].id)
-        setStartTime(Date.now())
-        setElapsedSeconds(0)
       } catch (err) {
         setError(err.message)
         toast.error('Ошибка загрузки: ' + err.message)
@@ -93,23 +88,97 @@ export default function QuestPlay({ session }) {
       }
     }
     fetchQuestAndTasks()
-  }, [id, session])
+  }, [id])
 
-  // 2. Таймер
+  // --- Проверка доступности (интервал) ---
+  const checkAvailability = useCallback(() => {
+    if (!quest) return
+
+    const now = new Date()
+    let available = true
+    let message = ''
+    let timeLeft = null
+
+    // 1. Закрыт организатором
+    if (quest.is_open === false) {
+      available = false
+      message = `⛔ Квест "${quest.title}" закрыт организатором`
+    }
+
+    // 2. Проверка окончания
+    if (available && quest.end_at) {
+      const end = new Date(quest.end_at)
+      if (end < now) {
+        available = false
+        message = `⏰ Квест "${quest.title}" был закрыт ${end.toLocaleString()}`
+      }
+    }
+
+    // 3. Проверка начала
+    if (available && quest.start_at) {
+      const start = new Date(quest.start_at)
+      if (start > now) {
+        available = false
+        timeLeft = Math.floor((start - now) / 1000)
+        message = `⏳ Квест "${quest.title}" откроется ${start.toLocaleString()} через`
+      }
+    }
+
+    setIsAvailable(available)
+    setAvailabilityMessage(message)
+    setTimeUntilStart(timeLeft)
+  }, [quest])
+
   useEffect(() => {
-    if (!startTime || finished) return
+    if (!quest) return
+    // Первая проверка сразу
+    checkAvailability()
+    const interval = setInterval(checkAvailability, 1000)
+    return () => clearInterval(interval)
+  }, [quest, checkAvailability])
+
+  // --- Запуск квеста при доступности ---
+  useEffect(() => {
+    if (isAvailable && !questStarted && quest && tasks.length > 0) {
+      const startQuest = async () => {
+        try {
+          const { data: attemptData, error: attemptError } = await supabase
+            .from('quest_attempts')
+            .insert({
+              quest_id: id,
+              user_id: session.user.id,
+              total_tasks: tasks.length,
+            })
+            .select()
+          if (attemptError) throw attemptError
+          setQuestAttemptId(attemptData[0].id)
+          setStartTime(Date.now())
+          setElapsedSeconds(0)
+          setQuestStarted(true)
+          toast.success('🔓 Квест открыт!')
+        } catch (err) {
+          toast.error('Ошибка запуска квеста: ' + err.message)
+        }
+      }
+      startQuest()
+    }
+  }, [isAvailable, questStarted, quest, tasks, id, session])
+
+  // --- Таймер прохождения ---
+  useEffect(() => {
+    if (!startTime || finished || !questStarted) return
     const interval = setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000))
     }, 1000)
     return () => clearInterval(interval)
-  }, [startTime, finished])
+  }, [startTime, finished, questStarted])
 
-  // 3. Инициализация задания (сброс состояний и создание task_attempt)
+  // --- Инициализация задания (создание task_attempt) ---
   useEffect(() => {
     if (!currentTask || !questAttemptId) return
 
     const initTask = async () => {
-      // Сброс
+      // Сброс состояний
       setLocationVerified(false)
       setCodeVerified(false)
       setCodeInput('')
@@ -121,7 +190,6 @@ export default function QuestPlay({ session }) {
       setIsLocationPhase(true)
       setTaskStartTime(Date.now())
 
-      // Создаём task_attempt
       try {
         const { data, error } = await supabase
           .from('task_attempts')
@@ -145,7 +213,7 @@ export default function QuestPlay({ session }) {
     initTask()
   }, [currentTaskIndex, currentTask, questAttemptId])
 
-  // 4. Автооткрытие задания при успешной проверке места
+  // --- Автооткрытие задания при проверке места ---
   useEffect(() => {
     if (isLocationPhase && taskAttemptId) {
       tryOpenTask()
@@ -170,7 +238,7 @@ export default function QuestPlay({ session }) {
     }
   }
 
-  // 5. Проверка GPS
+  // --- Проверка GPS ---
   function checkLocation() {
     if (!navigator.geolocation) {
       toast.error('Ваш браузер не поддерживает геолокацию')
@@ -212,7 +280,7 @@ export default function QuestPlay({ session }) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   }
 
-  // 6. Проверка кода
+  // --- Проверка кода ---
   function checkCode() {
     if (!currentTask.static_code) {
       setCodeVerified(true)
@@ -226,7 +294,7 @@ export default function QuestPlay({ session }) {
     }
   }
 
-  // 7. Проверка правильности ответа
+  // --- Проверка правильности ответа ---
   function isAnswerCorrect() {
     const correct = currentTask.correct_answer?.trim()?.toLowerCase() || ''
     if (!correct) return true
@@ -237,13 +305,12 @@ export default function QuestPlay({ session }) {
     }
   }
 
-  // 8. Завершение задания (с обязательным ответом)
+  // --- Завершение задания (с обязательным ответом) ---
   async function completeTask() {
     if (taskCompleted || taskFailed) return
 
     const hasAnswer = currentTask.correct_answer && currentTask.correct_answer.trim() !== ''
     if (hasAnswer) {
-      // Проверяем, что ответ выбран/введён
       let answerProvided = false
       if (currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0) {
         answerProvided = selectedOption.trim() !== ''
@@ -255,7 +322,6 @@ export default function QuestPlay({ session }) {
         return
       }
 
-      // Увеличиваем счётчик попыток
       const newAttempts = taskAttemptsUsed + 1
       setTaskAttemptsUsed(newAttempts)
       await supabase
@@ -263,7 +329,6 @@ export default function QuestPlay({ session }) {
         .update({ attempts_used: newAttempts })
         .eq('id', taskAttemptId)
 
-      // Проверяем правильность
       if (isAnswerCorrect()) {
         toast.success('✅ Правильный ответ!')
         await finishTask(true)
@@ -276,16 +341,14 @@ export default function QuestPlay({ session }) {
         }
       }
     } else {
-      // Если ответа нет – просто завершаем
       await finishTask(true)
     }
   }
 
-  // 9. Финализация задания
+  // --- Финализация задания ---
   async function finishTask(success) {
     const timeSpent = Math.floor((Date.now() - taskStartTime) / 1000)
 
-    // Обновляем task_attempts
     await supabase
       .from('task_attempts')
       .update({
@@ -295,7 +358,6 @@ export default function QuestPlay({ session }) {
       })
       .eq('id', taskAttemptId)
 
-    // Обновляем статистику quest_attempt
     let newCompleted = completedTasks
     let newFailed = failedTasks
     if (success) newCompleted++
@@ -332,7 +394,7 @@ export default function QuestPlay({ session }) {
     }
   }
 
-  // 10. Определение типа медиа
+  // --- Определение типа медиа ---
   function getMediaType(url) {
     if (!url) return null
     const ext = url.split('.').pop().toLowerCase()
@@ -342,12 +404,44 @@ export default function QuestPlay({ session }) {
     return 'image'
   }
 
+  function formatTime(seconds) {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
+
   // ========== Рендеринг ==========
   if (loading) return <Loader text="Загрузка квеста..." />
   if (error) return <div className="p-8 text-red-500">Ошибка: {error}</div>
   if (!quest || tasks.length === 0) {
     return <div className="p-8">В этом квесте пока нет заданий</div>
   }
+
+  // Проверка доступности
+  if (!isAvailable) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50">
+        <div className="bg-white p-8 rounded shadow max-w-md text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">⛔ Квест недоступен</h2>
+          <p className="text-gray-700">{availabilityMessage}</p>
+          {timeUntilStart !== null && timeUntilStart > 0 && (
+            <div className="mt-4 text-3xl font-mono font-bold text-blue-600">
+              {formatTime(timeUntilStart)}
+            </div>
+          )}
+          <button
+            onClick={() => navigate('/')}
+            className="mt-6 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
+            На главную
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Экран финиша
   if (finished) {
     const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
     return (
@@ -367,6 +461,7 @@ export default function QuestPlay({ session }) {
     )
   }
 
+  // Основной экран прохождения
   return (
     <div className="max-w-3xl mx-auto p-6">
       <div className="flex justify-between items-center mb-4">
