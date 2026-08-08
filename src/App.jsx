@@ -11,6 +11,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AppToaster from './components/Toaster'
 import Navbar from './components/Navbar'
 import Downloads from './pages/Downloads'
+import TaskManager from './pages/TaskManager'
+import TaskForm from './pages/TaskForm'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -115,6 +117,36 @@ function App() {
             <ProtectedRoute session={session}>
               <Layout>
                 <Downloads session={session} />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quests/:id/tasks"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout>
+                <TaskManager session={session} />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quests/:id/tasks/new"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout>
+                <TaskForm session={session} />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quests/:id/tasks/:taskId/edit"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout>
+                <TaskForm session={session} />
               </Layout>
             </ProtectedRoute>
           }
