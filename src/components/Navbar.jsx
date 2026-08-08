@@ -71,6 +71,9 @@ export default function Navbar({ session }) {
         <span className="hidden sm:inline text-sm opacity-80">
           {loading ? '...' : displayName}
         </span>
+        <Link to="/downloads" className="block px-4 py-2 hover:bg-gray-100">
+          📥 Мои загрузки
+        </Link>
       </div>
 
       {/* Правый блок: аватар + выпадающее меню */}

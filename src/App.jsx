@@ -10,6 +10,7 @@ import QuestStats from './pages/QuestStats'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppToaster from './components/Toaster'
 import Navbar from './components/Navbar'
+import Downloads from './pages/Downloads'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -27,6 +28,17 @@ function App() {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    const handleOnline = () => {
+      if (!session) return // если нет сессии, синхронизация не нужна
+      import('./services/sync').then(({ syncPendingResultsWithRetry }) => {
+        syncPendingResultsWithRetry(session).catch(err => console.error('Синхронизация не удалась:', err))
+      })
+    }
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [session]) // <-- добавили session
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Загрузка...</div>
@@ -93,6 +105,16 @@ function App() {
             <ProtectedRoute session={session}>
               <Layout>
                 <QuestPlay session={session} />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/downloads"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout>
+                <Downloads session={session} />
               </Layout>
             </ProtectedRoute>
           }

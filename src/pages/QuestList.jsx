@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { Link } from 'react-router-dom'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
+import { saveQuestToDB } from '../services/db'
 
 export default function QuestList({ session }) {
   const [quests, setQuests] = useState([])
@@ -154,18 +155,18 @@ export default function QuestList({ session }) {
                   </span>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-3 gap-2 mt-2 md:mt-0 md:flex md:flex-wrap md:justify-center">
                 <Link
                   to={`/quests/${quest.id}/edit`}
-                  className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-sm"
+                  className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 text-center flex items-center justify-center"
                 >
-                  Редактировать
+                  ✏️ Редактировать
                 </Link>
                 <Link
                   to={`/quests/${quest.id}/stats`}
-                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-sm"
+                  className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 text-center flex items-center justify-center"
                 >
-                  Статистика
+                  📊 Статистика
                 </Link>
                 <button
                   onClick={() => {
@@ -173,22 +174,47 @@ export default function QuestList({ session }) {
                     navigator.clipboard.writeText(url)
                     toast.success('Ссылка скопирована!')
                   }}
-                  className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600 text-sm"
+                  className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 text-center flex items-center justify-center"
                 >
-                  Поделиться
+                  🔗 Поделиться
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const { data: qData, error: qErr } = await supabase
+                        .from('quests')
+                        .select('*')
+                        .eq('id', quest.id)
+                        .single()
+                      if (qErr) throw qErr
+                      const { data: tData, error: tErr } = await supabase
+                        .from('tasks')
+                        .select('*')
+                        .eq('quest_id', quest.id)
+                        .order('order_index')
+                      if (tErr) throw tErr
+                      await saveQuestToDB(qData, tData)
+                      toast.success('Квест скачан для офлайн-прохождения!')
+                    } catch (err) {
+                      toast.error('Ошибка скачивания: ' + err.message)
+                    }
+                  }}
+                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 text-center flex items-center justify-center"
+                >
+                  📥 Скачать
                 </button>
                 <button
                   onClick={() => copyQuest(quest.id)}
                   disabled={copying === quest.id}
-                  className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm"
+                  className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 text-center flex items-center justify-center"
                 >
                   {copying === quest.id ? '...' : '📋 Копировать'}
                 </button>
                 <button
                   onClick={() => handleDelete(quest.id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
+                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 text-center flex items-center justify-center"
                 >
-                  Удалить
+                  🗑️ Удалить
                 </button>
               </div>
             </div>
