@@ -10,9 +10,8 @@ export default function TaskForm({ session }) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [locationOptions, setLocationOptions] = useState(['gps']) // по умолчанию
+  const [locationOptions, setLocationOptions] = useState(['gps'])
 
-  // Загружаем настройки квеста (location_options)
   useEffect(() => {
     async function fetchQuestOptions() {
       const { data, error } = await supabase
@@ -36,11 +35,12 @@ export default function TaskForm({ session }) {
     static_code: '',
     correct_answer: '',
     options: '',
-    media_url: '',
     location_text: '',
     location_image_url: '',
     order_index: 0,
   })
+  const [mediaList, setMediaList] = useState([])
+  const [newMedia, setNewMedia] = useState({ url: '', title: '', description: '' })
 
   const isEdit = !!taskId
 
@@ -66,7 +66,7 @@ export default function TaskForm({ session }) {
         lng = data.gps_point.coordinates[0].toString()
         lat = data.gps_point.coordinates[1].toString()
       }
-      const optionsStr = Array.isArray(data.options) ? data.options.join(', ') : ''
+      const optionsText = Array.isArray(data.options) ? data.options.join('\n') : ''
       setTaskForm({
         title: data.title || '',
         description: data.description || '',
@@ -75,12 +75,18 @@ export default function TaskForm({ session }) {
         gps_lng: lng,
         static_code: data.static_code || '',
         correct_answer: data.correct_answer || '',
-        options: optionsStr,
-        media_url: data.media_url || '',
+        options: optionsText,
         location_text: data.location_text || '',
         location_image_url: data.location_image_url || '',
         order_index: data.order_index || 0,
       })
+      if (data.media && Array.isArray(data.media)) {
+        setMediaList(data.media.map((item, idx) => ({ ...item, id: idx })))
+      } else if (data.media_url) {
+        setMediaList([{ id: 0, url: data.media_url, title: '', description: '' }])
+      } else {
+        setMediaList([])
+      }
     }
     setLoading(false)
   }
@@ -108,6 +114,29 @@ export default function TaskForm({ session }) {
     return true
   }
 
+  function addMedia() {
+    if (!newMedia.url.trim()) {
+      toast.error('Введите URL медиа')
+      return
+    }
+    if (mediaList.some(m => m.url.trim() === newMedia.url.trim())) {
+      toast.error('Этот URL уже добавлен')
+      return
+    }
+    const newItem = {
+      id: Date.now(),
+      url: newMedia.url.trim(),
+      title: newMedia.title.trim(),
+      description: newMedia.description.trim(),
+    }
+    setMediaList([...mediaList, newItem])
+    setNewMedia({ url: '', title: '', description: '' })
+  }
+
+  function removeMedia(id) {
+    setMediaList(mediaList.filter(item => item.id !== id))
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!taskForm.title.trim()) {
@@ -115,7 +144,6 @@ export default function TaskForm({ session }) {
       return
     }
 
-    // Проверяем обязательность полей в зависимости от опций места
     const opts = locationOptions
     const { gps_lat, gps_lng, location_text, location_image_url } = taskForm
 
@@ -138,9 +166,18 @@ export default function TaskForm({ session }) {
 
     let optionsArray = null
     if (taskForm.options.trim()) {
-      optionsArray = taskForm.options.split(',').map(s => s.trim()).filter(s => s.length > 0)
+      optionsArray = taskForm.options
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0)
       if (optionsArray.length === 0) optionsArray = null
     }
+
+    const mediaData = mediaList.map(({ url, title, description }) => ({
+      url,
+      title: title || '',
+      description: description || '',
+    }))
 
     const taskData = {
       quest_id: id,
@@ -153,7 +190,7 @@ export default function TaskForm({ session }) {
       static_code: taskForm.static_code.trim() || null,
       correct_answer: taskForm.correct_answer.trim() || null,
       options: optionsArray,
-      media_url: taskForm.media_url.trim() || null,
+      media: mediaData,
       location_text: taskForm.location_text.trim() || null,
       location_image_url: taskForm.location_image_url.trim() || null,
       order_index: taskForm.order_index || 0,
@@ -215,13 +252,64 @@ export default function TaskForm({ session }) {
           className="w-full border p-2 rounded"
           rows="2"
         />
-        <input
-          type="text"
-          placeholder="Ссылка на медиа (изображение, аудио, видео)"
-          value={taskForm.media_url}
-          onChange={e => setTaskForm({...taskForm, media_url: e.target.value})}
-          className="w-full border p-2 rounded"
-        />
+        
+        {/* Блок медиа */}
+        <div className="border p-3 rounded bg-gray-50">
+          <h4 className="font-medium mb-2">Медиафайлы</h4>
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="text"
+                placeholder="URL медиа"
+                value={newMedia.url}
+                onChange={e => setNewMedia({...newMedia, url: e.target.value})}
+                className="flex-1 min-w-[200px] border p-2 rounded"
+              />
+              <input
+                type="text"
+                placeholder="Название (опционально)"
+                value={newMedia.title}
+                onChange={e => setNewMedia({...newMedia, title: e.target.value})}
+                className="flex-1 min-w-[150px] border p-2 rounded"
+              />
+              <input
+                type="text"
+                placeholder="Описание (опционально)"
+                value={newMedia.description}
+                onChange={e => setNewMedia({...newMedia, description: e.target.value})}
+                className="flex-1 min-w-[150px] border p-2 rounded"
+              />
+              <button
+                type="button"
+                onClick={addMedia}
+                className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 whitespace-nowrap"
+              >
+                Добавить
+              </button>
+            </div>
+            {mediaList.length > 0 && (
+              <ul className="space-y-1">
+                {mediaList.map((item) => (
+                  <li key={item.id} className="flex justify-between items-center bg-white p-2 rounded border">
+                    <span className="truncate flex-1">
+                      {item.title ? `${item.title} (${item.url})` : item.url}
+                      {item.description && <span className="text-sm text-gray-500 ml-2">— {item.description}</span>}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeMedia(item.id)}
+                      className="text-red-500 hover:text-red-700 text-sm ml-2"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Добавьте ссылки на изображения, видео или аудио. Каждый файл можно снабдить названием и описанием.</p>
+        </div>
+
         <input
           type="text"
           placeholder="Подсказка"
@@ -229,13 +317,19 @@ export default function TaskForm({ session }) {
           onChange={e => setTaskForm({...taskForm, hint: e.target.value})}
           className="w-full border p-2 rounded"
         />
-        <input
-          type="text"
-          placeholder="Варианты ответа (через запятую)"
-          value={taskForm.options}
-          onChange={e => setTaskForm({...taskForm, options: e.target.value})}
-          className="w-full border p-2 rounded"
-        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Варианты ответов (каждый вариант на новой строке)
+          </label>
+          <textarea
+            placeholder="Вариант 1&#10;Вариант 2&#10;Вариант 3"
+            value={taskForm.options}
+            onChange={e => setTaskForm({...taskForm, options: e.target.value})}
+            className="w-full border p-2 rounded font-mono text-sm"
+            rows="4"
+          />
+          <p className="text-xs text-gray-500 mt-1">Оставьте пустым, если вариантов нет (тогда будет текстовый ответ).</p>
+        </div>
         <input
           type="text"
           placeholder="Правильный ответ (текст)"
