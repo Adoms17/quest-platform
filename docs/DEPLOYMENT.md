@@ -85,9 +85,11 @@ Playwright сам запускает production build и preview с тестов
 
 ## Staging перед production
 
-Сначала разверните ту же сборочную процедуру в staging с отдельным Supabase environment. Проверьте маршрутизацию, PWA, авторизацию, права доступа, online/offline flow и синхронизацию. Только после успешного smoke/regression прохода продвигайте проверенный артефакт в production.
+Сначала проверьте тот же commit и процедуру сборки в staging, используя переменные окружения staging Supabase. Проверьте маршрутизацию, PWA, авторизацию, права доступа, online/offline flow и синхронизацию.
 
-Не используйте production-персональные данные в staging-тестах.
+После успешной проверки создайте новый production-артефакт из того же commit, передав production-значения `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY`. Повторите обязательные проверки для production-сборки и только затем опубликуйте её.
+
+Не переносите staging-каталог `dist` в production: переменные `VITE_*` встраиваются в клиентский bundle во время сборки, поэтому staging-артефакт продолжит обращаться к staging Supabase.
 
 ## Smoke checklist после публикации
 
