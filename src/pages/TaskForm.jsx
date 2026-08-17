@@ -5,7 +5,7 @@ import MapPicker from '../components/MapPicker'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 
-export default function TaskForm({ session }) {
+export default function TaskForm() {
   const { id, taskId } = useParams()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)

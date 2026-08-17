@@ -12,7 +12,6 @@ import {
   upsertPendingResult,
   getActiveLocalQuestAttempt,
   saveQuestAttempt,
-  markQuestAttemptSynced,
   finishQuestAttempt,
   getQuestAttempt, // <-- добавить
 } from '../services/db'
@@ -35,7 +34,7 @@ export default function QuestPlay({ session }) {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [, setIsOnline] = useState(navigator.onLine)
 
   const [questAttemptId, setQuestAttemptId] = useState(null)
   const [totalTasks, setTotalTasks] = useState(0)
@@ -66,14 +65,11 @@ export default function QuestPlay({ session }) {
   const [timeUntilStart, setTimeUntilStart] = useState(null)
 
   const currentTask = tasks[currentTaskIndex] || null
-  const isLastTask = currentTaskIndex === tasks.length - 1
   const maxAttempts = quest?.max_attempts || 0
 
   const [manualLat, setManualLat] = useState('')
   const [manualLng, setManualLng] = useState('')
   const [showManualInput, setShowManualInput] = useState(false)
-  const isDev = import.meta.env.DEV
-
   // ----- Онлайн/офлайн -----
   useEffect(() => {
     const handleOnline = () => {
@@ -145,7 +141,7 @@ export default function QuestPlay({ session }) {
           if (navigator.onLine) {
             try {
               await saveQuestToDB(questData, tasksData)
-            } catch (e) { /* ignore */ }
+            } catch { /* ignore */ }
           }
         }
         setQuest(questData)

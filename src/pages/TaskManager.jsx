@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 
-export default function TaskManager({ session }) {
+export default function TaskManager() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [questTitle, setQuestTitle] = useState('')

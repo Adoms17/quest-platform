@@ -9,7 +9,6 @@ import {
 } from '../services/db'
 import { 
   syncPendingResults, 
-  syncPendingResultsWithRetry, 
   SYNC_COMPLETE_EVENT} from '../services/sync'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
@@ -79,7 +78,7 @@ export default function Downloads({ session }) {
       // После успешной синхронизации loadDownloads вызывается через событие
       // но на всякий случай обновим и здесь
       await loadDownloads()
-    } catch (err) {
+    } catch {
       // Ошибка уже показана в sync.js
       // Но мы можем обновить список, чтобы отразить возможные изменения
       await loadDownloads()

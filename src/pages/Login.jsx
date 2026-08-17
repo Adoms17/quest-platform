@@ -11,7 +11,7 @@ export default function Login({ setSession }) {
 
   const handleSignUp = async () => {
     setLoading(true)
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    const { error } = await supabase.auth.signUp({ email, password })
     if (error) toast.error(error.message)
     else toast.success('Проверьте почту или войдите сразу (если подтверждение отключено)')
     setLoading(false)
