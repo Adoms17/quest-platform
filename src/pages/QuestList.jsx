@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Link } from 'react-router-dom'
 import Loader from '../components/Loader'
@@ -10,17 +10,14 @@ export default function QuestList({ session }) {
   const [loading, setLoading] = useState(true)
   const [copying, setCopying] = useState(null) // id квеста, который копируется
 
-  useEffect(() => {
-    if (!session) return
-    fetchQuests()
-  }, [session])
+  const userId = session?.user?.id
 
-  async function fetchQuests() {
+  const fetchQuests = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
       .from('quests')
       .select('*')
-      .eq('creator_id', session.user.id)
+      .eq('creator_id', userId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -30,7 +27,12 @@ export default function QuestList({ session }) {
       setQuests(data || [])
     }
     setLoading(false)
-  }
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) return
+    fetchQuests()
+  }, [userId, fetchQuests])
 
   async function handleDelete(id) {
     if (!confirm('Удалить квест?')) return

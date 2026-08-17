@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
@@ -11,21 +11,16 @@ export default function TaskManager() {
   const [questTitle, setQuestTitle] = useState('')
   const [moving, setMoving] = useState(false)
 
-  useEffect(() => {
-    fetchQuestTitle()
-    fetchTasks()
-  }, [id])
-
-  async function fetchQuestTitle() {
+  const fetchQuestTitle = useCallback(async () => {
     const { data, error } = await supabase
       .from('quests')
       .select('title')
       .eq('id', id)
       .single()
     if (!error && data) setQuestTitle(data.title)
-  }
+  }, [id])
 
-  async function fetchTasks() {
+  const fetchTasks = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
       .from('tasks')
@@ -38,7 +33,12 @@ export default function TaskManager() {
       setTasks(data || [])
     }
     setLoading(false)
-  }
+  }, [id])
+
+  useEffect(() => {
+    fetchQuestTitle()
+    fetchTasks()
+  }, [fetchQuestTitle, fetchTasks])
 
   async function handleDelete(taskId) {
     if (!confirm('Удалить задание?')) return
