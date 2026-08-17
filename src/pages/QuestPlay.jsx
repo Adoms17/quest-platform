@@ -14,6 +14,7 @@ import {
   saveQuestAttempt,
   finishQuestAttempt,
   getQuestAttempt, // <-- добавить
+  getPendingResults,
 } from '../services/db'
 import { syncPendingResultsWithRetry } from '../services/sync'
 
@@ -219,7 +220,6 @@ export default function QuestPlay({ session }) {
         .eq('quest_attempt_id', attemptId)
       if (!error) attempts = data || []
     } else {
-      const { getPendingResults } = await import('../services/db')
       const pending = await getPendingResults()
       attempts = pending.filter(r => r.localQuestAttemptId === attemptId && !r.synced)
     }
