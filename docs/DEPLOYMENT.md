@@ -38,10 +38,13 @@ npm ci
 npm audit --audit-level=high
 npm run lint
 npm test
-npm run build
 npx playwright install chromium
 npm run test:e2e
 ```
+
+`npm run test:e2e` создаёт собственную сборку с тестовыми значениями Supabase и перезаписывает каталог `dist`. Полученный после E2E каталог нельзя публиковать в staging или production.
+
+Финальную сборку целевого окружения необходимо выполнять после E2E. После неё не запускайте `npm run test:e2e`, иначе production-артефакт снова будет заменён тестовой сборкой.
 
 Если загрузка bundled Chromium недоступна в текущей сети или регионе, для локальной проверки можно указать `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` к установленному Chrome. В CI должен использоваться Chromium, установленный Playwright.
 
@@ -49,12 +52,14 @@ Playwright сам запускает production build и preview с тестов
 
 ## Сборка и публикация
 
-1. Выполните `npm run build` с публичными переменными целевого окружения.
-2. Проверьте отсутствие ошибок и неожиданных предупреждений.
-3. Опубликуйте содержимое каталога `dist` как корень статического сайта.
-4. Настройте SPA fallback всех неизвестных URL на `index.html`.
-5. Не переписывайте запросы к существующим hashed assets на `index.html`.
-6. Сохраняйте предыдущие hashed assets как минимум на период rollout и жизни открытых вкладок.
+1. Выполните audit, lint, unit tests и E2E до создания финального артефакта.
+2. Установите `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` целевого окружения.
+3. Выполните `npm run build` как последнюю команду, создающую каталог `dist`.
+4. Убедитесь, что финальный `dist` не содержит `127.0.0.1:54321` или `test-anon-key`.
+5. Опубликуйте содержимое `dist` как корень статического сайта.
+6. Настройте SPA fallback неизвестных маршрутов на `index.html`.
+7. Не переписывайте запросы существующих hashed assets на `index.html`.
+8. Сохраняйте предыдущие hashed assets на период rollout и жизни открытых вкладок.
 
 ## BrowserRouter и прямые URL
 
@@ -90,6 +95,10 @@ Playwright сам запускает production build и preview с тестов
 После успешной проверки создайте новый production-артефакт из того же commit, передав production-значения `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY`. Повторите обязательные проверки для production-сборки и только затем опубликуйте её.
 
 Не переносите staging-каталог `dist` в production: переменные `VITE_*` встраиваются в клиентский bundle во время сборки, поэтому staging-артефакт продолжит обращаться к staging Supabase.
+
+После проверки staging выполните необходимые проверки исходного кода из того же commit, включая E2E. Затем задайте production-значения `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` и выполните `npm run build` как последнюю команду формирования production-артефакта.
+
+Не запускайте `npm run test:e2e` после этой финальной сборки: Playwright перезапишет `dist` тестовыми значениями. Не переносите staging-каталог `dist` в production.
 
 ## Smoke checklist после публикации
 
