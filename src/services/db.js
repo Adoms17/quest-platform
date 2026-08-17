@@ -5,7 +5,7 @@ const DB_VERSION = 6
 
 export async function initDB() {
   return openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion, newVersion, transaction) {
+    upgrade(db, oldVersion) {
       if (oldVersion < DB_VERSION) {
         if (db.objectStoreNames.contains('quests')) {
           db.deleteObjectStore('quests')
