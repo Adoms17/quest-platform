@@ -53,13 +53,38 @@ Playwright сам запускает production build и preview с тестов
 ## Сборка и публикация
 
 1. Выполните audit, lint, unit tests и E2E до создания финального артефакта.
-2. Установите `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` целевого окружения.
+2. Получите из защищённых настроек целевого окружения ожидаемые production-значения `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY`. Убедитесь, что обе переменные заданы и соответствуют утверждённому production-проекту Supabase.
 3. Выполните `npm run build` как последнюю команду, создающую каталог `dist`.
-4. Убедитесь, что финальный `dist` не содержит `127.0.0.1:54321` или `test-anon-key`.
+4. До публикации положительно проверьте, что JavaScript bundle содержит точные ожидаемые production URL и anon/publishable key. Проверка отсутствия `127.0.0.1:54321` и `test-anon-key` является только дополнительной и не заменяет проверку целевой конфигурации.
 5. Опубликуйте содержимое `dist` как корень статического сайта.
 6. Настройте SPA fallback неизвестных маршрутов на `index.html`.
 7. Не переписывайте запросы существующих hashed assets на `index.html`.
 8. Сохраняйте предыдущие hashed assets на период rollout и жизни открытых вкладок.
+
+Пример проверки без вывода значений в консоль:
+
+```powershell
+if ([string]::IsNullOrWhiteSpace($env:VITE_SUPABASE_URL) -or
+    [string]::IsNullOrWhiteSpace($env:VITE_SUPABASE_ANON_KEY)) {
+  throw "Production Supabase variables are not configured"
+}
+
+npm run build
+if ($LASTEXITCODE -ne 0) {
+  throw "Production build failed"
+}
+
+if (-not (Select-String -Path "dist\assets\*.js" -Pattern $env:VITE_SUPABASE_URL -SimpleMatch -Quiet)) {
+  throw "Expected production Supabase URL was not found in the bundle"
+}
+
+if (-not (Select-String -Path "dist\assets\*.js" -Pattern $env:VITE_SUPABASE_ANON_KEY -SimpleMatch -Quiet)) {
+  throw "Expected production Supabase key was not found in the bundle"
+}
+
+if (Select-String -Path "dist\assets\*.js" -Pattern "127.0.0.1:54321","test-anon-key" -SimpleMatch -Quiet) {
+  throw "Playwright Supabase values were found in the production bundle"
+}
 
 ## BrowserRouter и прямые URL
 
