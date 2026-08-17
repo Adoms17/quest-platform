@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-import Login from './pages/Login'
-import QuestList from './pages/QuestList'
-import QuestCreate from './pages/QuestCreate'
-import QuestEdit from './pages/QuestEdit'
-import QuestPlay from './pages/QuestPlay'
-import QuestStats from './pages/QuestStats'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppToaster from './components/Toaster'
 import Navbar from './components/Navbar'
-import Downloads from './pages/Downloads'
-import TaskManager from './pages/TaskManager'
-import TaskForm from './pages/TaskForm'
+import LazyRouteErrorBoundary from './components/LazyRouteErrorBoundary'
+
+const Login = lazy(() => import('./pages/Login'))
+const QuestList = lazy(() => import('./pages/QuestList'))
+const QuestCreate = lazy(() => import('./pages/QuestCreate'))
+const QuestEdit = lazy(() => import('./pages/QuestEdit'))
+const QuestPlay = lazy(() => import('./pages/QuestPlay'))
+const QuestStats = lazy(() => import('./pages/QuestStats'))
+const Downloads = lazy(() => import('./pages/Downloads'))
+const TaskManager = lazy(() => import('./pages/TaskManager'))
+const TaskForm = lazy(() => import('./pages/TaskForm'))
 
 function App() {
   const [session, setSession] = useState(null)
@@ -59,7 +61,9 @@ function App() {
   return (
     <BrowserRouter>
       <AppToaster />
-      <Routes>
+      <LazyRouteErrorBoundary>
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
+          <Routes>
         <Route path="/login" element={<Login setSession={setSession} />} />
         <Route
           path="/quests"
@@ -152,7 +156,9 @@ function App() {
           }
         />
         <Route path="*" element={<Navigate to={session ? '/quests' : '/login'} />} />
-      </Routes>
+          </Routes>
+        </Suspense>
+      </LazyRouteErrorBoundary>
     </BrowserRouter>
   )
 }
