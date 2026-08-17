@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -31,12 +31,12 @@ function MapController({ center, zoom }) {
 function LocationMarker({ position, setPosition, onSelect }) {
   const map = useMap()
   
-  const handleClick = (e) => {
+  const handleClick = useCallback((e) => {
     const lat = e.latlng.lat
     const lng = e.latlng.lng
     setPosition([lat, lng])
     if (onSelect) onSelect(lat, lng)
-  }
+  }, [onSelect, setPosition])
 
   // Добавляем обработчик клика через событие
   useEffect(() => {

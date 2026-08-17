@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
@@ -19,12 +19,9 @@ export default function QuestEdit({ session }) {
   const [endAt, setEndAt] = useState('')
   const [locationOptions, setLocationOptions] = useState(['gps'])
 
-  useEffect(() => {
-    if (!id) return
-    fetchQuest()
-  }, [id])
+  const userId = session?.user?.id
 
-  async function fetchQuest() {
+  const fetchQuest = useCallback(async () => {
     setLoading(true)
     try {
       const { data: questData, error: questError } = await supabase
@@ -33,7 +30,7 @@ export default function QuestEdit({ session }) {
         .eq('id', id)
         .single()
       if (questError) throw new Error('Квест не найден')
-      if (questData.creator_id !== session.user.id) {
+      if (questData.creator_id !== userId) {
         navigate('/quests')
         return
       }
@@ -57,7 +54,12 @@ export default function QuestEdit({ session }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id, userId, navigate])
+
+  useEffect(() => {
+    if (!id) return
+    fetchQuest()
+  }, [id, fetchQuest])
 
   async function updateLocationOptions(newOpts) {
     setLocationOptions(newOpts)

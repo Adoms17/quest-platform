@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import MapPicker from '../components/MapPicker'
@@ -44,13 +44,7 @@ export default function TaskForm() {
 
   const isEdit = !!taskId
 
-  useEffect(() => {
-    if (isEdit) {
-      fetchTask()
-    }
-  }, [taskId])
-
-  async function fetchTask() {
+  const fetchTask = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
       .from('tasks')
@@ -89,7 +83,13 @@ export default function TaskForm() {
       }
     }
     setLoading(false)
-  }
+  }, [taskId, id, navigate])
+
+  useEffect(() => {
+    if (isEdit) {
+      fetchTask()
+    }
+  }, [isEdit, fetchTask])
 
   function validateCoords(lat, lng) {
     if (!lat && !lng) return true
@@ -221,13 +221,13 @@ export default function TaskForm() {
     }
   }
 
-  function handleMapSelect(lat, lng) {
+  const handleMapSelect = useCallback((lat, lng) => {
     setTaskForm(prev => ({
       ...prev,
       gps_lat: lat.toString(),
       gps_lng: lng.toString(),
     }))
-  }
+  }, [])
 
   if (loading) return <Loader text="Загрузка задания..." />
 
