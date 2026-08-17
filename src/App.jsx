@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppToaster from './components/Toaster'
 import Navbar from './components/Navbar'
+import LazyRouteErrorBoundary from './components/LazyRouteErrorBoundary'
 
 const Login = lazy(() => import('./pages/Login'))
 const QuestList = lazy(() => import('./pages/QuestList'))
@@ -60,8 +61,9 @@ function App() {
   return (
     <BrowserRouter>
       <AppToaster />
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
-        <Routes>
+      <LazyRouteErrorBoundary>
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
+          <Routes>
         <Route path="/login" element={<Login setSession={setSession} />} />
         <Route
           path="/quests"
@@ -154,8 +156,9 @@ function App() {
           }
         />
         <Route path="*" element={<Navigate to={session ? '/quests' : '/login'} />} />
-        </Routes>
-      </Suspense>
+          </Routes>
+        </Suspense>
+      </LazyRouteErrorBoundary>
     </BrowserRouter>
   )
 }
