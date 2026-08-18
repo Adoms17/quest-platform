@@ -1,0 +1,165 @@
+﻿# Развёртывание Quest Platform
+
+## Назначение
+
+Эта инструкция не привязана к конкретному hosting-провайдеру. Она описывает требования для публикации статической production-сборки Vite. Наличие уже работающего production deployment текущим репозиторием не подтверждается.
+
+## Требования к hosting
+
+Hosting должен поддерживать:
+
+- публикацию статического каталога `dist`;
+- HTTPS;
+- SPA fallback: любой URL `BrowserRouter`, не соответствующий физическому файлу, должен возвращать `index.html`;
+- корректные MIME-типы JS, CSS, manifest и service worker;
+- управляемое кеширование HTML, service worker и hashed assets.
+
+Не удаляйте предыдущие hashed assets мгновенно: открытая вкладка может запросить старый lazy-чанк во время rollout.
+
+## Переменные окружения
+
+До сборки задайте:
+
+```text
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+```
+
+Используйте только URL нужного окружения и anon/publishable key. Переменные `VITE_*` публичны после сборки. `service_role` key и другие серверные секреты во frontend запрещены.
+
+Храните значения в защищённых настройках CI/hosting, а не в Git. Для staging и production используйте отдельные окружения и убедитесь, что сборка получает значения соответствующего окружения.
+
+## Предварительные проверки
+
+На чистой рабочей копии выполните:
+
+```bash
+npm ci
+npm audit --audit-level=high
+npm run lint
+npm test
+npx playwright install chromium
+npm run test:e2e
+```
+
+`npm run test:e2e` создаёт собственную сборку с тестовыми значениями Supabase и перезаписывает каталог `dist`. Полученный после E2E каталог нельзя публиковать в staging или production.
+
+Финальную сборку целевого окружения необходимо выполнять после E2E. После неё не запускайте `npm run test:e2e`, иначе production-артефакт снова будет заменён тестовой сборкой.
+
+Если загрузка bundled Chromium недоступна в текущей сети или регионе, для локальной проверки можно указать `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` к установленному Chrome. В CI должен использоваться Chromium, установленный Playwright.
+
+Playwright сам запускает production build и preview с тестовыми Supabase values. Он не должен обращаться к рабочему Supabase.
+
+## Сборка и публикация
+
+1. Выполните audit, lint, unit tests и E2E до создания финального артефакта.
+2. Получите из защищённых настроек целевого окружения ожидаемые production-значения `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY`. Убедитесь, что обе переменные заданы и соответствуют утверждённому production-проекту Supabase.
+3. Выполните `npm run build` как последнюю команду, создающую каталог `dist`.
+4. До публикации положительно проверьте, что JavaScript bundle содержит точные ожидаемые production URL и anon/publishable key. Проверка отсутствия `127.0.0.1:54321` и `test-anon-key` является только дополнительной и не заменяет проверку целевой конфигурации.
+5. Опубликуйте содержимое `dist` как корень статического сайта.
+6. Настройте SPA fallback неизвестных маршрутов на `index.html`.
+7. Не переписывайте запросы существующих hashed assets на `index.html`.
+8. Сохраняйте предыдущие hashed assets на период rollout и жизни открытых вкладок.
+
+Пример проверки без вывода значений в консоль:
+
+```powershell
+if ([string]::IsNullOrWhiteSpace($env:VITE_SUPABASE_URL) -or
+    [string]::IsNullOrWhiteSpace($env:VITE_SUPABASE_ANON_KEY)) {
+  throw "Production Supabase variables are not configured"
+}
+
+npm run build
+if ($LASTEXITCODE -ne 0) {
+  throw "Production build failed"
+}
+
+if (-not (Select-String -Path "dist\assets\*.js" -Pattern $env:VITE_SUPABASE_URL -SimpleMatch -Quiet)) {
+  throw "Expected production Supabase URL was not found in the bundle"
+}
+
+if (-not (Select-String -Path "dist\assets\*.js" -Pattern $env:VITE_SUPABASE_ANON_KEY -SimpleMatch -Quiet)) {
+  throw "Expected production Supabase key was not found in the bundle"
+}
+
+if (Select-String -Path "dist\assets\*.js" -Pattern "127.0.0.1:54321","test-anon-key" -SimpleMatch -Quiet) {
+  throw "Playwright Supabase values were found in the production bundle"
+}
+```
+
+## BrowserRouter и прямые URL
+
+Маршруты вроде `/login`, `/quests`, `/play/:id` и `/quests/:id/tasks` не являются файлами. Hosting должен возвращать `index.html`, после чего маршрут обработает `BrowserRouter`. Без SPA fallback прямой переход или обновление страницы завершится 404.
+
+## Supabase Auth
+
+В настройках Supabase для целевого окружения задайте:
+
+- Site URL опубликованного приложения;
+- разрешённые redirect URLs для production и staging.
+
+Точные значения зависят от выбранных доменов. Не добавляйте широкие wildcard без необходимости. Эти настройки выполняются вне текущего репозитория и должны проверяться отдельно.
+
+## PWA, service worker и manifest
+
+После публикации проверьте:
+
+- приложение доступно по HTTPS;
+- manifest загружается без ошибок;
+- service worker зарегистрирован и имеет ожидаемый scope;
+- precache-запросы успешны;
+- новая версия service worker активируется согласно `autoUpdate`;
+- lazy routes загружаются при прямом переходе и навигации через ссылки;
+- offline-поведение проверено после хотя бы одного online-посещения.
+
+`LazyRouteErrorBoundary` предлагает перезагрузку, если старый HTML/service worker запросил уже удалённый hashed-чанк. Это последний fallback, а не замена сохранению ассетов и корректной стратегии кеширования.
+
+## Staging перед production
+
+Сначала проверьте тот же commit и процедуру сборки в staging, используя переменные окружения staging Supabase. Проверьте маршрутизацию, PWA, авторизацию, права доступа, online/offline flow и синхронизацию.
+
+После успешной проверки создайте новый production-артефакт из того же commit, передав production-значения `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY`. Повторите обязательные проверки для production-сборки и только затем опубликуйте её.
+
+Не переносите staging-каталог `dist` в production: переменные `VITE_*` встраиваются в клиентский bundle во время сборки, поэтому staging-артефакт продолжит обращаться к staging Supabase.
+
+После проверки staging выполните необходимые проверки исходного кода из того же commit, включая E2E. Затем задайте production-значения `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` и выполните `npm run build` как последнюю команду формирования production-артефакта.
+
+Не запускайте `npm run test:e2e` после этой финальной сборки: Playwright перезапишет `dist` тестовыми значениями. Не переносите staging-каталог `dist` в production.
+
+## Smoke checklist после публикации
+
+- `/login` открывается напрямую;
+- неизвестный URL корректно попадает в приложение;
+- пользователь без сессии перенаправляется на `/login`;
+- вход и выход работают на целевом Supabase environment;
+- защищённые маршруты недоступны без сессии;
+- основные lazy routes загружаются без ошибок чанков;
+- скачивание квеста и чтение из IndexedDB работают;
+- offline-события сохраняются после перезапуска браузера;
+- повторное восстановление сети не создаёт дубликатов;
+- manifest, иконки и service worker доступны;
+- Error Boundary показывает понятное восстановление при искусственно вызванной ошибке чанка;
+- в консоли и network logs нет секретов или персональных данных.
+
+Авторизованные, RLS и offline-idempotency проверки пока не автоматизированы полностью и требуют отдельного плана тестирования.
+
+## Rollback
+
+1. Сохраняйте идентификатор и артефакт предыдущей проверенной сборки.
+2. При критической ошибке повторно опубликуйте предыдущий `dist`.
+3. Не удаляйте hashed assets предыдущей и текущей версий до стабилизации открытых вкладок.
+4. Проверьте, что service worker и HTML снова согласованы с опубликованными чанками.
+5. Повторите smoke checklist.
+
+Rollback frontend не откатывает Supabase schema/data. Изменения базы должны иметь отдельный совместимый план миграции и отката; таких миграций текущий репозиторий не содержит.
+
+## Безопасность
+
+- Никогда не публикуйте `service_role` key во frontend.
+- Не храните секреты и `.env.local` в Git или артефактах.
+- Не полагайтесь на `ProtectedRoute` как на защиту данных.
+- Перед production подтвердите политики RLS и протестируйте доступ к чужим приватным данным.
+- Правильные ответы, лимиты попыток и статистика должны проверяться сервером.
+- В настройках GitHub включены ruleset для `main`, обязательный CI `validate`, Dependabot, CodeQL Default Setup, secret scanning/push protection и Codex Review. Эти настройки не версионируются вместе с кодом, поэтому их необходимо отдельно проверять перед production-релизом.
+
+
