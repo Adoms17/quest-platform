@@ -85,6 +85,7 @@ if (-not (Select-String -Path "dist\assets\*.js" -Pattern $env:VITE_SUPABASE_ANO
 if (Select-String -Path "dist\assets\*.js" -Pattern "127.0.0.1:54321","test-anon-key" -SimpleMatch -Quiet) {
   throw "Playwright Supabase values were found in the production bundle"
 }
+```
 
 ## BrowserRouter и прямые URL
 
