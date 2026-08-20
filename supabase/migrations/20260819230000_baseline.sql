@@ -7,6 +7,24 @@ create extension if not exists pgcrypto with schema extensions;
 create extension if not exists "uuid-ossp" with schema extensions;
 create extension if not exists postgis with schema public;
 
+do $$
+declare
+  extension_schema text;
+begin
+  select n.nspname
+  into extension_schema
+  from pg_extension e
+  join pg_namespace n on n.oid = e.extnamespace
+  where e.extname = 'postgis';
+
+  if extension_schema is distinct from 'public' then
+    raise exception
+      'PostGIS must be installed in schema public, found %',
+      coalesce(extension_schema, '<missing>');
+  end if;
+end;
+$$;
+
 create table public.profiles (
   id uuid not null,
   username text,
@@ -39,7 +57,7 @@ create table public.tasks (
   title text not null,
   description text,
   hint text,
-  gps_point geometry(Point,4326),
+  gps_point public.geometry(Point,4326),
   static_code text,
   image_url text,
   required_photo_hash text,
