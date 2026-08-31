@@ -18,6 +18,10 @@ export default function QuestEdit({ session }) {
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
   const [locationOptions, setLocationOptions] = useState(['gps'])
+  const [verificationMode, setVerificationMode] =
+    useState('online')
+  const [offlineProgressPolicy, setOfflineProgressPolicy] =
+    useState('allow_pending')
 
   const userId = session?.user?.id
 
@@ -45,6 +49,12 @@ export default function QuestEdit({ session }) {
 
       const optsVer = Array.isArray(questData.verification_options) ? questData.verification_options : ['gps']
       setVerificationOptions(optsVer)
+      setVerificationMode(
+        questData.verification_mode || 'online'
+      )
+      setOfflineProgressPolicy(
+        questData.offline_progress_policy || 'allow_pending'
+      )
 
       setStartAt(questData.start_at ? new Date(questData.start_at).toISOString().slice(0, 16) : '')
       setEndAt(questData.end_at ? new Date(questData.end_at).toISOString().slice(0, 16) : '')
@@ -61,17 +71,33 @@ export default function QuestEdit({ session }) {
     fetchQuest()
   }, [id, fetchQuest])
 
-  async function updateLocationOptions(newOpts) {
-    setLocationOptions(newOpts)
+  async function updateLocationOptions(newOptions) {
+    const withoutGps = verificationOptions.filter(option => option !== 'gps')
+    const nextVerificationOptions = newOptions.includes('gps')
+      ? verificationOptions
+      : withoutGps.length > 0
+        ? withoutGps
+        : ['code']
+
+    const updates = {
+      location_options: newOptions,
+      verification_options: nextVerificationOptions,
+    }
+
     try {
       const { error } = await supabase
         .from('quests')
-        .update({ location_options: newOpts })
+        .update(updates)
         .eq('id', id)
+
       if (error) throw error
+
+      setLocationOptions(newOptions)
+      setVerificationOptions(nextVerificationOptions)
+      setQuest(previous => ({ ...previous, ...updates }))
       toast.success('Настройки места обновлены')
-    } catch (err) {
-      toast.error('Ошибка сохранения настроек: ' + err.message)
+    } catch (error) {
+      toast.error(`Ошибка обновления: ${error.message}`)
     }
   }
 
@@ -90,6 +116,8 @@ export default function QuestEdit({ session }) {
   }
 
   function toggleVerificationOption(opt) {
+    if (option === 'gps' && !locationOptions.includes('gps')) return
+
     if (verificationOptions.includes(opt)) {
       if (verificationOptions.length <= 1) {
         toast.error('Должна быть выбрана как минимум одна опция')
@@ -114,6 +142,32 @@ export default function QuestEdit({ session }) {
       newOpts = [...locationOptions, opt]
     }
     updateLocationOptions(newOpts)
+  }
+
+  async function updateSecuritySetting(field, value) {
+    try {
+      const { error } = await supabase
+        .from('quests')
+        .update({ [field]: value })
+        .eq('id', id)
+
+      if (error) throw error
+
+      if (field === 'verification_mode') {
+        setVerificationMode(value)
+      } else if (field === 'offline_progress_policy') {
+        setOfflineProgressPolicy(value)
+      }
+
+      setQuest(previous => ({
+        ...previous,
+        [field]: value,
+      }))
+
+      toast.success('Настройки безопасности обновлены')
+    } catch (err) {
+      toast.error('Ошибка обновления: ' + err.message)
+    }
   }
 
   async function updateQuest() {
@@ -338,6 +392,7 @@ export default function QuestEdit({ session }) {
             <input
               type="checkbox"
               checked={verificationOptions.includes('gps')}
+              disabled={!locationOptions.includes('gps')}
               onChange={() => toggleVerificationOption('gps')}
             />
             📍 GPS-координаты
@@ -352,6 +407,69 @@ export default function QuestEdit({ session }) {
           </label>
         </div>
         <p className="text-sm text-gray-500 mt-2">Выберите хотя бы один вариант. Участник должен будет подтвердить нахождение по выбранным условиям.</p>
+      </div>
+
+      <div className="bg-gray-50 p-4 rounded mb-6 border">
+        <h3 className="font-semibold mb-3">
+          Безопасность проверки
+        </h3>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Режим проверки
+            </label>
+            <select
+              value={verificationMode}
+              onChange={event =>
+                updateSecuritySetting(
+                  'verification_mode',
+                  event.target.value
+                )
+              }
+              className="w-full border p-2 rounded"
+            >
+              <option value="online">
+                Online — всегда серверная проверка
+              </option>
+              <option value="hybrid">
+                Hybrid — локальная PBKDF2-предпроверка
+              </option>
+              <option value="secure_online">
+                Secure online — без verifier на клиенте
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Поведение без интернета
+            </label>
+            <select
+              value={offlineProgressPolicy}
+              onChange={event =>
+                updateSecuritySetting(
+                  'offline_progress_policy',
+                  event.target.value
+                )
+              }
+              className="w-full border p-2 rounded"
+            >
+              <option value="allow_pending">
+                Разрешить pending
+              </option>
+              <option value="block">
+                Блокировать прохождение
+              </option>
+            </select>
+          </div>
+
+          <p className="text-sm text-gray-500">
+            Сервер остаётся источником истины. После переключения
+            существующего квеста на Hybrid повторно сохраните задания
+            с кодами или ответами, чтобы создать PBKDF2 verifier.
+          </p>
+        </div>
       </div>
 
       {/* Ссылка на управление заданиями */}
