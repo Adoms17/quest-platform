@@ -1,198 +1,302 @@
 import { supabase } from '../supabaseClient'
 import {
-  getPendingResults,
-  markResultsSynced,
   clearSyncedResults,
-  getActiveLocalQuestAttempt,
-  saveQuestAttempt,
+  getPendingResults,
+  getQuestAttempt,
   markQuestAttemptSynced,
-  updateQuestSyncDate
+  markResultsSynced,
+  saveQuestAttempt,
+  updateQuestSyncDate,
+  clearFinishedQuestAttempts,
+  finishQuestAttemptAliases,
 } from './db'
+import {
+  startServerQuestAttempt,
+  submitTaskEvent,
+} from './questApi'
+import { reconcilePendingReceipts } from './syncReceipts'
 import toast from 'react-hot-toast'
+import { isTransportError } from './network'
 
 export const SYNC_COMPLETE_EVENT = 'quest-sync-complete'
 
-export async function syncPendingResults(session = null) {
+const SUPPORTED_EVENT_TYPES = new Set(['open', 'answer'])
+
+function getEventValue(record, field) {
+  return record.payload?.[field] ?? record[field] ?? null
+}
+
+async function getServerAttemptId(localId, questId, userId) {
+  let localAttempt = await getQuestAttempt(localId)
+
+  if (localAttempt && localAttempt.userId !== userId) {
+    throw new Error(
+      'Локальная попытка принадлежит другому пользователю'
+    )
+  }
+
+  if (!localAttempt) {
+    await saveQuestAttempt(localId, questId, userId, null, false, false)
+    localAttempt = await getQuestAttempt(localId)
+  }
+
+  // Сервер вернёт активную попытку либо создаст новую,
+  // если прежняя уже завершена.
+  const serverAttempt = await startServerQuestAttempt(questId)
+
+  if (
+    localAttempt?.serverId !== serverAttempt.id ||
+    localAttempt?.synced !== true
+  ) {
+    await markQuestAttemptSynced(localId, serverAttempt.id)
+  }
+
+  if (
+    typeof window !== 'undefined' &&
+    window.sessionStorage.getItem(`questAttempt_${questId}`) === localId
+  ) {
+    window.sessionStorage.setItem(
+      `questAttempt_${questId}`,
+      serverAttempt.id
+    )
+  }
+
+  return serverAttempt.id
+}
+
+export async function syncPendingResults(
+  session = null,
+  { suppressErrorToast = false } = {}
+) {
   try {
     let user = session?.user
+
     if (!user) {
-      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
+      const {
+        data: { session: currentSession },
+        error: sessionError,
+      } = await supabase.auth.getSession()
+
       if (sessionError || !currentSession) {
         throw new Error('Нет активной сессии. Пожалуйста, войдите заново.')
       }
+
       user = currentSession.user
     }
 
-    const pending = await getPendingResults()
-    const unsynced = pending.filter(p => !p.synced)
+    const pending = await getPendingResults(user.id)
+    const unsynced = pending.filter(record => !record.synced)
+
     if (unsynced.length === 0) {
-      return // нет данных для синхронизации
-    }
-
-    console.log(`Найдено ${unsynced.length} несинхронизированных записей`)
-
-    // Группируем по localQuestAttemptId
-    const groups = {}
-    for (const rec of unsynced) {
-      if (!groups[rec.localQuestAttemptId]) {
-        groups[rec.localQuestAttemptId] = []
+      if (pending.some(record => record.synced === true)) {
+        await clearSyncedResults(user.id)
       }
-      groups[rec.localQuestAttemptId].push(rec)
+
+      return {
+        syncedEvents: 0,
+        skippedLegacyEvents: 0,
+      }
     }
 
-    const syncedQuestIds = new Set()
+    const supportedUnsynced = unsynced
+      .filter(record => SUPPORTED_EVENT_TYPES.has(record.eventType))
 
-    for (const [localId, records] of Object.entries(groups)) {
-      // Дедупликация по taskId (оставляем последнюю запись)
-      const taskMap = {}
-      for (const rec of records) {
-        const taskId = rec.taskId
-        if (!taskMap[taskId] || rec.id > taskMap[taskId].id) {
-          taskMap[taskId] = rec
+    const skippedLegacyEvents =
+      unsynced.length - supportedUnsynced.length
+    const receiptPlan = await reconcilePendingReceipts(pending)
+    const supportedEvents = receiptPlan.unresolvedEvents
+      .sort((left, right) => left.id - right.id)
+
+    const groups = new Map()
+
+    for (const record of supportedEvents) {
+      const localId = record.localQuestAttemptId
+
+      if (!groups.has(localId)) {
+        groups.set(localId, [])
+      }
+
+      groups.get(localId).push(record)
+    }
+
+    const syncedQuestIds = new Set(receiptPlan.syncedQuestIds)
+    let syncedEvents = receiptPlan.syncedEvents
+    const finishedLocalAttemptIds = new Set(
+      receiptPlan.finishedLocalAttemptIds
+    )
+    let rejectedEvents = 0
+
+    for (const [localId, records] of groups) {
+      const questId = records[0].questId
+
+      if (records.some(record => record.questId !== questId)) {
+        throw new Error(
+          'Локальная попытка содержит события разных квестов'
+        )
+      }
+
+      const receiptContext = receiptPlan.contexts.get(localId) || {
+        attemptFinished: false,
+        attemptId: null,
+        rejectedTaskIds: [],
+      }
+
+      if (receiptContext.attemptFinished) {
+        await markResultsSynced(records.map(record => record.id))
+        await finishQuestAttemptAliases(
+          localId,
+          receiptContext.attemptId
+        )
+        finishedLocalAttemptIds.add(localId)
+        syncedEvents += records.length
+        rejectedEvents += records.length
+        syncedQuestIds.add(questId)
+        continue
+      }
+
+      let serverAttemptId = receiptContext.attemptId
+
+      if (serverAttemptId) {
+        await markQuestAttemptSynced(localId, serverAttemptId)
+      } else {
+        serverAttemptId = await getServerAttemptId(
+          localId,
+          questId,
+          user.id
+        )
+      }
+
+      const rejectedTaskIds = new Set(
+        receiptContext.rejectedTaskIds
+      )
+
+      for (const record of records) {
+        if (
+          record.eventType === 'answer' &&
+          rejectedTaskIds.has(record.taskId)
+        ) {
+          await markResultsSynced([record.id])
+          syncedEvents += 1
+          rejectedEvents += 1
+          syncedQuestIds.add(questId)
+          continue
         }
-      }
-      const uniqueRecords = Object.values(taskMap)
-      console.log(`Группа ${localId}: ${uniqueRecords.length} уникальных заданий`)
 
-      // Получаем локальную попытку
-      let localAttempt = await getActiveLocalQuestAttempt(uniqueRecords[0].questId, user.id)
-      if (!localAttempt) {
-        const newLocalId = `local-${Date.now()}`
-        await saveQuestAttempt(newLocalId, uniqueRecords[0].questId, user.id, null, false, false)
-        localAttempt = await getActiveLocalQuestAttempt(uniqueRecords[0].questId, user.id)
-      }
+        const serverState = await submitTaskEvent({
+          questAttemptId: serverAttemptId,
+          taskId: record.taskId,
+          clientEventId: record.clientEventId,
+          eventType: record.eventType,
+          submittedValue: getEventValue(record, 'submittedValue'),
+          latitude: getEventValue(record, 'latitude'),
+          longitude: getEventValue(record, 'longitude'),
+          clientElapsedSeconds: getEventValue(
+            record,
+            'clientElapsedSeconds'
+          ),
+        })
 
-      let serverAttemptId = localAttempt.serverId
+        // Каждое событие подтверждается отдельно. При последующем сбое
+        // уже подтверждённые события не будут отправлены повторно.
+        await markResultsSynced([record.id])
 
-      // Если нет serverId, проверяем на сервере, нет ли уже попытки
-      if (!serverAttemptId) {
-        const { data: existingAttempt, error: findError } = await supabase
-          .from('quest_attempts')
-          .select('id')
-          .eq('quest_id', uniqueRecords[0].questId)
-          .eq('user_id', user.id)
-          .is('finished_at', null)
-          .maybeSingle()
-
-        if (findError) throw findError
-
-        if (existingAttempt) {
-          serverAttemptId = existingAttempt.id
-          await markQuestAttemptSynced(localAttempt.localId, serverAttemptId)
-          console.log(`Используем существующую серверную попытку ${serverAttemptId}`)
-        } else {
-          // Создаём новую
-          const { data: qaData, error: qaError } = await supabase
-            .from('quest_attempts')
-            .insert({
-              quest_id: uniqueRecords[0].questId,
-              user_id: user.id,
-              total_tasks: uniqueRecords.length,
-              started_at: new Date().toISOString(),
-            })
-            .select()
-            .single()
-
-          if (qaError) throw qaError
-
-          serverAttemptId = qaData.id
-          await markQuestAttemptSynced(localAttempt.localId, serverAttemptId)
-          console.log(`Создана новая серверная попытка ${serverAttemptId}`)
-
-          // Обновляем sessionStorage
-          const storageKey = `questAttempt_${uniqueRecords[0].questId}`
-          if (window.sessionStorage.getItem(storageKey) === localId) {
-            window.sessionStorage.setItem(storageKey, serverAttemptId)
-          }
+        if (
+          record.eventType === 'open' &&
+          (
+            serverState?.accepted !== true ||
+            serverState?.opened !== true
+          )
+        ) {
+          rejectedTaskIds.add(record.taskId)
+          rejectedEvents += 1
         }
+        if (serverState?.quest_attempt?.finished_at) {
+          await finishQuestAttemptAliases(localId, serverAttemptId)
+          finishedLocalAttemptIds.add(localId)
+        }
+        syncedEvents += 1
+        syncedQuestIds.add(questId)
+      }
+    }
+
+    if (syncedEvents > 0) {
+      const syncedAt = new Date().toISOString()
+
+      for (const questId of syncedQuestIds) {
+        await updateQuestSyncDate(questId, syncedAt)
       }
 
-      // Вставляем task_attempts
-      for (const rec of uniqueRecords) {
-        const { error: taskError } = await supabase
-          .from('task_attempts')
-          .insert({
-            quest_attempt_id: serverAttemptId,
-            task_id: rec.taskId,
-            opened: rec.opened || true,
-            attempts_used: rec.attemptsUsed || 0,
-            completed: rec.completed || false,
-            failed: rec.failed || false,
-            time_spent: rec.timeSpent || 0,
-          })
-        if (taskError) throw taskError
+      await clearSyncedResults(user.id)
+      if (finishedLocalAttemptIds.size > 0) {
+        await clearFinishedQuestAttempts()
       }
 
-      // Обновляем статистику
-      const { data: tasks, error: tasksError } = await supabase
-        .from('task_attempts')
-        .select('completed, failed, time_spent, attempts_used')
-        .eq('quest_attempt_id', serverAttemptId)
-
-      if (!tasksError && tasks && tasks.length > 0) {
-        const completed = tasks.filter(t => t.completed).length
-        const failed = tasks.filter(t => t.failed).length
-        const totalTime = tasks.reduce((sum, t) => sum + (t.time_spent || 0), 0)
-        const totalAttempts = tasks.reduce((sum, t) => sum + (t.attempts_used || 0), 0)
-        const percent = uniqueRecords.length > 0 ? (completed / uniqueRecords.length) * 100 : 0
-
-        await supabase
-          .from('quest_attempts')
-          .update({
-            completed_tasks: completed,
-            failed_tasks: failed,
-            total_attempts: totalAttempts,
-            total_time: totalTime,
-            percent_success: percent,
-            finished_at: new Date().toISOString(),
-          })
-          .eq('id', serverAttemptId)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(SYNC_COMPLETE_EVENT, {
+          detail: {
+            syncedQuestIds: Array.from(syncedQuestIds),
+          },
+        }))
       }
-
-      syncedQuestIds.add(uniqueRecords[0].questId)
     }
 
-    // Обновляем дату синхронизации
-    const now = new Date().toISOString()
-    for (const questId of syncedQuestIds) {
-      await updateQuestSyncDate(questId, now)
+    if (skippedLegacyEvents > 0) {
+      toast.error(
+        `Сохранено старых результатов без eventType: ${skippedLegacyEvents}. Они не удалены и требуют повторной обработки.`,
+        { duration: 7000 }
+      )
+    } else if (rejectedEvents > 0) {
+      toast.error(
+        'Сервер не подтвердил открытие задания. Проверьте код и повторите попытку.',
+        { duration: 7000 }
+      )
+    } else if (syncedEvents > 0) {
+      toast.success('Результаты синхронизированы!')
     }
 
-    // Очищаем синхронизированные записи
-    const ids = unsynced.map(r => r.id)
-    await markResultsSynced(ids)
-    await clearSyncedResults()
-
-    toast.success('Результаты синхронизированы!')
-
-    // Диспатчим событие для обновления страницы загрузок
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(SYNC_COMPLETE_EVENT, { detail: { syncedQuestIds: Array.from(syncedQuestIds) } }))
+    return {
+      syncedEvents,
+      skippedLegacyEvents,
     }
-  } catch (err) {
-    console.error('Ошибка синхронизации:', err)
-    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
-      toast.error('Ошибка сети. Попробуйте позже.', { duration: 5000 })
-    } else {
-      toast.error('Ошибка синхронизации: ' + err.message)
+  } catch (error) {
+    if (!suppressErrorToast) {
+      console.error('Ошибка синхронизации:', error)
+
+      if (isTransportError(error)) {
+        toast.error('Ошибка сети. Попробуйте позже.', {
+          duration: 5000,
+        })
+      } else {
+        toast.error(`Ошибка синхронизации: ${error.message}`)
+      }
     }
-    throw err
+
+    throw error
   }
 }
 
-export async function syncPendingResultsWithRetry(session = null, maxRetries = 3) {
+export async function syncPendingResultsWithRetry(
+  session = null,
+  maxRetries = 3,
+  options = {}
+) {
   let lastError = null
-  for (let i = 0; i < maxRetries; i++) {
+
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     try {
-      await syncPendingResults(session)
-      return
-    } catch (err) {
-      lastError = err
-      if (i < maxRetries - 1) {
-        console.log(`Попытка ${i + 1} не удалась, повтор через 2 секунды...`)
+      return await syncPendingResults(session, options)
+    } catch (error) {
+      lastError = error
+
+      if (!isTransportError(error)) {
+        throw error
+      }
+
+      if (attempt < maxRetries - 1) {
         await new Promise(resolve => setTimeout(resolve, 2000))
       }
     }
   }
+
   throw lastError
 }
