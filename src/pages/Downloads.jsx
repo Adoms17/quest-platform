@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   getDownloadedQuests,
@@ -22,11 +22,13 @@ export default function Downloads({ session }) {
   const [syncing, setSyncing] = useState(false)
   const [syncErrors, setSyncErrors] = useState({})
 
-  const loadDownloads = async () => {
+  const loadDownloads = useCallback(async () => {
     setLoading(true)
     try {
       const downloaded = await getDownloadedQuests()
-      const pending = await getPendingResults()
+      const pending = session?.user?.id
+        ? await getPendingResults(session.user.id)
+        : []
       const questsWithStatus = []
       for (const d of downloaded) {
         const localQuest = await getQuestFromDB(d.questId)
@@ -45,11 +47,11 @@ export default function Downloads({ session }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [session?.user?.id])
 
   useEffect(() => {
     loadDownloads()
-  }, [])
+  }, [loadDownloads])
 
   // Подписка на событие успешной синхронизации
   useEffect(() => {
@@ -60,13 +62,17 @@ export default function Downloads({ session }) {
     return () => {
       window.removeEventListener(SYNC_COMPLETE_EVENT, handleSyncComplete)
     }
-  }, [])
+  }, [loadDownloads])
 
   async function handleDelete(questId) {
     if (!confirm('Удалить загруженный квест?')) return
-    await removeQuestFromDB(questId)
-    setQuests(quests.filter(q => q.questId !== questId))
-    toast.success('Квест удалён из загрузок')
+    try {
+      await removeQuestFromDB(questId)
+      setQuests(quests.filter(q => q.questId !== questId))
+      toast.success('Квест удалён из загрузок')
+    } catch (error) {
+      toast.error(error.message)
+    }
   }
 
   async function handleSyncAll() {

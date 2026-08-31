@@ -4,6 +4,12 @@ import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 
+const TIMING_CONFIDENCE_LABELS = {
+  trusted: '✅ Серверное',
+  bounded: '⚠️ Ограниченное',
+  reported: '📱 С устройства',
+}
+
 export default function QuestStats({ session }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -43,6 +49,9 @@ export default function QuestStats({ session }) {
               completed,
               failed,
               time_spent,
+              trusted_time_seconds,
+              reported_offline_time_seconds,
+              timing_confidence,
               tasks:task_id (id, title)
             )
           `)
@@ -164,8 +173,14 @@ export default function QuestStats({ session }) {
                 <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('total_attempts')}>
                   Попыток {sortField === 'total_attempts' && (sortDirection === 'asc' ? '▲' : '▼')}
                 </th>
-                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('total_time')}>
-                  Время (сек) {sortField === 'total_time' && (sortDirection === 'asc' ? '▲' : '▼')}
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('trusted_time_seconds')}>
+                  Время сервера (сек) {sortField === 'trusted_time_seconds' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
+                <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('reported_offline_time_seconds')}>
+                  Offline-время (сек) {sortField === 'reported_offline_time_seconds' && (sortDirection === 'asc' ? '▲' : '▼')}
+                </th>
+                <th className="py-2 px-4 border">
+                  Доверие ко времени
                 </th>
                 <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('percent_success')}>
                   % успеха {sortField === 'percent_success' && (sortDirection === 'asc' ? '▲' : '▼')}
@@ -189,7 +204,13 @@ export default function QuestStats({ session }) {
                     <td className="py-2 px-4 border">{attempt.completed_tasks}</td>
                     <td className="py-2 px-4 border">{attempt.failed_tasks}</td>
                     <td className="py-2 px-4 border">{attempt.total_attempts || 0}</td>
-                    <td className="py-2 px-4 border">{attempt.total_time || 0}</td>
+                    <td className="py-2 px-4 border">
+                      {attempt.trusted_time_seconds ?? attempt.total_time ?? 0}
+                    </td>
+                    <td className="py-2 px-4 border">{attempt.reported_offline_time_seconds || 0}</td>
+                    <td className="py-2 px-4 border">
+                      {TIMING_CONFIDENCE_LABELS[attempt.timing_confidence] || '—'}
+                    </td>
                     <td className="py-2 px-4 border font-semibold">{percent}%</td>
                     <td className="py-2 px-4 border">
                       <details>
@@ -203,7 +224,9 @@ export default function QuestStats({ session }) {
                                 {t.opened ? '🔓 открыто' : '🔒 закрыто'} |
                                 попыток: {t.attempts_used || 0} |
                                 {t.completed && ' ✅ успешно'} {t.failed && ' ❌ неуспешно'} |
-                                время: {t.time_spent || 0} сек
+                                сервер: {t.trusted_time_seconds ?? t.time_spent ?? 0} сек |
+                                offline: {t.reported_offline_time_seconds || 0} сек |
+                                {TIMING_CONFIDENCE_LABELS[t.timing_confidence] || '—'}
                               </span>
                             </li>
                           ))}

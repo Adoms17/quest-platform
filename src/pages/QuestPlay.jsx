@@ -1,34 +1,33 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { MapContainer, TileLayer, Marker } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 import {
   getQuestFromDB,
   saveQuestToDB,
-  upsertPendingResult,
   getActiveLocalQuestAttempt,
   saveQuestAttempt,
-  finishQuestAttempt,
   getQuestAttempt, // <-- добавить
   getPendingResults,
+  createClientEventId,
+  enqueuePendingEvent,
 } from '../services/db'
-import { syncPendingResultsWithRetry } from '../services/sync'
-
-delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-})
+import {
+  loadParticipantTasks,
+  startServerQuestAttempt,
+  submitTaskEvent,
+} from '../services/questApi'
+import { verifyHybridCandidate } from '../services/hybridVerification'
+import { isTransportError } from '../services/network'
+import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
 
 export default function QuestPlay({ session }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const isOnlineRef = useRef(navigator.onLine)
+  const questLoadKeyRef = useRef(null)
+  const attemptInitializationKeyRef = useRef(null)
 
   const [quest, setQuest] = useState(null)
   const [tasks, setTasks] = useState([])
@@ -41,11 +40,13 @@ export default function QuestPlay({ session }) {
   const [totalTasks, setTotalTasks] = useState(0)
   const [completedTasks, setCompletedTasks] = useState(0)
   const [failedTasks, setFailedTasks] = useState(0)
-  const [totalAttempts, setTotalAttempts] = useState(0)
-  const [totalTime, setTotalTime] = useState(0)
+  const [, setTotalAttempts] = useState(0)
+  const [, setTotalTime] = useState(0)
   const [startTime, setStartTime] = useState(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [finished, setFinished] = useState(false)
+  const [hasPendingConfirmation, setHasPendingConfirmation] =
+  useState(false)
   const [initAttemptDone, setInitAttemptDone] = useState(false)
   const [taskAttemptsMap, setTaskAttemptsMap] = useState({})
 
@@ -59,7 +60,6 @@ export default function QuestPlay({ session }) {
   const [taskFailed, setTaskFailed] = useState(false)
   const [taskAttemptsUsed, setTaskAttemptsUsed] = useState(0)
   const [taskStartTime, setTaskStartTime] = useState(null)
-  const [taskAttemptId, setTaskAttemptId] = useState(null)
 
   const [isAvailable, setIsAvailable] = useState(false)
   const [availabilityMessage, setAvailabilityMessage] = useState('')
@@ -68,17 +68,12 @@ export default function QuestPlay({ session }) {
   const currentTask = tasks[currentTaskIndex] || null
   const maxAttempts = quest?.max_attempts || 0
 
-  const [manualLat, setManualLat] = useState('')
-  const [manualLng, setManualLng] = useState('')
-  const [showManualInput, setShowManualInput] = useState(false)
+  const [openingTask, setOpeningTask] = useState(false)
   // ----- Онлайн/офлайн -----
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true)
       isOnlineRef.current = true
-      if (session) {
-        syncPendingResultsWithRetry(session).catch(err => console.warn('Синхронизация не удалась:', err))
-      }
     }
     const handleOffline = () => {
       setIsOnline(false)
@@ -90,71 +85,83 @@ export default function QuestPlay({ session }) {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [session]) // <-- добавили session в зависимости
+  }, [])
 
   // ----- Загрузка квеста -----
   useEffect(() => {
+    const loadKey = `${id}:${session?.user?.id || 'anonymous'}`
+
+    if (questLoadKeyRef.current === loadKey) return
+    questLoadKeyRef.current = loadKey
+
     async function loadQuest() {
       setLoading(true)
+
       try {
-        let questData, tasksData
-        const localQuest = await getQuestFromDB(id)
-        if (localQuest) {
-          questData = localQuest
-          tasksData = localQuest.tasks || []
-          if (navigator.onLine) {
-            fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/quests?id=eq.${id}`, {
-              headers: {
-                apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-                Authorization: `Bearer ${session.access_token}`,
-              }
-            })
-              .then(res => res.json())
-              .then(async (data) => {
-                if (data.length > 0) {
-                  const { data: tasksRemote } = await supabase
-                    .from('tasks')
-                    .select('*')
-                    .eq('quest_id', id)
-                    .order('order_index')
-                  if (tasksRemote) {
-                    await saveQuestToDB(data[0], tasksRemote)
-                  }
-                }
-              })
-              .catch(err => console.warn('Фоновое обновление не удалось', err))
+        let questData
+        let tasksData
+
+        async function loadCachedQuest() {
+          const localQuest = await getQuestFromDB(id)
+
+          if (!localQuest) {
+            throw new Error('Квест не загружен для работы без интернета')
           }
-        } else {
-          const { data: qData, error: qErr } = await supabase
-            .from('quests')
-            .select('*')
-            .eq('id', id)
-            .single()
-          if (qErr) throw new Error('Квест не найден')
-          questData = qData
-          const { data: tData, error: tErr } = await supabase
-            .from('tasks')
-            .select('*')
-            .eq('quest_id', id)
-            .order('order_index')
-          if (tErr) throw tErr
-          tasksData = tData || []
-          if (navigator.onLine) {
-            try {
-              await saveQuestToDB(questData, tasksData)
-            } catch { /* ignore */ }
+
+          return {
+            questData: localQuest,
+            tasksData: localQuest.tasks || [],
           }
         }
+
+        if (isOnlineRef.current) {
+          try {
+            const { data: remoteQuest, error: questError } = await supabase
+              .from('quests')
+              .select('*')
+              .eq('id', id)
+              .single()
+
+            if (questError) {
+              if (isTransportError(questError)) throw questError
+              throw new Error('Квест не найден или недоступен')
+            }
+
+            questData = remoteQuest
+            tasksData = await loadParticipantTasks(id)
+
+            try {
+              await saveQuestToDB(questData, tasksData)
+            } catch (cacheError) {
+              console.warn('Не удалось сохранить квест для offline:', cacheError)
+            }
+          } catch (remoteError) {
+            if (!isTransportError(remoteError)) throw remoteError
+
+            isOnlineRef.current = false
+            setIsOnline(false)
+
+            const cached = await loadCachedQuest()
+            questData = cached.questData
+            tasksData = cached.tasksData
+          }
+        } else {
+          const cached = await loadCachedQuest()
+          questData = cached.questData
+          tasksData = cached.tasksData
+        }
+
         setQuest(questData)
         setTasks(tasksData)
         setTotalTasks(tasksData.length)
       } catch (err) {
         setError(err.message)
-        toast.error('Ошибка загрузки: ' + err.message)
+        toast.error(`Ошибка загрузки: ${err.message}`)
       } finally {
         setLoading(false)
       }
     }
+
     loadQuest()
   }, [id, session])
 
@@ -201,7 +208,7 @@ export default function QuestPlay({ session }) {
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i]
       const ta = map[task.id]
-      if (!ta || (!ta.completed && !ta.failed)) {
+      if (!ta || (!ta.completed && !ta.failed && !ta.pending)) {
         return i
       }
     }
@@ -210,7 +217,7 @@ export default function QuestPlay({ session }) {
 
   // ----- Загрузка существующих task_attempts -----
   const loadTaskAttempts = useCallback(async (attemptId) => {
-    const online = navigator.onLine
+    const online = isOnlineRef.current
     let attempts = []
 
     if (online) {
@@ -220,22 +227,57 @@ export default function QuestPlay({ session }) {
         .eq('quest_attempt_id', attemptId)
       if (!error) attempts = data || []
     } else {
-      const pending = await getPendingResults()
+      const pending = session?.user?.id
+        ? await getPendingResults(session.user.id)
+        : []
       attempts = pending.filter(r => r.localQuestAttemptId === attemptId && !r.synced)
     }
 
     const map = {}
-    for (const a of attempts) {
-      const taskId = a.task_id || a.taskId
-      map[taskId] = {
-        id: a.id,
-        attemptsUsed: a.attempts_used || a.attemptsUsed || 0,
-        completed: a.completed || false,
-        failed: a.failed || false,
-        opened: a.opened || false,
-        timeSpent: a.time_spent || a.timeSpent || 0,
+
+    for (const attempt of attempts) {
+      const taskId = attempt.task_id || attempt.taskId
+      const current = map[taskId] || {
+        id: null,
+        attemptsUsed: 0,
+        completed: false,
+        failed: false,
+        opened: false,
+        timeSpent: 0,
+        pending: false,
+        pendingOpen: false,
+      }
+
+      if (attempt.eventType === 'open') {
+        map[taskId] = {
+          ...current,
+          opened: true,
+          pendingOpen: true,
+        }
+      } else if (attempt.eventType === 'answer') {
+        map[taskId] = {
+          ...current,
+          opened: true,
+          pending: true,
+        }
+      } else {
+        // Совместимость со старыми локальными записями.
+        map[taskId] = {
+          ...current,
+          id: attempt.id,
+          attemptsUsed:
+            attempt.attempts_used || attempt.attemptsUsed || 0,
+          completed: Boolean(attempt.completed),
+          failed: Boolean(attempt.failed),
+          opened: Boolean(attempt.opened),
+          timeSpent: attempt.time_spent || attempt.timeSpent || 0,
+        }
       }
     }
+
+    setHasPendingConfirmation(
+      Object.values(map).some(attempt => attempt.pending)
+    )
 
     setTaskAttemptsMap(map)
 
@@ -251,7 +293,7 @@ export default function QuestPlay({ session }) {
     } else {
       setCurrentTaskIndex(nextIndex)
     }
-  }, [tasks, findNextTaskIndex])
+  }, [tasks, findNextTaskIndex, session?.user?.id])
 
   // ----- Инициализация попытки (исправленная офлайн-логика) -----
   const initializeAttempt = useCallback(async () => {
@@ -263,50 +305,48 @@ export default function QuestPlay({ session }) {
       return
     }
 
-    const online = navigator.onLine
+    const initializationKey = `${id}:${userId}`
+
+    if (attemptInitializationKeyRef.current === initializationKey) return
+    attemptInitializationKeyRef.current = initializationKey
+
+    let online = isOnlineRef.current
     let attemptId = null
 
     if (online) {
-      // Онлайн-режим – всегда используем серверный ID
-      const { data: existing, error: findError } = await supabase
-        .from('quest_attempts')
-        .select('id, completed_tasks, failed_tasks, total_attempts, total_time')
-        .eq('quest_id', id)
-        .eq('user_id', userId)
-        .is('finished_at', null)
-        .maybeSingle()
+      try {
+          // Сервер атомарно создаёт либо возвращает активную попытку.
+          const serverAttempt = await startServerQuestAttempt(id)
 
-      if (findError) throw findError
+          attemptId = serverAttempt.id
 
-      if (existing) {
-        attemptId = existing.id
-        setCompletedTasks(existing.completed_tasks || 0)
-        setFailedTasks(existing.failed_tasks || 0)
-        setTotalAttempts(existing.total_attempts || 0)
-        setTotalTime(existing.total_time || 0)
-        const localId = `local-${Date.now()}`
-        await saveQuestAttempt(localId, id, userId, attemptId, true, false)
-      } else {
-        const { data: newAttempt, error: createError } = await supabase
-          .from('quest_attempts')
-          .insert({
-            quest_id: id,
-            user_id: userId,
-            total_tasks: tasks.length,
-          })
-          .select()
-          .single()
-        if (createError) throw createError
-        attemptId = newAttempt.id
-        const localId = `local-${Date.now()}`
-        await saveQuestAttempt(localId, id, userId, attemptId, true, false)
-        setCompletedTasks(0)
-        setFailedTasks(0)
-        setTotalAttempts(0)
-        setTotalTime(0)
+          setCompletedTasks(serverAttempt.completed_tasks || 0)
+          setFailedTasks(serverAttempt.failed_tasks || 0)
+          setTotalAttempts(serverAttempt.total_attempts || 0)
+          setTotalTime(serverAttempt.total_time || 0)
+
+          // Используем серверный UUID также как локальный ключ. Это позволяет
+          // продолжить попытку после потери сети и повторно связать события.
+          await saveQuestAttempt(
+            attemptId,
+            id,
+            userId,
+            attemptId,
+            true,
+            Boolean(serverAttempt.finished_at)
+          )
+
+          sessionStorage.setItem(`questAttempt_${id}`, attemptId)
+      } catch (error) {
+        if (!isTransportError(error)) throw error
+
+        online = false
+        isOnlineRef.current = false
+        setIsOnline(false)
       }
-      sessionStorage.setItem(`questAttempt_${id}`, attemptId)
-    } else {
+    }
+
+    if (!online) {
       // Офлайн-режим
       const storageKey = `questAttempt_${id}`
       let stored = sessionStorage.getItem(storageKey)
@@ -315,7 +355,11 @@ export default function QuestPlay({ session }) {
       if (stored) {
         // Проверяем, не завершена ли эта попытка
         const existingAttempt = await getQuestAttempt(stored)
-        if (existingAttempt && !existingAttempt.finished) {
+        if (
+          existingAttempt &&
+          existingAttempt.userId === userId &&
+          !existingAttempt.finished
+        ) {
           attemptId = stored
         } else {
           // Попытка завершена или не найдена – создаём новую
@@ -352,7 +396,10 @@ export default function QuestPlay({ session }) {
   // Запуск инициализации
   useEffect(() => {
     if (isAvailable && !initAttemptDone) {
-      initializeAttempt()
+      initializeAttempt().catch(err => {
+        attemptInitializationKeyRef.current = null
+        toast.error(`Не удалось открыть квест: ${err.message}`)
+      })
     }
   }, [isAvailable, initAttemptDone, initializeAttempt])
 
@@ -384,12 +431,8 @@ export default function QuestPlay({ session }) {
       setTaskAttemptsUsed(0)
       setIsLocationPhase(true)
       setTaskStartTime(Date.now())
-      setManualLat('')
-      setManualLng('')
-      setShowManualInput(false)
 
       if (existing) {
-        setTaskAttemptId(existing.id)
         setTaskAttemptsUsed(existing.attemptsUsed || 0)
         setTaskCompleted(existing.completed || false)
         setTaskFailed(existing.failed || false)
@@ -407,328 +450,401 @@ export default function QuestPlay({ session }) {
           return
         }
       } else {
-        // Создаём новую запись
-        try {
-          let taskAttemptData
-          if (navigator.onLine) {
-            const { data, error } = await supabase
-              .from('task_attempts')
-              .insert({
-                quest_attempt_id: questAttemptId,
-                task_id: taskId,
-                opened: false,
-                attempts_used: 0,
-                completed: false,
-                failed: false,
-                time_spent: 0,
-              })
-              .select()
-            if (error) throw error
-            taskAttemptData = data[0]
-          } else {
-            taskAttemptData = {
-              id: `local-task-${Date.now()}`,
-              quest_attempt_id: questAttemptId,
-              task_id: taskId,
-              opened: false,
-              attempts_used: 0,
-              completed: false,
-              failed: false,
-              time_spent: 0,
-            }
-          }
-          const newEntry = {
-            id: taskAttemptData.id,
-            attemptsUsed: 0,
-            completed: false,
-            failed: false,
-            opened: false,
-            timeSpent: 0,
-          }
-          setTaskAttemptsMap(prev => ({ ...prev, [taskId]: newEntry }))
-          setTaskAttemptId(taskAttemptData.id)
-        } catch (err) {
-          toast.error('Ошибка создания записи задания: ' + err.message)
+        const newEntry = {
+          id: null,
+          attemptsUsed: 0,
+          completed: false,
+          failed: false,
+          opened: false,
+          timeSpent: 0,
         }
+
+        setTaskAttemptsMap(prev => ({
+          ...prev,
+          [taskId]: newEntry,
+        }))
       }
     }
 
     initTask()
   }, [currentTaskIndex, currentTask, questAttemptId, initAttemptDone, finished, taskAttemptsMap, tasks, findNextTaskIndex])
 
-  // ----- Логика открытия задания -----
-  const tryOpenTask = useCallback(async () => {
-    const opts = quest?.verification_options || ['gps']
-    let hasGps = false
-    let hasCode = false
-    if (opts.includes('gps')) hasGps = locationVerified
-    if (opts.includes('code')) hasCode = codeVerified
-
-    const isGpsRequired = opts.includes('gps')
-    const isCodeRequired = opts.includes('code')
-
-    if (!isGpsRequired && !isCodeRequired) {
-      setIsLocationPhase(false)
-      if (taskAttemptId) {
-        try {
-          if (navigator.onLine) {
-            await supabase.from('task_attempts').update({ opened: true }).eq('id', taskAttemptId)
-          } else {
-            await upsertPendingResult(quest.id, currentTask.id, questAttemptId, { opened: true })
-          }
-          setTaskAttemptsMap(prev => ({
-            ...prev,
-            [currentTask.id]: { ...prev[currentTask.id], opened: true }
-          }))
-        } catch (err) { console.error(err) }
-      }
-      toast.success('🔓 Задание открыто!')
+  // ----- Серверная проверка доступа к заданию -----
+  const submitOpenTask = useCallback(async ({
+    latitude = null,
+    longitude = null,
+  } = {}) => {
+    if (
+      !currentTask ||
+      !questAttemptId ||
+      !isLocationPhase ||
+      openingTask
+    ) {
       return
     }
 
-    let canOpen = false
-    if (isGpsRequired && hasGps) canOpen = true
-    if (isCodeRequired && hasCode) canOpen = true
-    if (isGpsRequired && isCodeRequired && hasGps && hasCode) canOpen = true
+    const requiresGps = Boolean(currentTask.requires_gps)
+    const requiresCode = Boolean(currentTask.requires_code)
+    const submittedCode = requiresCode ? codeInput.trim() : null
 
-    if (canOpen && isLocationPhase && taskAttemptId) {
-      setIsLocationPhase(false)
-      try {
-        if (navigator.onLine) {
-          await supabase.from('task_attempts').update({ opened: true }).eq('id', taskAttemptId)
-        } else {
-          await upsertPendingResult(quest.id, currentTask.id, questAttemptId, { opened: true })
+    if (requiresCode && !submittedCode) {
+      toast.error('Введите код доступа')
+      return
+    }
+
+    if (
+      requiresGps &&
+      (latitude === null || longitude === null)
+    ) {
+      toast.error('Не удалось получить координаты устройства')
+      return
+    }
+
+    setOpeningTask(true)
+
+    try {
+      if (
+        quest.verification_mode === 'hybrid' &&
+        requiresCode &&
+        currentTask.code_verifier
+      ) {
+        try {
+          const locallyMatches = await verifyHybridCandidate(
+            submittedCode,
+            currentTask.code_verifier
+          )
+
+          if (!locallyMatches && !isOnlineRef.current) {
+            toast.error(
+              '❌ Код не прошёл предварительную проверку'
+            )
+            return
+          }
+        } catch {
+          // Повреждённый или неподдерживаемый verifier не является
+          // источником истины: продолжаем через сервер или pending.
+          toast.error(
+            'Локальная проверка недоступна — результат проверит сервер'
+          )
         }
+      }
+
+      if (!isOnlineRef.current) {
+        if (quest.offline_progress_policy === 'block') {
+          toast.error(
+            'Этот квест нельзя продолжать без подключения к интернету'
+          )
+          return
+        }
+
+        await enqueuePendingEvent(
+          quest.id,
+          currentTask.id,
+          questAttemptId,
+          {
+            eventType: 'open',
+            submittedValue: submittedCode,
+            latitude,
+            longitude,
+          }
+        )
+
         setTaskAttemptsMap(prev => ({
           ...prev,
-          [currentTask.id]: { ...prev[currentTask.id], opened: true }
+          [currentTask.id]: {
+            ...prev[currentTask.id],
+            opened: true,
+            pendingOpen: true,
+          },
         }))
+
+        setLocationVerified(requiresGps)
+        setCodeVerified(requiresCode)
+        setIsLocationPhase(false)
+
+        toast.success(
+          '⏳ Проверка сохранена и будет подтверждена сервером'
+        )
+        return
+      }
+
+      const serverState = await submitTaskEvent({
+        questAttemptId,
+        taskId: currentTask.id,
+        clientEventId: createClientEventId(),
+        eventType: 'open',
+        submittedValue: submittedCode,
+        latitude,
+        longitude,
+      })
+
+      setTaskAttemptsMap(prev => ({
+        ...prev,
+        [currentTask.id]: {
+          ...prev[currentTask.id],
+          id: serverState.task_attempt_id,
+          opened: Boolean(serverState.opened),
+          pendingOpen: false,
+        },
+      }))
+
+      if (serverState.opened && serverState.accepted) {
+        setLocationVerified(requiresGps)
+        setCodeVerified(requiresCode)
+        setIsLocationPhase(false)
         toast.success('🔓 Задание открыто!')
-      } catch (err) { console.error(err) }
+      } else {
+        toast.error('Проверка места или кода не пройдена')
+      }
+    } catch (err) {
+      toast.error(`Ошибка открытия задания: ${err.message}`)
+    } finally {
+      setOpeningTask(false)
     }
-  }, [quest, locationVerified, codeVerified, isLocationPhase, taskAttemptId, currentTask, questAttemptId])
+  }, [
+    codeInput,
+    currentTask,
+    isLocationPhase,
+    openingTask,
+    quest,
+    questAttemptId,
+  ])
 
-  useEffect(() => {
-    if (isLocationPhase && taskAttemptId && questAttemptId) {
-      tryOpenTask()
-    }
-  }, [locationVerified, codeVerified, isLocationPhase, taskAttemptId, questAttemptId, tryOpenTask])
-
-  // ----- Вспомогательные функции -----
   function checkLocation() {
     if (!navigator.geolocation) {
       toast.error('Ваш браузер не поддерживает геолокацию')
-      setShowManualInput(true)
       return
     }
-    if (!currentTask.gps_point || !currentTask.gps_point.coordinates) {
-      setLocationVerified(true)
-      toast.success('✅ Проверка места пройдена автоматически (координаты не заданы)')
-      return
-    }
-    const [lng, lat] = currentTask.gps_point.coordinates
-    toast.loading('Определение местоположения...', { id: 'geolocation' })
+
+    toast.loading('Определение местоположения...', {
+      id: 'geolocation',
+    })
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      position => {
         toast.dismiss('geolocation')
-        const userLat = pos.coords.latitude
-        const userLng = pos.coords.longitude
-        const distance = getDistance(lat, lng, userLat, userLng)
-        if (distance <= 50) {
-          setLocationVerified(true)
-          toast.success(`✅ Вы на месте! Расстояние ${Math.round(distance)} м`)
-        } else {
-          toast.error(`❌ Вы слишком далеко (${Math.round(distance)} м). Подойдите ближе`)
-          setShowManualInput(true)
-        }
+
+        submitOpenTask({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        })
       },
-      (err) => {
+      error => {
         toast.dismiss('geolocation')
-        console.error('❌ Ошибка геолокации:', err)
-        toast.error('Не удалось определить местоположение: ' + err.message)
-        setShowManualInput(true)
+        toast.error(
+          `Не удалось определить местоположение: ${error.message}`
+        )
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
     )
   }
 
-  function checkManualLocation() {
-    const latNum = parseFloat(manualLat)
-    const lngNum = parseFloat(manualLng)
-    if (isNaN(latNum) || isNaN(lngNum)) {
-      toast.error('Введите корректные координаты (числа)')
-      return
-    }
-    if (!currentTask.gps_point || !currentTask.gps_point.coordinates) {
-      setLocationVerified(true)
-      toast.success('✅ Проверка места пройдена')
-      return
-    }
-    const [taskLng, taskLat] = currentTask.gps_point.coordinates
-    const distance = getDistance(taskLat, taskLng, latNum, lngNum)
-    if (distance <= 50) {
-      setLocationVerified(true)
-      toast.success(`✅ Вы на месте! Расстояние ${Math.round(distance)} м`)
-      setShowManualInput(false)
-    } else {
-      toast.error(`❌ Вы слишком далеко (${Math.round(distance)} м). Подойдите ближе`)
-    }
-  }
-
-  function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000
-    const dLat = (lat2 - lat1) * Math.PI / 180
-    const dLon = (lon2 - lon1) * Math.PI / 180
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-  }
-
   function checkCode() {
-    if (!currentTask.static_code) {
-      setCodeVerified(true)
+    if (currentTask.requires_gps) {
+      checkLocation()
       return
     }
-    if (codeInput.trim().toUpperCase() === currentTask.static_code.trim().toUpperCase()) {
-      setCodeVerified(true)
-      toast.success('✅ Код верен!')
-    } else {
-      toast.error('❌ Неверный код')
-    }
+
+    submitOpenTask()
   }
 
-  function isAnswerCorrect() {
-    const correct = currentTask.correct_answer?.trim()?.toLowerCase() || ''
-    if (!correct) return true
-    if (currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0) {
-      return selectedOption.trim().toLowerCase() === correct
-    } else {
-      return answerInput.trim().toLowerCase() === correct
+  useEffect(() => {
+    if (
+      currentTask &&
+      questAttemptId &&
+      isLocationPhase &&
+      !currentTask.requires_gps &&
+      !currentTask.requires_code
+    ) {
+      submitOpenTask()
     }
-  }
+  }, [
+    currentTask,
+    isLocationPhase,
+    questAttemptId,
+    submitOpenTask,
+  ])
 
   // ----- Завершение задания -----
   async function completeTask() {
     if (taskCompleted || taskFailed) return
-    const hasAnswer = currentTask.correct_answer && currentTask.correct_answer.trim() !== ''
+
+    const hasAnswer = Boolean(currentTask.requires_answer)
+
+    let submittedValue = null
+
     if (hasAnswer) {
-      let answerProvided = false
-      if (currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0) {
-        answerProvided = selectedOption.trim() !== ''
-      } else {
-        answerProvided = answerInput.trim() !== ''
-      }
-      if (!answerProvided) {
-        toast.error('Пожалуйста, выберите вариант или введите ответ перед завершением')
+      submittedValue =
+        Array.isArray(currentTask.options) && currentTask.options.length > 0
+          ? selectedOption.trim()
+          : answerInput.trim()
+
+      if (!submittedValue) {
+        toast.error(
+          'Пожалуйста, выберите вариант или введите ответ перед завершением'
+        )
         return
       }
-
-      const newAttempts = taskAttemptsUsed + 1
-      setTaskAttemptsUsed(newAttempts)
-
-      if (navigator.onLine) {
-        await supabase.from('task_attempts').update({ attempts_used: newAttempts }).eq('id', taskAttemptId)
-      } else {
-        await upsertPendingResult(quest.id, currentTask.id, questAttemptId, {
-          opened: true,
-          attemptsUsed: newAttempts,
-          completed: false,
-          failed: false,
-          timeSpent: 0,
-        })
-      }
-
-      if (isAnswerCorrect()) {
-        toast.success('✅ Правильный ответ!')
-        await finishTask(true)
-      } else {
-        if (maxAttempts > 0 && newAttempts >= maxAttempts) {
-          toast.error(`❌ Исчерпаны все ${maxAttempts} попыток. Задание не засчитано.`)
-          await finishTask(false)
-        } else {
-          toast.error('❌ Неправильный ответ, попробуйте ещё раз')
-        }
-      }
-    } else {
-      await finishTask(true)
     }
-  }
 
-  async function finishTask(success) {
-    const timeSpent = Math.floor((Date.now() - taskStartTime) / 1000)
+    if (
+      quest.verification_mode === 'hybrid' &&
+      hasAnswer &&
+      currentTask.answer_verifier
+    ) {
+      try {
+        const locallyMatches = await verifyHybridCandidate(
+          submittedValue,
+          currentTask.answer_verifier
+        )
 
-    if (navigator.onLine) {
-      await supabase
-        .from('task_attempts')
-        .update({
-          completed: success,
-          failed: !success,
-          time_spent: timeSpent,
+        if (!locallyMatches && !isOnlineRef.current) {
+          toast.error(
+            '❌ Ответ не прошёл предварительную проверку'
+          )
+          return
+        }
+      } catch {
+        // Не доверяем повреждённому verifier и не подменяем сервер.
+        toast.error(
+          'Локальная проверка недоступна — результат проверит сервер'
+        )
+      }
+    }
+
+    if (isOnlineRef.current) {
+      try {
+        const serverState = await submitTaskEvent({
+          questAttemptId,
+          taskId: currentTask.id,
+          clientEventId: createClientEventId(),
+          eventType: 'answer',
+          submittedValue,
         })
-        .eq('id', taskAttemptId)
-    } else {
-      await upsertPendingResult(quest.id, currentTask.id, questAttemptId, {
+
+        const attemptsUsed = serverState.attempts_used || 0
+        setTaskAttemptsUsed(attemptsUsed)
+        setTaskCompleted(Boolean(serverState.completed))
+        setTaskFailed(Boolean(serverState.failed))
+
+        const newMap = {
+          ...taskAttemptsMap,
+          [currentTask.id]: {
+            ...taskAttemptsMap[currentTask.id],
+            id: serverState.task_attempt_id,
+            opened: Boolean(serverState.opened),
+            completed: Boolean(serverState.completed),
+            failed: Boolean(serverState.failed),
+            attemptsUsed,
+          },
+        }
+
+        setTaskAttemptsMap(newMap)
+
+        const serverAttempt = serverState.quest_attempt || {}
+        setCompletedTasks(serverAttempt.completed_tasks || 0)
+        setFailedTasks(serverAttempt.failed_tasks || 0)
+        setTotalAttempts(serverAttempt.total_attempts || 0)
+        setTotalTime(serverAttempt.total_time || 0)
+
+        if (serverState.correct) {
+          toast.success('✅ Правильный ответ!')
+        } else if (serverState.failed) {
+          toast.error('❌ Сервер отклонил ответ: лимит попыток исчерпан.')
+        } else {
+          const remaining = serverState.remaining_attempts
+          toast.error(
+            remaining === null || remaining === undefined
+              ? '❌ Неправильный ответ, попробуйте ещё раз'
+              : `❌ Неправильный ответ. Осталось попыток: ${remaining}`
+          )
+        }
+
+        if (serverState.terminal) {
+          const nextIndex = findNextTaskIndex(newMap)
+
+          if (serverAttempt.finished_at) {
+            setFinished(true)
+
+            try {
+              await finalizeTrustedQuestAttempt(
+                questAttemptId,
+                id
+              )
+            } catch (cleanupError) {
+              console.error(
+                'Не удалось очистить завершённую локальную попытку:',
+                cleanupError
+              )
+            }
+          } else if (nextIndex === -1) {
+            setFinished(true)
+          } else {
+            setCurrentTaskIndex(nextIndex)
+          }
+        }
+
+        return
+      } catch (err) {
+        toast.error(`Ошибка проверки ответа: ${err.message}`)
+        return
+      }
+    }
+
+    // Offline-событие остаётся pending. Локальная PBKDF2-проверка
+    // не создаёт доверенный результат и не изменяет серверный лимит.
+    if (quest.offline_progress_policy === 'block') {
+      toast.error(
+        'Этот квест нельзя продолжать без подключения к интернету'
+      )
+      return
+    }
+
+    const clientElapsedSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - taskStartTime) / 1000)
+    )
+
+    await enqueuePendingEvent(
+      quest.id,
+      currentTask.id,
+      questAttemptId,
+      {
+        eventType: 'answer',
+        submittedValue,
+        clientElapsedSeconds,
+      }
+    )
+
+    const newMap = {
+      ...taskAttemptsMap,
+      [currentTask.id]: {
+        ...taskAttemptsMap[currentTask.id],
         opened: true,
-        attemptsUsed: taskAttemptsUsed + 1,
-        completed: success,
-        failed: !success,
-        timeSpent: timeSpent,
-      })
+        completed: false,
+        failed: false,
+        pending: true,
+      },
     }
 
-    setTaskAttemptsMap(prev => {
-      const newMap = {
-        ...prev,
-        [currentTask.id]: {
-          ...prev[currentTask.id],
-          completed: success,
-          failed: !success,
-          attemptsUsed: taskAttemptsUsed + 1,
-          timeSpent: timeSpent,
-        }
-      }
+    setTaskAttemptsMap(newMap)
+    setHasPendingConfirmation(true)
 
-      // Пересчитываем статистику
-      const completed = tasks.filter(t => newMap[t.id]?.completed).length
-      const failed = tasks.filter(t => newMap[t.id]?.failed).length
-      setCompletedTasks(completed)
-      setFailedTasks(failed)
-      setTotalTime(totalTime + timeSpent)
-      setTotalAttempts(totalAttempts + taskAttemptsUsed + 1)
+    toast.success(
+      '⏳ Ответ сохранён и ожидает серверной проверки'
+    )
 
-      // Обновляем quest_attempts (онлайн)
-      if (navigator.onLine) {
-        supabase
-          .from('quest_attempts')
-          .update({
-            completed_tasks: completed,
-            failed_tasks: failed,
-            total_attempts: totalAttempts + taskAttemptsUsed + 1,
-            total_time: totalTime + timeSpent,
-            percent_success: totalTasks > 0 ? (completed / totalTasks) * 100 : 0,
-          })
-          .eq('id', questAttemptId)
-          .then()
-      }
+    const nextIndex = findNextTaskIndex(newMap)
 
-      // Находим следующий незавершённый индекс
-      const nextIndex = findNextTaskIndex(newMap)
-      if (nextIndex === -1) {
-        if (navigator.onLine) {
-          supabase
-            .from('quest_attempts')
-            .update({ finished_at: new Date().toISOString() })
-            .eq('id', questAttemptId)
-            .then()
-        } else {
-          finishQuestAttempt(questAttemptId)
-        }
-        setFinished(true)
-      } else {
-        setCurrentTaskIndex(nextIndex)
-      }
-
-      return newMap
-    })
+    if (nextIndex === -1) {
+      setFinished(true)
+    } else {
+      setCurrentTaskIndex(nextIndex)
+    }
   }
 
   // ----- Форматирование времени и медиа -----
@@ -781,7 +897,18 @@ export default function QuestPlay({ session }) {
     const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-green-50 p-8">
-        <h1 className="text-4xl font-bold text-green-600">🏁 Квест завершён!</h1>
+        {hasPendingConfirmation && (
+          <div className="mb-6 max-w-lg rounded border border-yellow-300 bg-yellow-50 p-4 text-center text-yellow-900">
+            ⏳ Результаты сохранены локально и ожидают подтверждения
+            сервером. Итоговая статистика может измениться после
+            синхронизации.
+          </div>
+        )}
+        <h1 className="text-4xl font-bold text-green-600">
+          {hasPendingConfirmation
+            ? '⏳ Квест ожидает проверки'
+            : '🏁 Квест завершён!'}
+        </h1>
         <p className="text-xl mt-4">Вы прошли {completedTasks} из {totalTasks} заданий</p>
         <p className="text-lg mt-2">✅ Успешно: {completedTasks} | ❌ Неуспешно: {failedTasks}</p>
         <p className="text-lg">⏱️ Время: {elapsedSeconds} секунд</p>
@@ -816,35 +943,24 @@ export default function QuestPlay({ session }) {
       </div>
       <div className="bg-white shadow rounded p-6">
         <h2 className="text-xl font-semibold mb-2">{currentTask.title}</h2>
-        {(currentTask.gps_point?.coordinates || currentTask.location_text || currentTask.location_image_url) && (
+        {(currentTask.location_text || currentTask.location_image_url) && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-            <h4 className="font-semibold text-blue-700 mb-1">📍 Место задания</h4>
-            {currentTask.gps_point?.coordinates && (
-              <>
-                <p className="text-sm text-gray-600">
-                  Координаты: {currentTask.gps_point.coordinates[1].toFixed(6)}, {currentTask.gps_point.coordinates[0].toFixed(6)}
-                </p>
-                <div className="h-48 w-full mt-2 rounded overflow-hidden border">
-                  <MapContainer
-                    center={[currentTask.gps_point.coordinates[1], currentTask.gps_point.coordinates[0]]}
-                    zoom={15}
-                    scrollWheelZoom={false}
-                    dragging={false}
-                    zoomControl={false}
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <Marker position={[currentTask.gps_point.coordinates[1], currentTask.gps_point.coordinates[0]]} />
-                  </MapContainer>
-                </div>
-              </>
+            <h4 className="font-semibold text-blue-700 mb-1">
+              📍 Место задания
+            </h4>
+
+            {currentTask.location_text && (
+              <p className="text-sm text-gray-700 mt-1">
+                {currentTask.location_text}
+              </p>
             )}
-            {currentTask.location_text && <p className="text-sm text-gray-700 mt-1">{currentTask.location_text}</p>}
+
             {currentTask.location_image_url && (
-              <img src={currentTask.location_image_url} alt="Место" className="mt-2 max-w-full h-auto rounded max-h-40 object-cover" />
+              <img
+                src={currentTask.location_image_url}
+                alt="Место"
+                className="mt-2 max-w-full h-auto rounded max-h-40 object-cover"
+              />
             )}
           </div>
         )}
@@ -855,59 +971,26 @@ export default function QuestPlay({ session }) {
               <div className="mb-3">
                 <button
                   onClick={checkLocation}
-                  disabled={locationVerified}
+                  disabled={locationVerified || openingTask}
                   className={`px-4 py-2 rounded ${locationVerified ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                 >
                   {locationVerified ? '✅ На месте' : '📍 Я на месте'}
                 </button>
-                {!locationVerified && showManualInput && (
-                  <div className="mt-2 p-3 border rounded bg-yellow-50">
-                    <p className="text-sm text-gray-700 mb-2">Не удалось определить местоположение. Введите координаты вручную:</p>
-                    <div className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        placeholder="Широта (например, 44.6058)"
-                        value={manualLat}
-                        onChange={(e) => setManualLat(e.target.value)}
-                        className="border p-1 rounded w-1/2 text-sm"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Долгота (например, 33.5891)"
-                        value={manualLng}
-                        onChange={(e) => setManualLng(e.target.value)}
-                        className="border p-1 rounded w-1/2 text-sm"
-                      />
-                    </div>
-                    <button
-                      onClick={checkManualLocation}
-                      className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
-                    >
-                      Проверить по координатам
-                    </button>
-                    <button
-                      onClick={() => setShowManualInput(false)}
-                      className="ml-2 bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-400"
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                )}
               </div>
             )}
-            {quest.verification_options.includes('code') && (
+            {currentTask.requires_code && (
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   placeholder="Введите код доступа"
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value)}
-                  disabled={codeVerified}
+                  disabled={codeVerified || openingTask}
                   className="border p-2 rounded flex-1"
                 />
                 <button
                   onClick={checkCode}
-                  disabled={codeVerified}
+                  disabled={codeVerified || openingTask}
                   className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
                 >
                   {codeVerified ? '✅ Код принят' : 'Проверить код'}
@@ -942,7 +1025,7 @@ export default function QuestPlay({ session }) {
                 <p className="mt-1 text-gray-600 bg-gray-100 p-2 rounded">{currentTask.hint}</p>
               </details>
             )}
-            {currentTask.correct_answer && currentTask.correct_answer.trim() !== '' && (
+            {currentTask.requires_answer && (
               <div className="mb-3">
                 {currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0 ? (
                   <div className="space-y-2">
