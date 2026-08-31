@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import MapPicker from '../components/MapPicker'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
+import { createHybridVerifier } from '../services/hybridVerification'
 
 export default function TaskForm() {
   const { id, taskId } = useParams()
@@ -11,16 +12,20 @@ export default function TaskForm() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [locationOptions, setLocationOptions] = useState(['gps'])
+  const [verificationMode, setVerificationMode] = useState('online')
 
   useEffect(() => {
     async function fetchQuestOptions() {
       const { data, error } = await supabase
         .from('quests')
-        .select('location_options')
+        .select('location_options, verification_mode')
         .eq('id', id)
         .single()
       if (!error && data?.location_options) {
         setLocationOptions(data.location_options)
+        if (!error && data?.verification_mode) {
+          setVerificationMode(data.verification_mode)
+        }
       }
     }
     fetchQuestOptions()
@@ -179,6 +184,34 @@ export default function TaskForm() {
       description: description || '',
     }))
 
+    let answerClientVerifier = null
+    let codeClientVerifier = null
+
+    if (verificationMode === 'hybrid') {
+      try {
+        [answerClientVerifier, codeClientVerifier] = await Promise.all([
+          taskForm.correct_answer.trim()
+            ? createHybridVerifier(
+                taskForm.correct_answer,
+                'answer'
+              )
+            : null,
+          taskForm.static_code.trim()
+            ? createHybridVerifier(
+                taskForm.static_code,
+                'code'
+              )
+            : null,
+        ])
+      } catch (err) {
+        toast.error(
+          'Не удалось создать hybrid verifier: ' + err.message
+        )
+        setSaving(false)
+        return
+      }
+    }
+
     const taskData = {
       quest_id: id,
       title: taskForm.title.trim(),
@@ -189,6 +222,8 @@ export default function TaskForm() {
         : null,
       static_code: taskForm.static_code.trim() || null,
       correct_answer: taskForm.correct_answer.trim() || null,
+      answer_client_verifier: answerClientVerifier,
+      code_client_verifier: codeClientVerifier,
       options: optionsArray,
       media: mediaData,
       location_text: taskForm.location_text.trim() || null,
