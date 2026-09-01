@@ -1,32 +1,57 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'  // ← добавить
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
+import { getAuthErrorMessage, logAuthError } from '../services/authErrors'
 
 export default function Login({ setSession }) {
-  const navigate = useNavigate()  // ← добавить
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSignUp = async () => {
     setLoading(true)
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) toast.error(error.message)
-    else toast.success('Проверьте почту или войдите сразу (если подтверждение отключено)')
-    setLoading(false)
+    try {
+      const { error } = await supabase.auth.signUp({ email, password })
+      if (error) {
+        logAuthError('Ошибка регистрации', error)
+        toast.error(getAuthErrorMessage(error))
+        return
+      }
+
+      toast.success(
+        'Проверьте почту или войдите сразу, если подтверждение email отключено.',
+      )
+    } catch (error) {
+      logAuthError('Ошибка регистрации', error)
+      toast.error(getAuthErrorMessage(error))
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSignIn = async () => {
     setLoading(true)
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      toast.error(error.message)
-    } else {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) {
+        logAuthError('Ошибка входа', error)
+        toast.error(getAuthErrorMessage(error))
+        return
+      }
+
       setSession(data.session)
-      navigate('/quests')  // ← явный редирект
+      navigate('/quests')
+    } catch (error) {
+      logAuthError('Ошибка входа', error)
+      toast.error(getAuthErrorMessage(error))
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -37,14 +62,14 @@ export default function Login({ setSession }) {
           type="email"
           placeholder="Email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(event) => setEmail(event.target.value)}
           className="w-full p-2 border rounded mb-3"
         />
         <input
           type="password"
           placeholder="Пароль"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(event) => setPassword(event.target.value)}
           className="w-full p-2 border rounded mb-3"
         />
         <div className="flex gap-2">
