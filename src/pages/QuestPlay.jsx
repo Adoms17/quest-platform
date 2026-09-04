@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
@@ -21,6 +21,7 @@ import {
 import { verifyHybridCandidate } from '../services/hybridVerification'
 import { isTransportError } from '../services/network'
 import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
+import { getQuestAvailability } from '../services/questAvailability'
 
 export default function QuestPlay({ session }) {
   const { id } = useParams()
@@ -61,9 +62,7 @@ export default function QuestPlay({ session }) {
   const [taskAttemptsUsed, setTaskAttemptsUsed] = useState(0)
   const [taskStartTime, setTaskStartTime] = useState(null)
 
-  const [isAvailable, setIsAvailable] = useState(false)
-  const [availabilityMessage, setAvailabilityMessage] = useState('')
-  const [timeUntilStart, setTimeUntilStart] = useState(null)
+  const [availabilityNow, setAvailabilityNow] = useState(() => Date.now())
 
   const currentTask = tasks[currentTaskIndex] || null
   const maxAttempts = quest?.max_attempts || 0
@@ -166,42 +165,15 @@ export default function QuestPlay({ session }) {
   }, [id, session])
 
   // ----- Доступность -----
-  const checkAvailability = useCallback(() => {
-    if (!quest) return
-    const now = new Date()
-    let available = true
-    let message = ''
-    let timeLeft = null
-    if (quest.is_open === false) {
-      available = false
-      message = `⛔ Квест "${quest.title}" закрыт организатором`
-    }
-    if (available && quest.end_at) {
-      const end = new Date(quest.end_at)
-      if (end < now) {
-        available = false
-        message = `⏰ Квест "${quest.title}" был закрыт ${end.toLocaleString()}`
-      }
-    }
-    if (available && quest.start_at) {
-      const start = new Date(quest.start_at)
-      if (start > now) {
-        available = false
-        timeLeft = Math.floor((start - now) / 1000)
-        message = `⏳ Квест "${quest.title}" откроется ${start.toLocaleString()} через`
-      }
-    }
-    setIsAvailable(available)
-    setAvailabilityMessage(message)
-    setTimeUntilStart(timeLeft)
-  }, [quest])
+  const { isAvailable, availabilityMessage, timeUntilStart } = useMemo(() => {
+    return getQuestAvailability(quest, availabilityNow)
+  }, [availabilityNow, quest])
 
   useEffect(() => {
     if (!quest) return
-    checkAvailability()
-    const interval = setInterval(checkAvailability, 1000)
+    const interval = setInterval(() => setAvailabilityNow(Date.now()), 1000)
     return () => clearInterval(interval)
-  }, [quest, checkAvailability])
+  }, [quest])
 
   // ----- Функция поиска следующего незавершённого задания -----
   const findNextTaskIndex = useCallback((map) => {
@@ -216,6 +188,8 @@ export default function QuestPlay({ session }) {
   }, [tasks])
 
   // ----- Загрузка существующих task_attempts -----
+  const userId = session?.user?.id
+
   const loadTaskAttempts = useCallback(async (attemptId) => {
     const online = isOnlineRef.current
     let attempts = []
@@ -227,8 +201,8 @@ export default function QuestPlay({ session }) {
         .eq('quest_attempt_id', attemptId)
       if (!error) attempts = data || []
     } else {
-      const pending = session?.user?.id
-        ? await getPendingResults(session.user.id)
+      const pending = userId
+        ? await getPendingResults(userId)
         : []
       attempts = pending.filter(r => r.localQuestAttemptId === attemptId && !r.synced)
     }
@@ -293,7 +267,7 @@ export default function QuestPlay({ session }) {
     } else {
       setCurrentTaskIndex(nextIndex)
     }
-  }, [tasks, findNextTaskIndex, session?.user?.id])
+  }, [tasks, findNextTaskIndex, userId])
 
   // ----- Инициализация попытки (исправленная офлайн-логика) -----
   const initializeAttempt = useCallback(async () => {
@@ -396,10 +370,14 @@ export default function QuestPlay({ session }) {
   // Запуск инициализации
   useEffect(() => {
     if (isAvailable && !initAttemptDone) {
-      initializeAttempt().catch(err => {
-        attemptInitializationKeyRef.current = null
-        toast.error(`Не удалось открыть квест: ${err.message}`)
-      })
+      const timeout = setTimeout(() => {
+        initializeAttempt().catch(err => {
+          attemptInitializationKeyRef.current = null
+          toast.error(`Не удалось открыть квест: ${err.message}`)
+        })
+      }, 0)
+
+      return () => clearTimeout(timeout)
     }
   }, [isAvailable, initAttemptDone, initializeAttempt])
 
@@ -660,7 +638,8 @@ export default function QuestPlay({ session }) {
       !currentTask.requires_gps &&
       !currentTask.requires_code
     ) {
-      submitOpenTask()
+      const timeout = setTimeout(() => submitOpenTask(), 0)
+      return () => clearTimeout(timeout)
     }
   }, [
     currentTask,

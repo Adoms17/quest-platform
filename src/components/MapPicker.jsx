@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -28,15 +28,14 @@ function MapController({ center, zoom }) {
 }
 
 // Компонент для обработки кликов и отображения маркера
-function LocationMarker({ position, setPosition, onSelect }) {
+function LocationMarker({ position, onSelect }) {
   const map = useMap()
   
   const handleClick = useCallback((e) => {
     const lat = e.latlng.lat
     const lng = e.latlng.lng
-    setPosition([lat, lng])
     if (onSelect) onSelect(lat, lng)
-  }, [onSelect, setPosition])
+  }, [onSelect])
 
   // Добавляем обработчик клика через событие
   useEffect(() => {
@@ -50,16 +49,9 @@ function LocationMarker({ position, setPosition, onSelect }) {
 }
 
 export default function MapPicker({ onSelect, initialLat, initialLng }) {
-  const [position, setPosition] = useState(null)
-
-  // Синхронизируем локальное состояние с пропсами
-  useEffect(() => {
-    if (initialLat && initialLng) {
-      setPosition([initialLat, initialLng])
-    } else {
-      setPosition(null)
-    }
-  }, [initialLat, initialLng])
+  const position = Number.isFinite(initialLat) && Number.isFinite(initialLng)
+    ? [initialLat, initialLng]
+    : null
 
   const defaultCenter = [55.7558, 37.6173] // Москва
   const center = position || defaultCenter
@@ -79,7 +71,6 @@ export default function MapPicker({ onSelect, initialLat, initialLng }) {
         <MapController center={center} zoom={zoom} />
         <LocationMarker
           position={position}
-          setPosition={setPosition}
           onSelect={onSelect}
         />
       </MapContainer>

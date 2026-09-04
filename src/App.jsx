@@ -20,6 +20,15 @@ const Downloads = lazy(() => import('./pages/Downloads'))
 const TaskManager = lazy(() => import('./pages/TaskManager'))
 const TaskForm = lazy(() => import('./pages/TaskForm'))
 
+function Layout({ children, session }) {
+  return (
+    <>
+      <Navbar session={session} />
+      <main>{children}</main>
+    </>
+  )
+}
+
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -83,16 +92,6 @@ function App() {
     return <div className="min-h-screen flex items-center justify-center">Загрузка...</div>
   }
 
-  // Обёртка для страниц с навигацией
-  function Layout({ children }) {
-    return (
-      <>
-        <Navbar session={session} />
-        <main>{children}</main>
-      </>
-    )
-  }
-
   return (
     <BrowserRouter>
       <AppToaster />
@@ -104,7 +103,7 @@ function App() {
           path="/quests"
           element={
             <ProtectedRoute session={session}>
-              <Layout>
+              <Layout session={session}>
                 <QuestList session={session} />
               </Layout>
             </ProtectedRoute>
@@ -114,7 +113,7 @@ function App() {
           path="/quests/new"
           element={
             <ProtectedRoute session={session}>
-              <Layout>
+              <Layout session={session}>
                 <QuestCreate session={session} />
               </Layout>
             </ProtectedRoute>
@@ -124,7 +123,7 @@ function App() {
           path="/quests/:id/edit"
           element={
             <ProtectedRoute session={session}>
-              <Layout>
+              <Layout session={session}>
                 <QuestEdit session={session} />
               </Layout>
             </ProtectedRoute>
@@ -134,7 +133,7 @@ function App() {
           path="/quests/:id/stats"
           element={
             <ProtectedRoute session={session}>
-              <Layout>
+              <Layout session={session}>
                 <QuestStats session={session} />
               </Layout>
             </ProtectedRoute>
@@ -144,7 +143,7 @@ function App() {
           path="/play/:id"
           element={
             <ProtectedRoute session={session}>
-              <Layout>
+              <Layout session={session}>
                 <QuestPlay session={session} />
               </Layout>
             </ProtectedRoute>
@@ -154,7 +153,7 @@ function App() {
           path="/downloads"
           element={
             <ProtectedRoute session={session}>
-              <Layout>
+              <Layout session={session}>
                 <Downloads session={session} />
               </Layout>
             </ProtectedRoute>
@@ -164,7 +163,7 @@ function App() {
           path="/quests/:id/tasks"
           element={
             <ProtectedRoute session={session}>
-              <Layout>
+              <Layout session={session}>
                 <TaskManager session={session} />
               </Layout>
             </ProtectedRoute>
@@ -174,7 +173,7 @@ function App() {
           path="/quests/:id/tasks/new"
           element={
             <ProtectedRoute session={session}>
-              <Layout>
+              <Layout session={session}>
                 <TaskForm session={session} />
               </Layout>
             </ProtectedRoute>
@@ -184,7 +183,7 @@ function App() {
           path="/quests/:id/tasks/:taskId/edit"
           element={
             <ProtectedRoute session={session}>
-              <Layout>
+              <Layout session={session}>
                 <TaskForm session={session} />
               </Layout>
             </ProtectedRoute>
