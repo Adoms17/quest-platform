@@ -2,7 +2,12 @@
 
 ## Назначение
 
-Эта инструкция не привязана к конкретному hosting-провайдеру. Она описывает требования для публикации статической production-сборки Vite. Наличие уже работающего production deployment текущим репозиторием не подтверждается.
+Frontend развёрнут в Cloudflare Workers как два изолированных приложения:
+
+- production: `quest-platform`, ветка `main`;
+- staging: `quest-platform-staging`, ветка `staging`.
+
+Оба Worker собирают статический Vite/PWA bundle из одного репозитория, но используют разные Supabase build variables. Настройки Cloudflare остаются внешней конфигурацией и должны сверяться перед релизом.
 
 ## Требования к hosting
 
@@ -61,6 +66,15 @@ Playwright сам запускает production build и preview с тестов
 7. Не переписывайте запросы существующих hashed assets на `index.html`.
 8. Сохраняйте предыдущие hashed assets на период rollout и жизни открытых вкладок.
 
+Wrangler использует default environment для production и именованное окружение для staging:
+
+```bash
+npx wrangler deploy --env=""
+npx wrangler deploy --env staging
+```
+
+Cloudflare build command для обоих окружений — `npm run build`. Production deploy command — `npx wrangler deploy --env=""`; staging deploy command — `npx wrangler deploy --env staging`. Явный пустой environment для production устраняет неоднозначность при наличии именованного `env.staging`. Ветка `main` не должна автоматически публиковаться в staging Worker, а ветка `staging` — в production Worker.
+
 Пример проверки без вывода значений в консоль:
 
 ```powershell
@@ -116,9 +130,9 @@ if (Select-String -Path "dist\assets\*.js" -Pattern "127.0.0.1:54321","test-anon
 
 ## Staging перед production
 
-Сначала проверьте тот же commit и процедуру сборки в staging, используя переменные окружения staging Supabase. Проверьте маршрутизацию, PWA, авторизацию, права доступа, online/offline flow и синхронизацию.
+Изменения проходят через pull request в защищённую ветку `staging`. CI `validate` обязателен и для `staging`, и для `main`. После merge Cloudflare собирает staging Worker с переменными staging Supabase. Проверьте маршрутизацию, PWA, авторизацию, права доступа, online/offline flow и синхронизацию.
 
-После успешной проверки создайте новый production-артефакт из того же commit, передав production-значения `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY`. Повторите обязательные проверки для production-сборки и только затем опубликуйте её.
+После успешного smoke создайте pull request из `staging` в `main`. После обязательных проверок и squash merge Cloudflare создаёт новый production-артефакт с production-значениями `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY`. GitHub Environment `production` отдельно требует ручного подтверждения для Supabase migration workflow.
 
 Не переносите staging-каталог `dist` в production: переменные `VITE_*` встраиваются в клиентский bundle во время сборки, поэтому staging-артефакт продолжит обращаться к staging Supabase.
 
@@ -151,7 +165,7 @@ if (Select-String -Path "dist\assets\*.js" -Pattern "127.0.0.1:54321","test-anon
 4. Проверьте, что service worker и HTML снова согласованы с опубликованными чанками.
 5. Повторите smoke checklist.
 
-Rollback frontend не откатывает Supabase schema/data. Изменения базы должны иметь отдельный совместимый план миграции и отката; таких миграций текущий репозиторий не содержит.
+Cloudflare хранит историю версий Worker и позволяет вернуть трафик на предыдущую проверенную версию. Rollback frontend не откатывает Supabase schema/data. Изменения базы оформляются миграциями и должны иметь отдельный совместимый план отката или forward-fix.
 
 ## Безопасность
 
