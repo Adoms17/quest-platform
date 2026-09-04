@@ -33,7 +33,7 @@ Quest Platform — развиваемый mobile-first PWA для создани
 - Supabase Auth и Supabase JavaScript Client;
 - IndexedDB через `idb`;
 - Leaflet и React Leaflet;
-- Tailwind CSS 3;
+- Tailwind CSS 4;
 - `vite-plugin-pwa` и Workbox;
 - Vitest и React Testing Library;
 - Playwright;

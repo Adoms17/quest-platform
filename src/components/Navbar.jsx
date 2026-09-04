@@ -62,7 +62,7 @@ export default function Navbar({ session }) {
   if (!session) return null
 
   return (
-    <nav className="bg-blue-600 text-white p-4 shadow flex justify-between items-center">
+    <nav className="bg-blue-600 text-white p-4 shadow-sm flex justify-between items-center">
       {/* Левый блок: логотип и имя пользователя (на больших экранах) */}
       <div className="flex items-center gap-4">
         <Link to="/quests" className="text-xl font-bold hover:underline">
@@ -80,7 +80,7 @@ export default function Navbar({ session }) {
       <div className="relative user-menu">
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="flex items-center gap-2 focus:outline-none"
+          className="flex items-center gap-2 focus:outline-hidden"
         >
           {avatarUrl ? (
             <img
@@ -106,7 +106,7 @@ export default function Navbar({ session }) {
 
         {/* Выпадающее меню */}
         {menuOpen && (
-          <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded shadow-lg py-1 z-10">
+          <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-sm shadow-lg py-1 z-10">
             <div className="px-4 py-2 border-b">
               <p className="font-medium">{displayName}</p>
               <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
