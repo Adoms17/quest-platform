@@ -21,7 +21,6 @@ export default function TaskManager() {
   }, [id])
 
   const fetchTasks = useCallback(async () => {
-    setLoading(true)
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
@@ -36,8 +35,11 @@ export default function TaskManager() {
   }, [id])
 
   useEffect(() => {
-    fetchQuestTitle()
-    fetchTasks()
+    const timeout = setTimeout(() => {
+      fetchQuestTitle()
+      fetchTasks()
+    }, 0)
+    return () => clearTimeout(timeout)
   }, [fetchQuestTitle, fetchTasks])
 
   async function handleDelete(taskId) {
@@ -54,12 +56,8 @@ export default function TaskManager() {
   async function moveTaskUp(index) {
     if (index === 0) return
     setMoving(true)
-    const task = tasks[index]
-    const prevTask = tasks[index - 1]
-    // Меняем order_index местами
-    const tempOrder = task.order_index
-    task.order_index = prevTask.order_index
-    prevTask.order_index = tempOrder
+    const task = { ...tasks[index], order_index: tasks[index - 1].order_index }
+    const prevTask = { ...tasks[index - 1], order_index: tasks[index].order_index }
 
     // Обновляем в БД
     try {
@@ -93,11 +91,8 @@ export default function TaskManager() {
   async function moveTaskDown(index) {
     if (index === tasks.length - 1) return
     setMoving(true)
-    const task = tasks[index]
-    const nextTask = tasks[index + 1]
-    const tempOrder = task.order_index
-    task.order_index = nextTask.order_index
-    nextTask.order_index = tempOrder
+    const task = { ...tasks[index], order_index: tasks[index + 1].order_index }
+    const nextTask = { ...tasks[index + 1], order_index: tasks[index].order_index }
 
     try {
       const { error: err1 } = await supabase

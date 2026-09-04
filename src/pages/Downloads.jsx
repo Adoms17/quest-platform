@@ -21,13 +21,13 @@ export default function Downloads({ session }) {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncErrors, setSyncErrors] = useState({})
+  const userId = session?.user?.id
 
   const loadDownloads = useCallback(async () => {
-    setLoading(true)
     try {
       const downloaded = await getDownloadedQuests()
-      const pending = session?.user?.id
-        ? await getPendingResults(session.user.id)
+      const pending = userId
+        ? await getPendingResults(userId)
         : []
       const questsWithStatus = []
       for (const d of downloaded) {
@@ -47,10 +47,11 @@ export default function Downloads({ session }) {
     } finally {
       setLoading(false)
     }
-  }, [session?.user?.id])
+  }, [userId])
 
   useEffect(() => {
-    loadDownloads()
+    const timeout = setTimeout(() => loadDownloads(), 0)
+    return () => clearTimeout(timeout)
   }, [loadDownloads])
 
   // Подписка на событие успешной синхронизации

@@ -13,7 +13,6 @@ export default function QuestList({ session }) {
   const userId = session?.user?.id
 
   const fetchQuests = useCallback(async () => {
-    setLoading(true)
     const { data, error } = await supabase
       .from('quests')
       .select('*')
@@ -31,7 +30,8 @@ export default function QuestList({ session }) {
 
   useEffect(() => {
     if (!userId) return
-    fetchQuests()
+    const timeout = setTimeout(() => fetchQuests(), 0)
+    return () => clearTimeout(timeout)
   }, [userId, fetchQuests])
 
   async function handleDelete(id) {

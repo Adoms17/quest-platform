@@ -26,7 +26,6 @@ export default function QuestEdit({ session }) {
   const userId = session?.user?.id
 
   const fetchQuest = useCallback(async () => {
-    setLoading(true)
     try {
       const { data: questData, error: questError } = await supabase
         .from('quests')
@@ -68,7 +67,8 @@ export default function QuestEdit({ session }) {
 
   useEffect(() => {
     if (!id) return
-    fetchQuest()
+    const timeout = setTimeout(() => fetchQuest(), 0)
+    return () => clearTimeout(timeout)
   }, [id, fetchQuest])
 
   async function updateLocationOptions(newOptions) {

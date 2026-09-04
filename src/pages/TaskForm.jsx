@@ -9,7 +9,7 @@ import { createHybridVerifier } from '../services/hybridVerification'
 export default function TaskForm() {
   const { id, taskId } = useParams()
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(Boolean(taskId))
   const [saving, setSaving] = useState(false)
   const [locationOptions, setLocationOptions] = useState(['gps'])
   const [verificationMode, setVerificationMode] = useState('online')
@@ -50,7 +50,6 @@ export default function TaskForm() {
   const isEdit = !!taskId
 
   const fetchTask = useCallback(async () => {
-    setLoading(true)
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
@@ -92,7 +91,8 @@ export default function TaskForm() {
 
   useEffect(() => {
     if (isEdit) {
-      fetchTask()
+      const timeout = setTimeout(() => fetchTask(), 0)
+      return () => clearTimeout(timeout)
     }
   }, [isEdit, fetchTask])
 
