@@ -857,7 +857,7 @@ export default function QuestPlay({ session }) {
   if (!isAvailable) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50">
-        <div className="bg-white p-8 rounded shadow max-w-md text-center">
+        <div className="bg-white p-8 rounded-sm shadow-sm max-w-md text-center">
           <h2 className="text-2xl font-bold text-red-600 mb-4">⛔ Квест недоступен</h2>
           <p className="text-gray-700">{availabilityMessage}</p>
           {timeUntilStart !== null && timeUntilStart > 0 && (
@@ -865,7 +865,7 @@ export default function QuestPlay({ session }) {
               {formatTime(timeUntilStart)}
             </div>
           )}
-          <button onClick={() => navigate('/')} className="mt-6 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+          <button onClick={() => navigate('/')} className="mt-6 bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600">
             На главную
           </button>
         </div>
@@ -877,7 +877,7 @@ export default function QuestPlay({ session }) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-green-50 p-8">
         {hasPendingConfirmation && (
-          <div className="mb-6 max-w-lg rounded border border-yellow-300 bg-yellow-50 p-4 text-center text-yellow-900">
+          <div className="mb-6 max-w-lg rounded-sm border border-yellow-300 bg-yellow-50 p-4 text-center text-yellow-900">
             ⏳ Результаты сохранены локально и ожидают подтверждения
             сервером. Итоговая статистика может измениться после
             синхронизации.
@@ -892,7 +892,7 @@ export default function QuestPlay({ session }) {
         <p className="text-lg mt-2">✅ Успешно: {completedTasks} | ❌ Неуспешно: {failedTasks}</p>
         <p className="text-lg">⏱️ Время: {elapsedSeconds} секунд</p>
         <p className="text-lg">🎯 Процент успеха: {percent}%</p>
-        <button onClick={() => navigate('/')} className="mt-6 bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600">
+        <button onClick={() => navigate('/')} className="mt-6 bg-blue-500 text-white px-6 py-3 rounded-sm hover:bg-blue-600">
           На главную
         </button>
       </div>
@@ -905,7 +905,7 @@ export default function QuestPlay({ session }) {
         <h1 className="text-2xl font-bold">{quest.title}</h1>
         <button
           onClick={handleExit}
-          className="text-red-500 hover:text-red-700 text-sm border border-red-500 px-3 py-1 rounded hover:bg-red-50"
+          className="text-red-500 hover:text-red-700 text-sm border border-red-500 px-3 py-1 rounded-sm hover:bg-red-50"
         >
           ✕ Выйти из квеста
         </button>
@@ -920,10 +920,10 @@ export default function QuestPlay({ session }) {
           style={{ width: `${((currentTaskIndex) / tasks.length) * 100}%` }}
         />
       </div>
-      <div className="bg-white shadow rounded p-6">
+      <div className="bg-white shadow-sm rounded-sm p-6">
         <h2 className="text-xl font-semibold mb-2">{currentTask.title}</h2>
         {(currentTask.location_text || currentTask.location_image_url) && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-sm">
             <h4 className="font-semibold text-blue-700 mb-1">
               📍 Место задания
             </h4>
@@ -938,7 +938,7 @@ export default function QuestPlay({ session }) {
               <img
                 src={currentTask.location_image_url}
                 alt="Место"
-                className="mt-2 max-w-full h-auto rounded max-h-40 object-cover"
+                className="mt-2 max-w-full h-auto rounded-sm max-h-40 object-cover"
               />
             )}
           </div>
@@ -951,7 +951,7 @@ export default function QuestPlay({ session }) {
                 <button
                   onClick={checkLocation}
                   disabled={locationVerified || openingTask}
-                  className={`px-4 py-2 rounded ${locationVerified ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                  className={`px-4 py-2 rounded-sm ${locationVerified ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                 >
                   {locationVerified ? '✅ На месте' : '📍 Я на месте'}
                 </button>
@@ -965,12 +965,12 @@ export default function QuestPlay({ session }) {
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value)}
                   disabled={codeVerified || openingTask}
-                  className="border p-2 rounded flex-1"
+                  className="border p-2 rounded-sm flex-1"
                 />
                 <button
                   onClick={checkCode}
                   disabled={codeVerified || openingTask}
-                  className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                  className="bg-yellow-500 text-white px-4 py-2 rounded-sm hover:bg-yellow-600"
                 >
                   {codeVerified ? '✅ Код принят' : 'Проверить код'}
                 </button>
@@ -984,10 +984,10 @@ export default function QuestPlay({ session }) {
             {currentTask.media_url && (
               <div className="mb-3">
                 {getMediaType(currentTask.media_url) === 'image' && (
-                  <img src={currentTask.media_url} alt="Медиа" className="max-w-full h-auto rounded" />
+                  <img src={currentTask.media_url} alt="Медиа" className="max-w-full h-auto rounded-sm" />
                 )}
                 {getMediaType(currentTask.media_url) === 'video' && (
-                  <video controls className="max-w-full h-auto rounded">
+                  <video controls className="max-w-full h-auto rounded-sm">
                     <source src={currentTask.media_url} type={`video/${currentTask.media_url.split('.').pop()}`} />
                   </video>
                 )}
@@ -1001,7 +1001,7 @@ export default function QuestPlay({ session }) {
             {currentTask.hint && (
               <details className="mb-3">
                 <summary className="text-blue-500 cursor-pointer">Подсказка</summary>
-                <p className="mt-1 text-gray-600 bg-gray-100 p-2 rounded">{currentTask.hint}</p>
+                <p className="mt-1 text-gray-600 bg-gray-100 p-2 rounded-sm">{currentTask.hint}</p>
               </details>
             )}
             {currentTask.requires_answer && (
@@ -1013,7 +1013,7 @@ export default function QuestPlay({ session }) {
                       <button
                         key={idx}
                         onClick={() => setSelectedOption(opt)}
-                        className={`block w-full text-left p-2 border rounded transition ${
+                        className={`block w-full text-left p-2 border rounded-sm transition ${
                           selectedOption === opt ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'
                         }`}
                       >
@@ -1028,7 +1028,7 @@ export default function QuestPlay({ session }) {
                     value={answerInput}
                     onChange={(e) => setAnswerInput(e.target.value)}
                     disabled={taskCompleted || taskFailed}
-                    className="w-full border p-2 rounded"
+                    className="w-full border p-2 rounded-sm"
                   />
                 )}
                 {maxAttempts > 0 && (
@@ -1039,7 +1039,7 @@ export default function QuestPlay({ session }) {
             <button
               onClick={completeTask}
               disabled={taskCompleted || taskFailed}
-              className={`w-full py-3 rounded text-white ${
+              className={`w-full py-3 rounded-sm text-white ${
                 taskCompleted ? 'bg-green-500' :
                 taskFailed ? 'bg-red-500' :
                 'bg-green-500 hover:bg-green-600'

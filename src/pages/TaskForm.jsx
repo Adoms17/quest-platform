@@ -277,19 +277,19 @@ export default function TaskForm() {
           placeholder="Название задания *"
           value={taskForm.title}
           onChange={e => setTaskForm({...taskForm, title: e.target.value})}
-          className="w-full border p-2 rounded"
+          className="w-full border p-2 rounded-sm"
           required
         />
         <textarea
           placeholder="Описание задания"
           value={taskForm.description}
           onChange={e => setTaskForm({...taskForm, description: e.target.value})}
-          className="w-full border p-2 rounded"
+          className="w-full border p-2 rounded-sm"
           rows="2"
         />
         
         {/* Блок медиа */}
-        <div className="border p-3 rounded bg-gray-50">
+        <div className="border p-3 rounded-sm bg-gray-50">
           <h4 className="font-medium mb-2">Медиафайлы</h4>
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
@@ -298,26 +298,26 @@ export default function TaskForm() {
                 placeholder="URL медиа"
                 value={newMedia.url}
                 onChange={e => setNewMedia({...newMedia, url: e.target.value})}
-                className="flex-1 min-w-[200px] border p-2 rounded"
+                className="flex-1 min-w-[200px] border p-2 rounded-sm"
               />
               <input
                 type="text"
                 placeholder="Название (опционально)"
                 value={newMedia.title}
                 onChange={e => setNewMedia({...newMedia, title: e.target.value})}
-                className="flex-1 min-w-[150px] border p-2 rounded"
+                className="flex-1 min-w-[150px] border p-2 rounded-sm"
               />
               <input
                 type="text"
                 placeholder="Описание (опционально)"
                 value={newMedia.description}
                 onChange={e => setNewMedia({...newMedia, description: e.target.value})}
-                className="flex-1 min-w-[150px] border p-2 rounded"
+                className="flex-1 min-w-[150px] border p-2 rounded-sm"
               />
               <button
                 type="button"
                 onClick={addMedia}
-                className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 whitespace-nowrap"
+                className="bg-green-500 text-white px-3 py-2 rounded-sm hover:bg-green-600 whitespace-nowrap"
               >
                 Добавить
               </button>
@@ -325,7 +325,7 @@ export default function TaskForm() {
             {mediaList.length > 0 && (
               <ul className="space-y-1">
                 {mediaList.map((item) => (
-                  <li key={item.id} className="flex justify-between items-center bg-white p-2 rounded border">
+                  <li key={item.id} className="flex justify-between items-center bg-white p-2 rounded-sm border">
                     <span className="truncate flex-1">
                       {item.title ? `${item.title} (${item.url})` : item.url}
                       {item.description && <span className="text-sm text-gray-500 ml-2">— {item.description}</span>}
@@ -350,7 +350,7 @@ export default function TaskForm() {
           placeholder="Подсказка"
           value={taskForm.hint}
           onChange={e => setTaskForm({...taskForm, hint: e.target.value})}
-          className="w-full border p-2 rounded"
+          className="w-full border p-2 rounded-sm"
         />
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -360,7 +360,7 @@ export default function TaskForm() {
             placeholder="Вариант 1&#10;Вариант 2&#10;Вариант 3"
             value={taskForm.options}
             onChange={e => setTaskForm({...taskForm, options: e.target.value})}
-            className="w-full border p-2 rounded font-mono text-sm"
+            className="w-full border p-2 rounded-sm font-mono text-sm"
             rows="4"
           />
           <p className="text-xs text-gray-500 mt-1">Оставьте пустым, если вариантов нет (тогда будет текстовый ответ).</p>
@@ -370,7 +370,7 @@ export default function TaskForm() {
           placeholder="Правильный ответ (текст)"
           value={taskForm.correct_answer}
           onChange={e => setTaskForm({...taskForm, correct_answer: e.target.value})}
-          className="w-full border p-2 rounded"
+          className="w-full border p-2 rounded-sm"
         />
 
         {locationOptions.includes('gps') && (
@@ -381,7 +381,7 @@ export default function TaskForm() {
                 placeholder="Широта"
                 value={taskForm.gps_lat}
                 onChange={e => setTaskForm({...taskForm, gps_lat: e.target.value})}
-                className="w-1/2 border p-2 rounded"
+                className="w-1/2 border p-2 rounded-sm"
                 required={locationOptions.includes('gps')}
               />
               <input
@@ -389,7 +389,7 @@ export default function TaskForm() {
                 placeholder="Долгота"
                 value={taskForm.gps_lng}
                 onChange={e => setTaskForm({...taskForm, gps_lng: e.target.value})}
-                className="w-1/2 border p-2 rounded"
+                className="w-1/2 border p-2 rounded-sm"
                 required={locationOptions.includes('gps')}
               />
             </div>
@@ -406,7 +406,7 @@ export default function TaskForm() {
             placeholder="Текстовое описание места *"
             value={taskForm.location_text}
             onChange={e => setTaskForm({...taskForm, location_text: e.target.value})}
-            className="w-full border p-2 rounded"
+            className="w-full border p-2 rounded-sm"
             rows="2"
             required={locationOptions.includes('text')}
           />
@@ -418,7 +418,7 @@ export default function TaskForm() {
             placeholder="Ссылка на изображение места *"
             value={taskForm.location_image_url}
             onChange={e => setTaskForm({...taskForm, location_image_url: e.target.value})}
-            className="w-full border p-2 rounded"
+            className="w-full border p-2 rounded-sm"
             required={locationOptions.includes('image')}
           />
         )}
@@ -428,21 +428,21 @@ export default function TaskForm() {
           placeholder="Статический код (например, ABC123)"
           value={taskForm.static_code}
           onChange={e => setTaskForm({...taskForm, static_code: e.target.value})}
-          className="w-full border p-2 rounded"
+          className="w-full border p-2 rounded-sm"
         />
 
         <div className="flex gap-2">
           <button
             type="submit"
             disabled={saving}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            className="bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600"
           >
             {saving ? 'Сохранение...' : isEdit ? 'Обновить задание' : 'Добавить задание'}
           </button>
           <button
             type="button"
             onClick={() => navigate(`/quests/${id}/tasks`)}
-            className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-sm hover:bg-gray-400"
           >
             Отмена
           </button>

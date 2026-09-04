@@ -1,9 +1,22 @@
+@import 'tailwindcss';
+
 /* Leaflet */
 @import 'leaflet/dist/leaflet.css';
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+}
 
 .leaflet-control-container .leaflet-routing-container-hide {
   display: none;

@@ -58,7 +58,7 @@ export default function MapPicker({ onSelect, initialLat, initialLng }) {
   const zoom = position ? 15 : 12
 
   return (
-    <div className="h-64 w-full rounded border">
+    <div className="h-64 w-full rounded-sm border">
       <MapContainer
         center={defaultCenter} // начальный центр, будет переопределён контроллером
         zoom={12}

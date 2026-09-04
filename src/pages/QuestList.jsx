@@ -121,7 +121,7 @@ export default function QuestList({ session }) {
         <h1 className="text-2xl font-bold">Мои квесты</h1>
         <Link
           to="/quests/new"
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          className="bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600"
         >
           + Создать квест
         </Link>
@@ -132,7 +132,7 @@ export default function QuestList({ session }) {
       ) : (
         <div className="space-y-4">
           {quests.map((quest) => (
-            <div key={quest.id} className="border p-4 rounded shadow flex justify-between items-center">
+            <div key={quest.id} className="border p-4 rounded-sm shadow-sm flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-semibold">{quest.title}</h2>
                 <p className="text-gray-600 text-sm">
@@ -143,16 +143,16 @@ export default function QuestList({ session }) {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
-                <span className={`px-2 py-1 rounded ${quest.is_open ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                <span className={`px-2 py-1 rounded-sm ${quest.is_open ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                   {quest.is_open ? '✅ Открыт' : '❌ Закрыт'}
                 </span>
                 {quest.start_at && (
-                  <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                  <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-sm">
                     🕐 Начало: {new Date(quest.start_at).toLocaleString()}
                   </span>
                 )}
                 {quest.end_at && (
-                  <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                  <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-sm">
                     ⏰ Окончание: {new Date(quest.end_at).toLocaleString()}
                   </span>
                 )}
@@ -160,13 +160,13 @@ export default function QuestList({ session }) {
               <div className="grid grid-cols-3 gap-2 mt-2 md:mt-0 md:flex md:flex-wrap md:justify-center">
                 <Link
                   to={`/quests/${quest.id}/edit`}
-                  className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 text-center flex items-center justify-center"
+                  className="bg-yellow-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-yellow-600 text-center flex items-center justify-center"
                 >
                   ✏️ Редактировать
                 </Link>
                 <Link
                   to={`/quests/${quest.id}/stats`}
-                  className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 text-center flex items-center justify-center"
+                  className="bg-green-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-green-600 text-center flex items-center justify-center"
                 >
                   📊 Статистика
                 </Link>
@@ -176,7 +176,7 @@ export default function QuestList({ session }) {
                     navigator.clipboard.writeText(url)
                     toast.success('Ссылка скопирована!')
                   }}
-                  className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 text-center flex items-center justify-center"
+                  className="bg-purple-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-purple-600 text-center flex items-center justify-center"
                 >
                   🔗 Поделиться
                 </button>
@@ -201,20 +201,20 @@ export default function QuestList({ session }) {
                       toast.error('Ошибка скачивания: ' + err.message)
                     }
                   }}
-                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 text-center flex items-center justify-center"
+                  className="bg-blue-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-blue-600 text-center flex items-center justify-center"
                 >
                   📥 Скачать
                 </button>
                 <button
                   onClick={() => copyQuest(quest.id)}
                   disabled={copying === quest.id}
-                  className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 text-center flex items-center justify-center"
+                  className="bg-gray-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-gray-600 text-center flex items-center justify-center"
                 >
                   {copying === quest.id ? '...' : '📋 Копировать'}
                 </button>
                 <button
                   onClick={() => handleDelete(quest.id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 text-center flex items-center justify-center"
+                  className="bg-red-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-red-600 text-center flex items-center justify-center"
                 >
                   🗑️ Удалить
                 </button>
