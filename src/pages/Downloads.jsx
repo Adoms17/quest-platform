@@ -118,7 +118,7 @@ export default function Downloads({ session }) {
         <button
           onClick={handleSyncAll}
           disabled={syncing || quests.every(q => !q.hasUnsynced)}
-          className={`px-4 py-2 rounded text-white ${
+          className={`px-4 py-2 rounded-sm text-white ${
             syncing || quests.every(q => !q.hasUnsynced)
               ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-blue-500 hover:bg-blue-600'
@@ -140,7 +140,7 @@ export default function Downloads({ session }) {
             const canSync = q.hasUnsynced && !syncing
 
             return (
-              <li key={q.questId} className="border p-4 rounded shadow">
+              <li key={q.questId} className="border p-4 rounded-sm shadow-sm">
                 <div className="flex flex-wrap justify-between items-start gap-2">
                   <div>
                     <h3 className="font-medium text-lg">{q.title}</h3>
@@ -172,7 +172,7 @@ export default function Downloads({ session }) {
                     <button
                       onClick={() => navigate(`/play/${q.questId}`)}
                       disabled={!canPlay}
-                      className={`px-3 py-1 rounded text-sm ${
+                      className={`px-3 py-1 rounded-sm text-sm ${
                         canPlay
                           ? 'bg-blue-500 text-white hover:bg-blue-600'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -184,7 +184,7 @@ export default function Downloads({ session }) {
                     <button
                       onClick={() => handleSyncSingle(q.questId)}
                       disabled={!canSync || syncing}
-                      className={`px-3 py-1 rounded text-sm ${
+                      className={`px-3 py-1 rounded-sm text-sm ${
                         canSync && !syncing
                           ? 'bg-yellow-500 text-white hover:bg-yellow-600'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -194,7 +194,7 @@ export default function Downloads({ session }) {
                     </button>
                     <button
                       onClick={() => handleDelete(q.questId)}
-                      className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+                      className="bg-red-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-red-600"
                     >
                       🗑️ Удалить
                     </button>
@@ -215,7 +215,7 @@ export default function Downloads({ session }) {
               loadDownloads()
             }
           }}
-          className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+          className="bg-red-600 text-white px-3 py-1 rounded-sm text-sm hover:bg-red-700"
         >
           Сбросить все данные
         </button>

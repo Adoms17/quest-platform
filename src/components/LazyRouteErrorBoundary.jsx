@@ -28,7 +28,7 @@ export default class LazyRouteErrorBoundary extends Component {
           <button
             type="button"
             onClick={this.handleReload}
-            className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+            className="rounded-sm bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
           >
             Перезагрузить приложение
           </button>

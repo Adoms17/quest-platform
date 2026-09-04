@@ -95,7 +95,7 @@ export default function QuestCreate({ session }) {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border p-2 rounded-sm"
             required
           />
         </div>
@@ -104,7 +104,7 @@ export default function QuestCreate({ session }) {
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border p-2 rounded-sm"
             rows="3"
           />
         </div>
@@ -181,7 +181,7 @@ export default function QuestCreate({ session }) {
               onChange={event =>
                 setVerificationMode(event.target.value)
               }
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded-sm"
             >
               <option value="online">
                 Online — всегда серверная проверка
@@ -208,7 +208,7 @@ export default function QuestCreate({ session }) {
               onChange={event =>
                 setOfflineProgressPolicy(event.target.value)
               }
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded-sm"
             >
               <option value="allow_pending">
                 Разрешить pending — проверить после синхронизации
@@ -224,7 +224,7 @@ export default function QuestCreate({ session }) {
             min="0"
             value={maxAttempts}
             onChange={(e) => setMaxAttempts(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border p-2 rounded-sm"
           />
           <p className="text-sm text-gray-500 mt-1">0 — неограниченно. Если указано число, то при исчерпании попыток задание засчитывается как невыполненное.</p>
         </div>
@@ -243,14 +243,14 @@ export default function QuestCreate({ session }) {
           <button
             type="submit"
             disabled={loading}
-            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            className="bg-green-500 text-white px-4 py-2 rounded-sm hover:bg-green-600"
           >
             {loading ? 'Создание...' : 'Создать'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/quests')}
-            className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-sm hover:bg-gray-400"
           >
             Отмена
           </button>
