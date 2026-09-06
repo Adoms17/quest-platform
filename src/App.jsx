@@ -9,6 +9,7 @@ import { selectAuthSession } from './services/authSession'
 import { isTransportError } from './services/network'
 import { createSyncCoordinator } from './services/syncCoordinator'
 import { PENDING_RESULT_ENQUEUED_EVENT } from './services/syncSignals'
+import { OrganizationProvider } from './contexts/OrganizationContext'
 
 const Login = lazy(() => import('./pages/Login'))
 const QuestList = lazy(() => import('./pages/QuestList'))
@@ -95,7 +96,8 @@ function App() {
   return (
     <BrowserRouter>
       <AppToaster />
-      <LazyRouteErrorBoundary>
+      <OrganizationProvider session={session}>
+        <LazyRouteErrorBoundary>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
           <Routes>
         <Route
@@ -201,7 +203,8 @@ function App() {
         <Route path="*" element={<Navigate to={session ? '/quests' : '/login'} />} />
           </Routes>
         </Suspense>
-      </LazyRouteErrorBoundary>
+        </LazyRouteErrorBoundary>
+      </OrganizationProvider>
     </BrowserRouter>
   )
 }

@@ -10,7 +10,7 @@ const TIMING_CONFIDENCE_LABELS = {
   reported: '📱 С устройства',
 }
 
-export default function QuestStats({ session }) {
+export default function QuestStats() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [quest, setQuest] = useState(null)
@@ -30,11 +30,6 @@ export default function QuestStats({ session }) {
           .eq('id', id)
           .single()
         if (questError) throw questError
-        if (questData.creator_id !== session.user.id) {
-          toast.error('У вас нет прав на просмотр этой статистики')
-          navigate('/quests')
-          return
-        }
         setQuest(questData)
 
         const { data: attemptsData, error: attemptsError } = await supabase
@@ -68,7 +63,7 @@ export default function QuestStats({ session }) {
       }
     }
     fetchStats()
-  }, [id, session, navigate])
+  }, [id, navigate])
 
   // Функция очистки статистики
   async function clearStats() {

@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
+import { useOrganization } from '../contexts/useOrganization'
 
 export default function QuestCreate({ session }) {
   const navigate = useNavigate()
+  const { currentOrganization, loadingOrganizations } = useOrganization()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [isPublic, setIsPublic] = useState(false)
@@ -54,6 +56,10 @@ export default function QuestCreate({ session }) {
       toast.error('Введите название')
       return
     }
+    if (!currentOrganization?.id) {
+      toast.error('Выберите организацию для создания квеста')
+      return
+    }
     if (
       verificationOptions.includes('gps') &&
       !locationOptions.includes('gps')
@@ -67,6 +73,7 @@ export default function QuestCreate({ session }) {
       .from('quests')
       .insert({
         creator_id: session.user.id,
+        organization_id: currentOrganization.id,
         title: title.trim(),
         description: description.trim() || null,
         is_public: isPublic,
@@ -86,6 +93,10 @@ export default function QuestCreate({ session }) {
       navigate(`/quests/${data[0].id}/edit`)
     }
     setLoading(false)
+  }
+
+  if (loadingOrganizations) {
+    return <div className="p-8">Загрузка организации...</div>
   }
 
   return (
@@ -267,7 +278,7 @@ export default function QuestCreate({ session }) {
         <div className="flex gap-2">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !currentOrganization}
             className="bg-green-500 text-white px-4 py-2 rounded-sm hover:bg-green-600"
           >
             {loading ? 'Создание...' : 'Создать'}
