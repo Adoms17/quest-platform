@@ -13,6 +13,8 @@ export default function QuestEdit({ session }) {
   const [questTitle, setQuestTitle] = useState('')
   const [questDescription, setQuestDescription] = useState('')
   const [verificationOptions, setVerificationOptions] = useState(['gps'])
+  const [verificationMatchPolicy, setVerificationMatchPolicy] =
+    useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
   const [isOpen, setIsOpen] = useState(true)
   const [startAt, setStartAt] = useState('')
@@ -48,6 +50,9 @@ export default function QuestEdit({ session }) {
 
       const optsVer = Array.isArray(questData.verification_options) ? questData.verification_options : ['gps']
       setVerificationOptions(optsVer)
+      setVerificationMatchPolicy(
+        questData.verification_match_policy || 'all'
+      )
       setVerificationMode(
         questData.verification_mode || 'online'
       )
@@ -116,7 +121,7 @@ export default function QuestEdit({ session }) {
   }
 
   function toggleVerificationOption(opt) {
-    if (option === 'gps' && !locationOptions.includes('gps')) return
+    if (opt === 'gps' && !locationOptions.includes('gps')) return
 
     if (verificationOptions.includes(opt)) {
       if (verificationOptions.length <= 1) {
@@ -157,6 +162,8 @@ export default function QuestEdit({ session }) {
         setVerificationMode(value)
       } else if (field === 'offline_progress_policy') {
         setOfflineProgressPolicy(value)
+      } else if (field === 'verification_match_policy') {
+        setVerificationMatchPolicy(value)
       }
 
       setQuest(previous => ({
@@ -407,6 +414,31 @@ export default function QuestEdit({ session }) {
           </label>
         </div>
         <p className="text-sm text-gray-500 mt-2">Выберите хотя бы один вариант. Участник должен будет подтвердить нахождение по выбранным условиям.</p>
+        {verificationOptions.includes('gps') &&
+          verificationOptions.includes('code') && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium mb-1">
+                Сколько условий должен выполнить участник?
+              </label>
+              <select
+                value={verificationMatchPolicy}
+                onChange={event =>
+                  updateSecuritySetting(
+                    'verification_match_policy',
+                    event.target.value
+                  )
+                }
+                className="w-full border p-2 rounded-sm"
+              >
+                <option value="all">Оба условия: GPS и код</option>
+                <option value="any">Хотя бы одно: GPS или код</option>
+              </select>
+              <p className="text-sm text-gray-500 mt-1">
+                При выборе «хотя бы одно» код остаётся резервным способом,
+                если GPS недоступен или работает нестабильно.
+              </p>
+            </div>
+          )}
       </div>
 
       <div className="bg-gray-50 p-4 rounded-sm mb-6 border">
