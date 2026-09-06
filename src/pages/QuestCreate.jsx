@@ -10,6 +10,8 @@ export default function QuestCreate({ session }) {
   const [isPublic, setIsPublic] = useState(false)
   const [locationOptions, setLocationOptions] = useState(['gps'])
   const [verificationOptions, setVerificationOptions] = useState(['gps'])
+  const [verificationMatchPolicy, setVerificationMatchPolicy] =
+    useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
   const [verificationMode, setVerificationMode] =
     useState('online')
@@ -69,6 +71,7 @@ export default function QuestCreate({ session }) {
         description: description.trim() || null,
         is_public: isPublic,
         verification_options: verificationOptions,
+        verification_match_policy: verificationMatchPolicy,
         verification_mode: verificationMode,
         offline_progress_policy: offlineProgressPolicy,
         location_options: locationOptions,
@@ -169,6 +172,28 @@ export default function QuestCreate({ session }) {
             </label>
           </div>
           <p className="text-sm text-gray-500 mt-1">Выберите хотя бы один вариант.</p>
+          {verificationOptions.includes('gps') &&
+            verificationOptions.includes('code') && (
+              <div className="mt-3">
+                <label className="block font-medium mb-1">
+                  Сколько условий должен выполнить участник?
+                </label>
+                <select
+                  value={verificationMatchPolicy}
+                  onChange={event =>
+                    setVerificationMatchPolicy(event.target.value)
+                  }
+                  className="w-full border p-2 rounded-sm"
+                >
+                  <option value="all">Оба условия: GPS и код</option>
+                  <option value="any">Хотя бы одно: GPS или код</option>
+                </select>
+                <p className="text-sm text-gray-500 mt-1">
+                  «Хотя бы одно» позволяет открыть задание по коду, если GPS
+                  недоступен или работает нестабильно.
+                </p>
+              </div>
+            )}
         </div>
 
         <div>

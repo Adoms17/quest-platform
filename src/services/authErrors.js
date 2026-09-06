@@ -6,6 +6,8 @@ const ERROR_MESSAGES_BY_CODE = {
   user_already_exists: 'Пользователь с таким email уже зарегистрирован.',
   signup_disabled: 'Регистрация временно отключена.',
   weak_password: 'Пароль не соответствует требованиям безопасности.',
+  auth_request_timeout:
+    'Сервер авторизации не ответил вовремя. Проверьте соединение и попробуйте снова.',
 }
 
 const MESSAGE_MATCHERS = [
