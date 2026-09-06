@@ -19,6 +19,7 @@ import {
   submitTaskEvent,
 } from '../services/questApi'
 import { verifyHybridCandidate } from '../services/hybridVerification'
+import { usesAnyLocationVerification } from '../services/verificationPolicy'
 import { isTransportError } from '../services/network'
 import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
 import { getQuestAvailability } from '../services/questAvailability'
@@ -463,16 +464,25 @@ export default function QuestPlay({ session }) {
 
     const requiresGps = Boolean(currentTask.requires_gps)
     const requiresCode = Boolean(currentTask.requires_code)
+    const acceptsAnyLocationCheck = usesAnyLocationVerification(
+      quest,
+      currentTask
+    )
     const submittedCode = requiresCode ? codeInput.trim() : null
 
-    if (requiresCode && !submittedCode) {
+    if (
+      requiresCode &&
+      !submittedCode &&
+      !(acceptsAnyLocationCheck && latitude !== null && longitude !== null)
+    ) {
       toast.error('Введите код доступа')
       return
     }
 
     if (
       requiresGps &&
-      (latitude === null || longitude === null)
+      (latitude === null || longitude === null) &&
+      !(acceptsAnyLocationCheck && submittedCode)
     ) {
       toast.error('Не удалось получить координаты устройства')
       return
@@ -484,6 +494,7 @@ export default function QuestPlay({ session }) {
       if (
         quest.verification_mode === 'hybrid' &&
         requiresCode &&
+        submittedCode &&
         currentTask.code_verifier
       ) {
         try {
@@ -622,7 +633,10 @@ export default function QuestPlay({ session }) {
   }
 
   function checkCode() {
-    if (currentTask.requires_gps) {
+    if (
+      currentTask.requires_gps &&
+      quest.verification_match_policy !== 'any'
+    ) {
       checkLocation()
       return
     }

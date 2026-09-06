@@ -98,7 +98,16 @@ function App() {
       <LazyRouteErrorBoundary>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
           <Routes>
-        <Route path="/login" element={<Login setSession={setSession} />} />
+        <Route
+          path="/login"
+          element={
+            session ? (
+              <Navigate to="/quests" replace />
+            ) : (
+              <Login setSession={setSession} />
+            )
+          }
+        />
         <Route
           path="/quests"
           element={

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
 import { getAuthErrorMessage, logAuthError } from '../services/authErrors'
+import { withAuthTimeout } from '../services/authRequest'
 
 export default function Login({ setSession }) {
   const navigate = useNavigate()
@@ -10,10 +11,21 @@ export default function Login({ setSession }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const validateCredentials = () => {
+    if (!email.trim() || !password) {
+      toast.error('Введите email и пароль.')
+      return false
+    }
+    return true
+  }
+
   const handleSignUp = async () => {
+    if (!validateCredentials()) return
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { error } = await withAuthTimeout(
+        supabase.auth.signUp({ email: email.trim(), password }),
+      )
       if (error) {
         logAuthError('Ошибка регистрации', error)
         toast.error(getAuthErrorMessage(error))
@@ -32,12 +44,15 @@ export default function Login({ setSession }) {
   }
 
   const handleSignIn = async () => {
+    if (!validateCredentials()) return
     setLoading(true)
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      const { data, error } = await withAuthTimeout(
+        supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        }),
+      )
       if (error) {
         logAuthError('Ошибка входа', error)
         toast.error(getAuthErrorMessage(error))
@@ -78,14 +93,14 @@ export default function Login({ setSession }) {
             disabled={loading}
             className="flex-1 bg-blue-500 text-white p-2 rounded-sm hover:bg-blue-600"
           >
-            Регистрация
+            {loading ? 'Подождите…' : 'Регистрация'}
           </button>
           <button
             onClick={handleSignIn}
             disabled={loading}
             className="flex-1 bg-green-500 text-white p-2 rounded-sm hover:bg-green-600"
           >
-            Вход
+            {loading ? 'Подождите…' : 'Вход'}
           </button>
         </div>
       </div>
