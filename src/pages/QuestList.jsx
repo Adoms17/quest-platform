@@ -4,19 +4,33 @@ import { Link } from 'react-router-dom'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 import { saveQuestToDB } from '../services/db'
+import { useOrganization } from '../contexts/useOrganization'
 
 export default function QuestList({ session }) {
   const [quests, setQuests] = useState([])
   const [loading, setLoading] = useState(true)
   const [copying, setCopying] = useState(null) // id квеста, который копируется
+  const {
+    currentOrganization,
+    loadingOrganizations,
+    organizationError,
+  } = useOrganization()
+  const currentOrganizationId = currentOrganization?.id
 
   const userId = session?.user?.id
 
   const fetchQuests = useCallback(async () => {
+    setLoading(true)
+    if (!currentOrganizationId) {
+      setQuests([])
+      setLoading(false)
+      return
+    }
+
     const { data, error } = await supabase
       .from('quests')
       .select('*')
-      .eq('creator_id', userId)
+      .eq('organization_id', currentOrganizationId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -26,13 +40,13 @@ export default function QuestList({ session }) {
       setQuests(data || [])
     }
     setLoading(false)
-  }, [userId])
+  }, [currentOrganizationId])
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId || loadingOrganizations) return
     const timeout = setTimeout(() => fetchQuests(), 0)
     return () => clearTimeout(timeout)
-  }, [userId, fetchQuests])
+  }, [userId, loadingOrganizations, fetchQuests])
 
   async function handleDelete(id) {
     if (!confirm('Удалить квест?')) return
@@ -59,6 +73,7 @@ export default function QuestList({ session }) {
       // 2. Создаём новый квест (копия)
       const newQuest = {
         creator_id: session.user.id,
+        organization_id: currentOrganization.id,
         title: original.title + ' (копия)',
         description: original.description,
         is_public: original.is_public,
@@ -113,12 +128,28 @@ export default function QuestList({ session }) {
     }
   }
 
-  if (loading) return <Loader text="Загрузка списка квестов..." />
+  if (loading || loadingOrganizations) return <Loader text="Загрузка списка квестов..." />
+
+  if (!currentOrganization) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <h1 className="text-2xl font-bold mb-4">Квесты</h1>
+        <p className="text-gray-600">
+          {organizationError
+            ? `Не удалось загрузить организации: ${organizationError.message}`
+            : 'Нет доступной организации. Обновите страницу или обратитесь к администратору.'}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Мои квесты</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Квесты</h1>
+          <p className="text-sm text-gray-500">{currentOrganization.name}</p>
+        </div>
         <Link
           to="/quests/new"
           className="bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600"

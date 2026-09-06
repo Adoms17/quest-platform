@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 
-export default function QuestEdit({ session }) {
+export default function QuestEdit() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [quest, setQuest] = useState(null)
@@ -25,8 +25,6 @@ export default function QuestEdit({ session }) {
   const [offlineProgressPolicy, setOfflineProgressPolicy] =
     useState('allow_pending')
 
-  const userId = session?.user?.id
-
   const fetchQuest = useCallback(async () => {
     try {
       const { data: questData, error: questError } = await supabase
@@ -35,10 +33,6 @@ export default function QuestEdit({ session }) {
         .eq('id', id)
         .single()
       if (questError) throw new Error('Квест не найден')
-      if (questData.creator_id !== userId) {
-        navigate('/quests')
-        return
-      }
       setQuest(questData)
       setMaxAttempts(questData.max_attempts || 0)
       setQuestTitle(questData.title)
@@ -68,7 +62,7 @@ export default function QuestEdit({ session }) {
     } finally {
       setLoading(false)
     }
-  }, [id, userId, navigate])
+  }, [id, navigate])
 
   useEffect(() => {
     if (!id) return

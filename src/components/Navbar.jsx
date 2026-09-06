@@ -2,12 +2,20 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
+import { useOrganization } from '../contexts/useOrganization'
 
 export default function Navbar({ session }) {
   const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const {
+    organizations,
+    currentOrganization,
+    loadingOrganizations,
+    organizationError,
+    selectOrganization,
+  } = useOrganization()
 
   // Загружаем профиль пользователя
   useEffect(() => {
@@ -74,6 +82,29 @@ export default function Navbar({ session }) {
         <Link to="/downloads" className="block px-4 py-2 hover:bg-gray-100">
           📥 Мои загрузки
         </Link>
+        {organizations.length > 0 && (
+          <label className="hidden md:flex items-center gap-2 text-sm">
+            <span className="sr-only">Текущая организация</span>
+            <select
+              aria-label="Текущая организация"
+              value={currentOrganization?.id || ''}
+              disabled={loadingOrganizations}
+              onChange={event => selectOrganization(event.target.value)}
+              className="max-w-56 rounded-sm border border-blue-400 bg-blue-700 px-2 py-1 text-white"
+            >
+              {organizations.map(organization => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {organizationError && (
+          <span className="hidden lg:inline text-xs text-yellow-200">
+            Организации недоступны
+          </span>
+        )}
       </div>
 
       {/* Правый блок: аватар + выпадающее меню */}
