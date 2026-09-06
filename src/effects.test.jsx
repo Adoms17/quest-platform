@@ -26,6 +26,16 @@ vi.mock('./supabaseClient', () => ({
   supabase: { from: mocks.from },
 }))
 
+vi.mock('./contexts/useOrganization', () => ({
+  useOrganization: () => ({
+    organizations: [{ id: 'organization-1', name: 'Organization' }],
+    currentOrganization: { id: 'organization-1', name: 'Organization' },
+    loadingOrganizations: false,
+    organizationError: null,
+    selectOrganization: vi.fn(),
+  }),
+}))
+
 vi.mock('react-hot-toast', () => ({
   default: { error: vi.fn(), success: vi.fn() },
 }))
@@ -115,7 +125,7 @@ describe('stable data-loading effects', () => {
     await waitFor(() => expect(callsFor('quests')).toBe(2))
   })
 
-  it('reloads QuestEdit only when id or user id changes', async () => {
+  it('reloads QuestEdit only when the quest id changes', async () => {
     const { rerender } = render(<QuestEdit session={{ user: { id: 'user-1' } }} />)
     await waitFor(() => expect(callsFor('quests')).toBe(1))
 
@@ -128,7 +138,8 @@ describe('stable data-loading effects', () => {
     await waitFor(() => expect(callsFor('quests')).toBe(2))
 
     rerender(<QuestEdit session={{ user: { id: 'user-2' } }} />)
-    await waitFor(() => expect(callsFor('quests')).toBe(3))
+    await act(async () => {})
+    expect(callsFor('quests')).toBe(2)
   })
   it('reloads TaskManager only when the quest id changes', async () => {
     const { rerender } = render(<TaskManager />)
