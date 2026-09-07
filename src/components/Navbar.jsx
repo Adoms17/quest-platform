@@ -85,6 +85,9 @@ export default function Navbar({ session }) {
         <Link to="/downloads" className="block px-4 py-2 hover:bg-gray-100">
           📥 Мои загрузки
         </Link>
+        <Link to="/access/code" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
+          🔑 Ввести код
+        </Link>
         {canManageTeam && (
           <Link to="/organization/team" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
             👥 Команда
@@ -163,6 +166,13 @@ export default function Navbar({ session }) {
                 👥 Команда
               </Link>
             )}
+            <Link
+              to="/access/code"
+              onClick={() => setMenuOpen(false)}
+              className="block px-4 py-2 hover:bg-gray-100 transition sm:hidden"
+            >
+              🔑 Ввести код
+            </Link>
             <button
               onClick={handleLogout}
               className="block w-full text-left px-4 py-2 hover:bg-gray-100 transition"

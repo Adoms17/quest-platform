@@ -10,6 +10,7 @@ import {
   revokeOrganizationMembership,
   setOrganizationMemberRoles,
 } from '../services/teamApi'
+import { loadLocalSecretLinks, removeLocalSecretLink, saveLocalSecretLink } from '../services/localSecretLinks'
 
 function roleNames(roles) {
   return roles?.map(role => role.name).join(', ') || 'Без роли'
@@ -36,6 +37,8 @@ export default function OrganizationTeam() {
   const [editingMemberId, setEditingMemberId] = useState(null)
   const [memberRoleKeys, setMemberRoleKeys] = useState([])
   const [savingMemberId, setSavingMemberId] = useState(null)
+  const [savedInvitationLinks, setSavedInvitationLinks] = useState({})
+  const linkScope = `organization:${currentOrganization?.id || 'none'}`
 
   const pendingInvitations = useMemo(
     () => invitations.filter(invitation => invitation.status === 'pending'),
@@ -78,6 +81,14 @@ export default function OrganizationTeam() {
     return () => clearTimeout(timeout)
   }, [loadTeam])
 
+  useEffect(() => {
+    let active = true
+    void loadLocalSecretLinks(linkScope).then(links => {
+      if (active) setSavedInvitationLinks(links)
+    })
+    return () => { active = false }
+  }, [linkScope])
+
   const toggleRole = roleKey => {
     setSelectedRoles(current => current.includes(roleKey)
       ? current.filter(key => key !== roleKey)
@@ -97,6 +108,7 @@ export default function OrganizationTeam() {
         roleKeys: selectedRoles,
       })
       const link = `${window.location.origin}/invitations/accept?token=${encodeURIComponent(invitation.invitation_token)}`
+      setSavedInvitationLinks(await saveLocalSecretLink(linkScope, invitation.invitation_id, link))
       setInvitationLink(link)
       setEmail('')
       toast.success('Приглашение создано')
@@ -116,6 +128,7 @@ export default function OrganizationTeam() {
   const handleRevokeInvitation = async invitationId => {
     try {
       await revokeOrganizationInvitation(invitationId)
+      setSavedInvitationLinks(await removeLocalSecretLink(linkScope, invitationId))
       toast.success('Приглашение отозвано')
       await loadTeam()
     } catch (nextError) {
@@ -310,7 +323,12 @@ export default function OrganizationTeam() {
             {pendingInvitations.map(invitation => (
               <div key={invitation.id} className="flex flex-col justify-between gap-3 rounded-lg border bg-white p-4 sm:flex-row sm:items-center">
                 <div><strong>{invitation.email}</strong><p className="text-sm text-gray-500">{roleNames(invitation.roles)} · до {formatDate(invitation.expires_at)}</p></div>
-                <button type="button" onClick={() => handleRevokeInvitation(invitation.id)} className="self-start text-sm text-red-700 hover:underline">Отозвать</button>
+                <div className="flex gap-4">
+                  {savedInvitationLinks[invitation.id] && (
+                    <button type="button" onClick={async () => { await navigator.clipboard.writeText(savedInvitationLinks[invitation.id]); toast.success('Ссылка скопирована') }} className="text-sm text-blue-700 hover:underline">Копировать ссылку</button>
+                  )}
+                  <button type="button" onClick={() => handleRevokeInvitation(invitation.id)} className="self-start text-sm text-red-700 hover:underline">Отозвать</button>
+                </div>
               </div>
             ))}
           </div>

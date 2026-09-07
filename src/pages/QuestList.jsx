@@ -16,6 +16,9 @@ export default function QuestList({ session }) {
     organizationError,
   } = useOrganization()
   const currentOrganizationId = currentOrganization?.id
+  const canManageAccess = currentOrganization?.roles?.some(role =>
+    ['owner', 'admin', 'participant_manager', 'sales_manager'].includes(role.key)
+  )
 
   const userId = session?.user?.id
 
@@ -167,7 +170,7 @@ export default function QuestList({ session }) {
               <div>
                 <h2 className="text-xl font-semibold">{quest.title}</h2>
                 <p className="text-gray-600 text-sm">
-                  {quest.description || 'Без описания'} · {quest.is_public ? 'Публичный' : 'Приватный'}
+                  {quest.description || 'Без описания'} · {quest.is_public ? 'Без приглашения' : 'Доступ ограничен'}
                 </p>
                 <p className="text-xs text-gray-400">
                   Создан: {new Date(quest.created_at).toLocaleDateString()}
@@ -189,6 +192,14 @@ export default function QuestList({ session }) {
                 )}
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 md:mt-0 md:flex md:flex-wrap md:justify-center">
+                {canManageAccess && (
+                  <Link
+                    to={`/quests/${quest.id}/access`}
+                    className="bg-indigo-600 text-white px-3 py-1 rounded-sm text-sm hover:bg-indigo-700 text-center flex items-center justify-center"
+                  >
+                    🎟️ Доступ
+                  </Link>
+                )}
                 <Link
                   to={`/quests/${quest.id}/edit`}
                   className="bg-yellow-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-yellow-600 text-center flex items-center justify-center"

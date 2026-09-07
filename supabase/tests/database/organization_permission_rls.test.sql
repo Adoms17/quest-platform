@@ -1,6 +1,6 @@
 begin;
 
-select plan(12);
+select plan(13);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -82,14 +82,25 @@ select lives_ok(
   'an owner can update organization quest tasks'
 );
 
-select lives_ok(
+select throws_ok(
   $$select public.get_participant_tasks('29000000-0000-4000-8000-000000000001')$$,
-  'an organization member with quests.read can access a private quest RPC'
+  '42501',
+  'quest access denied',
+  'an organization role does not implicitly grant participant play access'
 );
+
+update public.quests set is_open = false
+where id = '29000000-0000-4000-8000-000000000001';
 
 reset role;
 select set_config('request.jwt.claim.sub', '19000000-0000-4000-8000-000000000003', true);
 set local role authenticated;
+
+select is(
+  (select is_open from public.get_quest_entry_status('29000000-0000-4000-8000-000000000001')),
+  false,
+  'availability status is visible before participant access is evaluated'
+);
 
 select is(
   (select count(*) from public.quests where id = '29000000-0000-4000-8000-000000000001'),
@@ -126,4 +137,3 @@ select is(
 reset role;
 select * from finish();
 rollback;
-

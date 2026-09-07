@@ -17,6 +17,7 @@ export default function QuestEdit() {
     useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
   const [isOpen, setIsOpen] = useState(true)
+  const [isPublic, setIsPublic] = useState(false)
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
   const [locationOptions, setLocationOptions] = useState(['gps'])
@@ -38,6 +39,7 @@ export default function QuestEdit() {
       setQuestTitle(questData.title)
       setQuestDescription(questData.description || '')
       setIsOpen(questData.is_open !== undefined ? questData.is_open : true)
+      setIsPublic(Boolean(questData.is_public))
 
       const opts = Array.isArray(questData.location_options) ? questData.location_options : ['gps']
       setLocationOptions(opts)
@@ -274,6 +276,23 @@ export default function QuestEdit() {
                   />
                   Квест открыт для прохождения
                 </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => {
+                      setIsPublic(e.target.checked)
+                      updateAvailability('is_public', e.target.checked)
+                    }}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block">Доступ без приглашения</span>
+                    <span className="block text-sm font-normal text-gray-500">
+                      Если выключено, участнику потребуется приглашение, ссылка или код доступа.
+                    </span>
+                  </span>
+                </label>
                 <div>
                   <label className="block text-sm font-medium">Дата и время начала (опционально)</label>
                   <input
@@ -338,6 +357,7 @@ export default function QuestEdit() {
               <h4 className="font-semibold text-sm">Текущие настройки доступности:</h4>
               <ul className="text-sm text-gray-700 mt-1">
                 <li>Статус: <span className={quest.is_open ? 'text-green-600' : 'text-red-600'}>{quest.is_open ? 'Открыт' : 'Закрыт'}</span></li>
+                <li>Доступ: {quest.is_public ? 'Без приглашения' : 'По приглашению, ссылке или коду'}</li>
                 {quest.start_at && <li>Начало: {new Date(quest.start_at).toLocaleString()}</li>}
                 {quest.end_at && <li>Окончание: {new Date(quest.end_at).toLocaleString()}</li>}
               </ul>
