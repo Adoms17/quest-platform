@@ -2,12 +2,23 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
+import { useOrganization } from '../contexts/useOrganization'
 
 export default function Navbar({ session }) {
   const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const {
+    organizations,
+    currentOrganization,
+    loadingOrganizations,
+    organizationError,
+    selectOrganization,
+  } = useOrganization()
+  const canManageTeam = currentOrganization?.roles?.some(
+    role => role.key === 'owner' || role.key === 'admin'
+  )
 
   // Загружаем профиль пользователя
   useEffect(() => {
@@ -62,7 +73,7 @@ export default function Navbar({ session }) {
   if (!session) return null
 
   return (
-    <nav className="bg-blue-600 text-white p-4 shadow flex justify-between items-center">
+    <nav className="bg-blue-600 text-white p-4 shadow-sm flex justify-between items-center">
       {/* Левый блок: логотип и имя пользователя (на больших экранах) */}
       <div className="flex items-center gap-4">
         <Link to="/quests" className="text-xl font-bold hover:underline">
@@ -74,13 +85,48 @@ export default function Navbar({ session }) {
         <Link to="/downloads" className="block px-4 py-2 hover:bg-gray-100">
           📥 Мои загрузки
         </Link>
+        <Link to="/access/code" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
+          🔑 Ввести код
+        </Link>
+        {canManageTeam && (
+          <Link to="/organization/team" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
+            👥 Команда
+          </Link>
+        )}
+        {organizations.length > 0 && (
+          <label className="hidden md:flex items-center gap-2 text-sm">
+            <span className="sr-only">Текущая организация</span>
+            <select
+              aria-label="Текущая организация"
+              value={currentOrganization?.id || ''}
+              disabled={loadingOrganizations}
+              onChange={event => selectOrganization(event.target.value)}
+              className="max-w-56 rounded-sm border border-blue-400 bg-blue-700 px-2 py-1 text-white"
+            >
+              {organizations.map(organization => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name}
+                  {' · '}
+                  {organization.personal_owner_id === session.user.id
+                    ? 'личная'
+                    : 'по приглашению'}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {organizationError && (
+          <span className="hidden lg:inline text-xs text-yellow-200">
+            Организации недоступны
+          </span>
+        )}
       </div>
 
       {/* Правый блок: аватар + выпадающее меню */}
       <div className="relative user-menu">
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="flex items-center gap-2 focus:outline-none"
+          className="flex items-center gap-2 focus:outline-hidden"
         >
           {avatarUrl ? (
             <img
@@ -106,11 +152,27 @@ export default function Navbar({ session }) {
 
         {/* Выпадающее меню */}
         {menuOpen && (
-          <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded shadow-lg py-1 z-10">
+          <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-sm shadow-lg py-1 z-10">
             <div className="px-4 py-2 border-b">
               <p className="font-medium">{displayName}</p>
               <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
             </div>
+            {canManageTeam && (
+              <Link
+                to="/organization/team"
+                onClick={() => setMenuOpen(false)}
+                className="block px-4 py-2 hover:bg-gray-100 transition"
+              >
+                👥 Команда
+              </Link>
+            )}
+            <Link
+              to="/access/code"
+              onClick={() => setMenuOpen(false)}
+              className="block px-4 py-2 hover:bg-gray-100 transition sm:hidden"
+            >
+              🔑 Ввести код
+            </Link>
             <button
               onClick={handleLogout}
               className="block w-full text-left px-4 py-2 hover:bg-gray-100 transition"

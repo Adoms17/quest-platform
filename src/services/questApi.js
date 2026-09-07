@@ -10,6 +10,14 @@ export async function loadParticipantTasks(questId) {
   return data || []
 }
 
+export async function loadQuestEntryStatus(questId) {
+  const { data, error } = await supabase
+    .rpc('get_quest_entry_status', { p_quest_id: questId })
+    .single()
+  throwIfError(error)
+  return data
+}
+
 export async function startServerQuestAttempt(questId) {
   const { data, error } = await supabase.rpc('start_quest_attempt', { p_quest_id: questId })
   throwIfError(error)

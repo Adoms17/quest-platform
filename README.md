@@ -14,11 +14,14 @@ Quest Platform — развиваемый mobile-first PWA для создани
 - управление заданиями и их порядком;
 - настройка GPS, кодов, ответов, подсказок и медиа;
 - управление доступностью и лимитами попыток;
+- выдача доступа участникам по персональному приглашению, общей ссылке или
+  короткому коду;
 - просмотр статистики;
 - копирование и публикация ссылок на квесты.
 
 ### Участник
 
+- получение доступа к закрытому квесту по приглашению, ссылке или короткому коду;
 - прохождение квестов с GPS- и кодовой проверкой;
 - работа с заданиями и подсказками;
 - скачивание квестов;
@@ -33,7 +36,7 @@ Quest Platform — развиваемый mobile-first PWA для создани
 - Supabase Auth и Supabase JavaScript Client;
 - IndexedDB через `idb`;
 - Leaflet и React Leaflet;
-- Tailwind CSS 3;
+- Tailwind CSS 4;
 - `vite-plugin-pwa` и Workbox;
 - Vitest и React Testing Library;
 - Playwright;
@@ -160,6 +163,8 @@ docs            архитектура и развёртывание
 
 - [Архитектура](docs/ARCHITECTURE.md)
 - [Развёртывание](docs/DEPLOYMENT.md)
+- [Модель доступа к квестам](docs/access/QUEST_ACCESS_GRANTS_DESIGN.md)
+- [Проверка и публикация доступа к квестам](docs/access/QUEST_ACCESS_GRANTS_ROLLOUT.md)
 - [Правила работы агента](AGENTS.md)
 
 ## Статус

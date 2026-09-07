@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 
-export default function QuestEdit({ session }) {
+export default function QuestEdit() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [quest, setQuest] = useState(null)
@@ -13,8 +13,11 @@ export default function QuestEdit({ session }) {
   const [questTitle, setQuestTitle] = useState('')
   const [questDescription, setQuestDescription] = useState('')
   const [verificationOptions, setVerificationOptions] = useState(['gps'])
+  const [verificationMatchPolicy, setVerificationMatchPolicy] =
+    useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
   const [isOpen, setIsOpen] = useState(true)
+  const [isPublic, setIsPublic] = useState(false)
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
   const [locationOptions, setLocationOptions] = useState(['gps'])
@@ -22,8 +25,6 @@ export default function QuestEdit({ session }) {
     useState('online')
   const [offlineProgressPolicy, setOfflineProgressPolicy] =
     useState('allow_pending')
-
-  const userId = session?.user?.id
 
   const fetchQuest = useCallback(async () => {
     try {
@@ -33,21 +34,21 @@ export default function QuestEdit({ session }) {
         .eq('id', id)
         .single()
       if (questError) throw new Error('Квест не найден')
-      if (questData.creator_id !== userId) {
-        navigate('/quests')
-        return
-      }
       setQuest(questData)
       setMaxAttempts(questData.max_attempts || 0)
       setQuestTitle(questData.title)
       setQuestDescription(questData.description || '')
       setIsOpen(questData.is_open !== undefined ? questData.is_open : true)
+      setIsPublic(Boolean(questData.is_public))
 
       const opts = Array.isArray(questData.location_options) ? questData.location_options : ['gps']
       setLocationOptions(opts)
 
       const optsVer = Array.isArray(questData.verification_options) ? questData.verification_options : ['gps']
       setVerificationOptions(optsVer)
+      setVerificationMatchPolicy(
+        questData.verification_match_policy || 'all'
+      )
       setVerificationMode(
         questData.verification_mode || 'online'
       )
@@ -63,7 +64,7 @@ export default function QuestEdit({ session }) {
     } finally {
       setLoading(false)
     }
-  }, [id, userId, navigate])
+  }, [id, navigate])
 
   useEffect(() => {
     if (!id) return
@@ -116,7 +117,7 @@ export default function QuestEdit({ session }) {
   }
 
   function toggleVerificationOption(opt) {
-    if (option === 'gps' && !locationOptions.includes('gps')) return
+    if (opt === 'gps' && !locationOptions.includes('gps')) return
 
     if (verificationOptions.includes(opt)) {
       if (verificationOptions.length <= 1) {
@@ -157,6 +158,8 @@ export default function QuestEdit({ session }) {
         setVerificationMode(value)
       } else if (field === 'offline_progress_policy') {
         setOfflineProgressPolicy(value)
+      } else if (field === 'verification_match_policy') {
+        setVerificationMatchPolicy(value)
       }
 
       setQuest(previous => ({
@@ -249,13 +252,13 @@ export default function QuestEdit({ session }) {
               type="text"
               value={questTitle}
               onChange={(e) => setQuestTitle(e.target.value)}
-              className="w-full border p-2 rounded text-xl font-bold"
+              className="w-full border p-2 rounded-sm text-xl font-bold"
               placeholder="Название квеста"
             />
             <textarea
               value={questDescription}
               onChange={(e) => setQuestDescription(e.target.value)}
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded-sm"
               rows="2"
               placeholder="Описание квеста"
             />
@@ -273,6 +276,23 @@ export default function QuestEdit({ session }) {
                   />
                   Квест открыт для прохождения
                 </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => {
+                      setIsPublic(e.target.checked)
+                      updateAvailability('is_public', e.target.checked)
+                    }}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block">Доступ без приглашения</span>
+                    <span className="block text-sm font-normal text-gray-500">
+                      Если выключено, участнику потребуется приглашение, ссылка или код доступа.
+                    </span>
+                  </span>
+                </label>
                 <div>
                   <label className="block text-sm font-medium">Дата и время начала (опционально)</label>
                   <input
@@ -282,7 +302,7 @@ export default function QuestEdit({ session }) {
                       setStartAt(e.target.value)
                       updateAvailability('start_at', e.target.value || null)
                     }}
-                    className="w-full border p-2 rounded"
+                    className="w-full border p-2 rounded-sm"
                   />
                 </div>
                 <div>
@@ -294,7 +314,7 @@ export default function QuestEdit({ session }) {
                       setEndAt(e.target.value)
                       updateAvailability('end_at', e.target.value || null)
                     }}
-                    className="w-full border p-2 rounded"
+                    className="w-full border p-2 rounded-sm"
                   />
                 </div>
               </div>
@@ -306,14 +326,14 @@ export default function QuestEdit({ session }) {
                 min="0"
                 value={maxAttempts}
                 onChange={(e) => updateMaxAttempts(e.target.value)}
-                className="w-full border p-2 rounded"
+                className="w-full border p-2 rounded-sm"
               />
               <p className="text-sm text-gray-500 mt-1">0 — неограниченно</p>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={updateQuest}
-                className="bg-green-500 text-white px-4 py-1 rounded hover:bg-green-600"
+                className="bg-green-500 text-white px-4 py-1 rounded-sm hover:bg-green-600"
               >
                 Сохранить
               </button>
@@ -323,7 +343,7 @@ export default function QuestEdit({ session }) {
                   setQuestTitle(quest.title)
                   setQuestDescription(quest.description || '')
                 }}
-                className="bg-gray-300 text-gray-700 px-4 py-1 rounded hover:bg-gray-400"
+                className="bg-gray-300 text-gray-700 px-4 py-1 rounded-sm hover:bg-gray-400"
               >
                 Отмена
               </button>
@@ -333,10 +353,11 @@ export default function QuestEdit({ session }) {
           <div className="flex-1">
             <h1 className="text-2xl font-bold">{quest.title}</h1>
             {quest.description && <p className="text-gray-600">{quest.description}</p>}
-            <div className="mt-4 p-3 bg-gray-50 border rounded">
+            <div className="mt-4 p-3 bg-gray-50 border rounded-sm">
               <h4 className="font-semibold text-sm">Текущие настройки доступности:</h4>
               <ul className="text-sm text-gray-700 mt-1">
                 <li>Статус: <span className={quest.is_open ? 'text-green-600' : 'text-red-600'}>{quest.is_open ? 'Открыт' : 'Закрыт'}</span></li>
+                <li>Доступ: {quest.is_public ? 'Без приглашения' : 'По приглашению, ссылке или коду'}</li>
                 {quest.start_at && <li>Начало: {new Date(quest.start_at).toLocaleString()}</li>}
                 {quest.end_at && <li>Окончание: {new Date(quest.end_at).toLocaleString()}</li>}
               </ul>
@@ -353,7 +374,7 @@ export default function QuestEdit({ session }) {
       </div>
 
       {/* Блок выбора опций места */}
-      <div className="bg-gray-50 p-4 rounded mb-6 border">
+      <div className="bg-gray-50 p-4 rounded-sm mb-6 border">
         <h3 className="font-semibold mb-2">Как будет описано место каждого задания?</h3>
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center gap-2">
@@ -385,7 +406,7 @@ export default function QuestEdit({ session }) {
       </div>
 
       {/* Блок выбора опций проверки */}
-      <div className="bg-gray-50 p-4 rounded mb-6 border">
+      <div className="bg-gray-50 p-4 rounded-sm mb-6 border">
         <h3 className="font-semibold mb-2">Как проверять нахождение на месте?</h3>
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center gap-2">
@@ -407,9 +428,34 @@ export default function QuestEdit({ session }) {
           </label>
         </div>
         <p className="text-sm text-gray-500 mt-2">Выберите хотя бы один вариант. Участник должен будет подтвердить нахождение по выбранным условиям.</p>
+        {verificationOptions.includes('gps') &&
+          verificationOptions.includes('code') && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium mb-1">
+                Сколько условий должен выполнить участник?
+              </label>
+              <select
+                value={verificationMatchPolicy}
+                onChange={event =>
+                  updateSecuritySetting(
+                    'verification_match_policy',
+                    event.target.value
+                  )
+                }
+                className="w-full border p-2 rounded-sm"
+              >
+                <option value="all">Оба условия: GPS и код</option>
+                <option value="any">Хотя бы одно: GPS или код</option>
+              </select>
+              <p className="text-sm text-gray-500 mt-1">
+                При выборе «хотя бы одно» код остаётся резервным способом,
+                если GPS недоступен или работает нестабильно.
+              </p>
+            </div>
+          )}
       </div>
 
-      <div className="bg-gray-50 p-4 rounded mb-6 border">
+      <div className="bg-gray-50 p-4 rounded-sm mb-6 border">
         <h3 className="font-semibold mb-3">
           Безопасность проверки
         </h3>
@@ -427,7 +473,7 @@ export default function QuestEdit({ session }) {
                   event.target.value
                 )
               }
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded-sm"
             >
               <option value="online">
                 Online — всегда серверная проверка
@@ -453,7 +499,7 @@ export default function QuestEdit({ session }) {
                   event.target.value
                 )
               }
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded-sm"
             >
               <option value="allow_pending">
                 Разрешить pending
@@ -477,7 +523,7 @@ export default function QuestEdit({ session }) {
         <h3 className="text-lg font-semibold mb-2">Управление заданиями</h3>
         <Link
           to={`/quests/${id}/tasks`}
-          className="inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          className="inline-block bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600"
         >
           Перейти к заданиям
         </Link>
@@ -486,7 +532,7 @@ export default function QuestEdit({ session }) {
       <div className="mt-6">
         <button
           onClick={() => navigate('/quests')}
-          className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+          className="bg-gray-300 text-gray-700 px-4 py-2 rounded-sm hover:bg-gray-400"
         >
           ← Назад к списку квестов
         </button>

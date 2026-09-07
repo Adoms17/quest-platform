@@ -4,19 +4,36 @@ import { Link } from 'react-router-dom'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 import { saveQuestToDB } from '../services/db'
+import { useOrganization } from '../contexts/useOrganization'
 
 export default function QuestList({ session }) {
   const [quests, setQuests] = useState([])
   const [loading, setLoading] = useState(true)
   const [copying, setCopying] = useState(null) // id квеста, который копируется
+  const {
+    currentOrganization,
+    loadingOrganizations,
+    organizationError,
+  } = useOrganization()
+  const currentOrganizationId = currentOrganization?.id
+  const canManageAccess = currentOrganization?.roles?.some(role =>
+    ['owner', 'admin', 'participant_manager', 'sales_manager'].includes(role.key)
+  )
 
   const userId = session?.user?.id
 
   const fetchQuests = useCallback(async () => {
+    setLoading(true)
+    if (!currentOrganizationId) {
+      setQuests([])
+      setLoading(false)
+      return
+    }
+
     const { data, error } = await supabase
       .from('quests')
       .select('*')
-      .eq('creator_id', userId)
+      .eq('organization_id', currentOrganizationId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -26,13 +43,13 @@ export default function QuestList({ session }) {
       setQuests(data || [])
     }
     setLoading(false)
-  }, [userId])
+  }, [currentOrganizationId])
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId || loadingOrganizations) return
     const timeout = setTimeout(() => fetchQuests(), 0)
     return () => clearTimeout(timeout)
-  }, [userId, fetchQuests])
+  }, [userId, loadingOrganizations, fetchQuests])
 
   async function handleDelete(id) {
     if (!confirm('Удалить квест?')) return
@@ -59,6 +76,7 @@ export default function QuestList({ session }) {
       // 2. Создаём новый квест (копия)
       const newQuest = {
         creator_id: session.user.id,
+        organization_id: currentOrganization.id,
         title: original.title + ' (копия)',
         description: original.description,
         is_public: original.is_public,
@@ -113,15 +131,31 @@ export default function QuestList({ session }) {
     }
   }
 
-  if (loading) return <Loader text="Загрузка списка квестов..." />
+  if (loading || loadingOrganizations) return <Loader text="Загрузка списка квестов..." />
+
+  if (!currentOrganization) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <h1 className="text-2xl font-bold mb-4">Квесты</h1>
+        <p className="text-gray-600">
+          {organizationError
+            ? `Не удалось загрузить организации: ${organizationError.message}`
+            : 'Нет доступной организации. Обновите страницу или обратитесь к администратору.'}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Мои квесты</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Квесты</h1>
+          <p className="text-sm text-gray-500">{currentOrganization.name}</p>
+        </div>
         <Link
           to="/quests/new"
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          className="bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600"
         >
           + Создать квест
         </Link>
@@ -132,41 +166,49 @@ export default function QuestList({ session }) {
       ) : (
         <div className="space-y-4">
           {quests.map((quest) => (
-            <div key={quest.id} className="border p-4 rounded shadow flex justify-between items-center">
+            <div key={quest.id} className="border p-4 rounded-sm shadow-sm flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-semibold">{quest.title}</h2>
                 <p className="text-gray-600 text-sm">
-                  {quest.description || 'Без описания'} · {quest.is_public ? 'Публичный' : 'Приватный'}
+                  {quest.description || 'Без описания'} · {quest.is_public ? 'Без приглашения' : 'Доступ ограничен'}
                 </p>
                 <p className="text-xs text-gray-400">
                   Создан: {new Date(quest.created_at).toLocaleDateString()}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
-                <span className={`px-2 py-1 rounded ${quest.is_open ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                <span className={`px-2 py-1 rounded-sm ${quest.is_open ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                   {quest.is_open ? '✅ Открыт' : '❌ Закрыт'}
                 </span>
                 {quest.start_at && (
-                  <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                  <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-sm">
                     🕐 Начало: {new Date(quest.start_at).toLocaleString()}
                   </span>
                 )}
                 {quest.end_at && (
-                  <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                  <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-sm">
                     ⏰ Окончание: {new Date(quest.end_at).toLocaleString()}
                   </span>
                 )}
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 md:mt-0 md:flex md:flex-wrap md:justify-center">
+                {canManageAccess && (
+                  <Link
+                    to={`/quests/${quest.id}/access`}
+                    className="bg-indigo-600 text-white px-3 py-1 rounded-sm text-sm hover:bg-indigo-700 text-center flex items-center justify-center"
+                  >
+                    🎟️ Доступ
+                  </Link>
+                )}
                 <Link
                   to={`/quests/${quest.id}/edit`}
-                  className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 text-center flex items-center justify-center"
+                  className="bg-yellow-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-yellow-600 text-center flex items-center justify-center"
                 >
                   ✏️ Редактировать
                 </Link>
                 <Link
                   to={`/quests/${quest.id}/stats`}
-                  className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 text-center flex items-center justify-center"
+                  className="bg-green-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-green-600 text-center flex items-center justify-center"
                 >
                   📊 Статистика
                 </Link>
@@ -176,7 +218,7 @@ export default function QuestList({ session }) {
                     navigator.clipboard.writeText(url)
                     toast.success('Ссылка скопирована!')
                   }}
-                  className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 text-center flex items-center justify-center"
+                  className="bg-purple-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-purple-600 text-center flex items-center justify-center"
                 >
                   🔗 Поделиться
                 </button>
@@ -201,20 +243,20 @@ export default function QuestList({ session }) {
                       toast.error('Ошибка скачивания: ' + err.message)
                     }
                   }}
-                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 text-center flex items-center justify-center"
+                  className="bg-blue-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-blue-600 text-center flex items-center justify-center"
                 >
                   📥 Скачать
                 </button>
                 <button
                   onClick={() => copyQuest(quest.id)}
                   disabled={copying === quest.id}
-                  className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 text-center flex items-center justify-center"
+                  className="bg-gray-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-gray-600 text-center flex items-center justify-center"
                 >
                   {copying === quest.id ? '...' : '📋 Копировать'}
                 </button>
                 <button
                   onClick={() => handleDelete(quest.id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 text-center flex items-center justify-center"
+                  className="bg-red-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-red-600 text-center flex items-center justify-center"
                 >
                   🗑️ Удалить
                 </button>

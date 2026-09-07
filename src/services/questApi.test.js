@@ -11,6 +11,7 @@ vi.mock('../supabaseClient', () => ({
 import {
   loadTaskEventReceipts,
   loadParticipantTasks,
+  loadQuestEntryStatus,
   startServerQuestAttempt,
   submitTaskEvent,
 } from './questApi'
@@ -26,6 +27,17 @@ describe('questApi', () => {
 
     await expect(loadParticipantTasks('quest-1')).resolves.toEqual(tasks)
     expect(rpc).toHaveBeenCalledWith('get_participant_tasks', {
+      p_quest_id: 'quest-1',
+    })
+  })
+
+  it('loads minimal availability before participant access', async () => {
+    const status = { id: 'quest-1', title: 'Quest', is_open: false }
+    const single = vi.fn().mockResolvedValue({ data: status, error: null })
+    rpc.mockReturnValue({ single })
+
+    await expect(loadQuestEntryStatus('quest-1')).resolves.toEqual(status)
+    expect(rpc).toHaveBeenCalledWith('get_quest_entry_status', {
       p_quest_id: 'quest-1',
     })
   })

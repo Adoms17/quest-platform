@@ -10,7 +10,7 @@ const TIMING_CONFIDENCE_LABELS = {
   reported: '📱 С устройства',
 }
 
-export default function QuestStats({ session }) {
+export default function QuestStats() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [quest, setQuest] = useState(null)
@@ -30,11 +30,6 @@ export default function QuestStats({ session }) {
           .eq('id', id)
           .single()
         if (questError) throw questError
-        if (questData.creator_id !== session.user.id) {
-          toast.error('У вас нет прав на просмотр этой статистики')
-          navigate('/quests')
-          return
-        }
         setQuest(questData)
 
         const { data: attemptsData, error: attemptsError } = await supabase
@@ -68,7 +63,7 @@ export default function QuestStats({ session }) {
       }
     }
     fetchStats()
-  }, [id, session, navigate])
+  }, [id, navigate])
 
   // Функция очистки статистики
   async function clearStats() {
@@ -130,14 +125,14 @@ export default function QuestStats({ session }) {
         <div className="flex gap-2">
           <button
             onClick={() => navigate('/quests')}
-            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+            className="bg-gray-500 text-white px-4 py-2 rounded-sm hover:bg-gray-600"
           >
             ← К списку квестов
           </button>
           <button
             onClick={clearStats}
             disabled={clearing || attempts.length === 0}
-            className={`px-4 py-2 rounded text-white ${
+            className={`px-4 py-2 rounded-sm text-white ${
               clearing || attempts.length === 0
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-red-500 hover:bg-red-600'
@@ -244,7 +239,7 @@ export default function QuestStats({ session }) {
       <div className="mt-4 flex gap-2">
         <button
           onClick={() => navigate(`/quests/${id}/edit`)}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          className="bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600"
         >
           ← Назад к редактированию
         </button>

@@ -9,6 +9,7 @@ import { selectAuthSession } from './services/authSession'
 import { isTransportError } from './services/network'
 import { createSyncCoordinator } from './services/syncCoordinator'
 import { PENDING_RESULT_ENQUEUED_EVENT } from './services/syncSignals'
+import { OrganizationProvider } from './contexts/OrganizationContext'
 
 const Login = lazy(() => import('./pages/Login'))
 const QuestList = lazy(() => import('./pages/QuestList'))
@@ -19,6 +20,11 @@ const QuestStats = lazy(() => import('./pages/QuestStats'))
 const Downloads = lazy(() => import('./pages/Downloads'))
 const TaskManager = lazy(() => import('./pages/TaskManager'))
 const TaskForm = lazy(() => import('./pages/TaskForm'))
+const OrganizationTeam = lazy(() => import('./pages/OrganizationTeam'))
+const AcceptOrganizationInvitation = lazy(() => import('./pages/AcceptOrganizationInvitation'))
+const QuestAccess = lazy(() => import('./pages/QuestAccess'))
+const RedeemQuestAccess = lazy(() => import('./pages/RedeemQuestAccess'))
+const RedeemQuestCode = lazy(() => import('./pages/RedeemQuestCode'))
 
 function Layout({ children, session }) {
   return (
@@ -95,10 +101,20 @@ function App() {
   return (
     <BrowserRouter>
       <AppToaster />
-      <LazyRouteErrorBoundary>
+      <OrganizationProvider session={session}>
+        <LazyRouteErrorBoundary>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
           <Routes>
-        <Route path="/login" element={<Login setSession={setSession} />} />
+        <Route
+          path="/login"
+          element={
+            session ? (
+              <Navigate to="/quests" replace />
+            ) : (
+              <Login setSession={setSession} />
+            )
+          }
+        />
         <Route
           path="/quests"
           element={
@@ -180,6 +196,38 @@ function App() {
           }
         />
         <Route
+          path="/invitations/accept"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout session={session}>
+                <AcceptOrganizationInvitation />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organization/team"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout session={session}>
+                <OrganizationTeam />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quests/:id/access"
+          element={<ProtectedRoute session={session}><Layout session={session}><QuestAccess /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/access/redeem"
+          element={<ProtectedRoute session={session}><Layout session={session}><RedeemQuestAccess /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/access/code"
+          element={<ProtectedRoute session={session}><Layout session={session}><RedeemQuestCode /></Layout></ProtectedRoute>}
+        />
+        <Route
           path="/quests/:id/tasks/:taskId/edit"
           element={
             <ProtectedRoute session={session}>
@@ -192,7 +240,8 @@ function App() {
         <Route path="*" element={<Navigate to={session ? '/quests' : '/login'} />} />
           </Routes>
         </Suspense>
-      </LazyRouteErrorBoundary>
+        </LazyRouteErrorBoundary>
+      </OrganizationProvider>
     </BrowserRouter>
   )
 }

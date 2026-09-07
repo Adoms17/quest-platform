@@ -131,7 +131,7 @@ export default function TaskManager() {
         </div>
         <Link
           to={`/quests/${id}/tasks/new`}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          className="bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600"
         >
           + Добавить задание
         </Link>
@@ -142,7 +142,7 @@ export default function TaskManager() {
       ) : (
         <ul className="space-y-3">
           {tasks.map((task, idx) => (
-            <li key={task.id} className="border p-4 rounded shadow flex justify-between items-center">
+            <li key={task.id} className="border p-4 rounded-sm shadow-sm flex justify-between items-center">
               <div className="flex items-center gap-3 flex-1">
                 <span className="font-medium text-gray-500">#{idx + 1}</span>
                 <span className="font-medium">{task.title}</span>
@@ -166,7 +166,7 @@ export default function TaskManager() {
                 <button
                   onClick={() => moveTaskUp(idx)}
                   disabled={idx === 0 || moving}
-                  className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-40"
+                  className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-sm disabled:opacity-40"
                   title="Переместить вверх"
                 >
                   ↑
@@ -174,7 +174,7 @@ export default function TaskManager() {
                 <button
                   onClick={() => moveTaskDown(idx)}
                   disabled={idx === tasks.length - 1 || moving}
-                  className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-40"
+                  className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-sm disabled:opacity-40"
                   title="Переместить вниз"
                 >
                   ↓
@@ -200,7 +200,7 @@ export default function TaskManager() {
       <div className="mt-6 flex gap-2">
         <Link
           to={`/quests/${id}/edit`}
-          className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+          className="bg-gray-300 text-gray-700 px-4 py-2 rounded-sm hover:bg-gray-400"
         >
           ← Назад к редактированию квеста
         </Link>

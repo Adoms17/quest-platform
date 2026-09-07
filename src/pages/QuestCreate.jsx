@@ -2,14 +2,18 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
+import { useOrganization } from '../contexts/useOrganization'
 
 export default function QuestCreate({ session }) {
   const navigate = useNavigate()
+  const { currentOrganization, loadingOrganizations } = useOrganization()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [isPublic, setIsPublic] = useState(false)
   const [locationOptions, setLocationOptions] = useState(['gps'])
   const [verificationOptions, setVerificationOptions] = useState(['gps'])
+  const [verificationMatchPolicy, setVerificationMatchPolicy] =
+    useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
   const [verificationMode, setVerificationMode] =
     useState('online')
@@ -52,6 +56,10 @@ export default function QuestCreate({ session }) {
       toast.error('Введите название')
       return
     }
+    if (!currentOrganization?.id) {
+      toast.error('Выберите организацию для создания квеста')
+      return
+    }
     if (
       verificationOptions.includes('gps') &&
       !locationOptions.includes('gps')
@@ -65,10 +73,12 @@ export default function QuestCreate({ session }) {
       .from('quests')
       .insert({
         creator_id: session.user.id,
+        organization_id: currentOrganization.id,
         title: title.trim(),
         description: description.trim() || null,
         is_public: isPublic,
         verification_options: verificationOptions,
+        verification_match_policy: verificationMatchPolicy,
         verification_mode: verificationMode,
         offline_progress_policy: offlineProgressPolicy,
         location_options: locationOptions,
@@ -85,6 +95,10 @@ export default function QuestCreate({ session }) {
     setLoading(false)
   }
 
+  if (loadingOrganizations) {
+    return <div className="p-8">Загрузка организации...</div>
+  }
+
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Создать новый квест</h1>
@@ -95,7 +109,7 @@ export default function QuestCreate({ session }) {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border p-2 rounded-sm"
             required
           />
         </div>
@@ -104,7 +118,7 @@ export default function QuestCreate({ session }) {
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border p-2 rounded-sm"
             rows="3"
           />
         </div>
@@ -169,6 +183,28 @@ export default function QuestCreate({ session }) {
             </label>
           </div>
           <p className="text-sm text-gray-500 mt-1">Выберите хотя бы один вариант.</p>
+          {verificationOptions.includes('gps') &&
+            verificationOptions.includes('code') && (
+              <div className="mt-3">
+                <label className="block font-medium mb-1">
+                  Сколько условий должен выполнить участник?
+                </label>
+                <select
+                  value={verificationMatchPolicy}
+                  onChange={event =>
+                    setVerificationMatchPolicy(event.target.value)
+                  }
+                  className="w-full border p-2 rounded-sm"
+                >
+                  <option value="all">Оба условия: GPS и код</option>
+                  <option value="any">Хотя бы одно: GPS или код</option>
+                </select>
+                <p className="text-sm text-gray-500 mt-1">
+                  «Хотя бы одно» позволяет открыть задание по коду, если GPS
+                  недоступен или работает нестабильно.
+                </p>
+              </div>
+            )}
         </div>
 
         <div>
@@ -181,7 +217,7 @@ export default function QuestCreate({ session }) {
               onChange={event =>
                 setVerificationMode(event.target.value)
               }
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded-sm"
             >
               <option value="online">
                 Online — всегда серверная проверка
@@ -208,7 +244,7 @@ export default function QuestCreate({ session }) {
               onChange={event =>
                 setOfflineProgressPolicy(event.target.value)
               }
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded-sm"
             >
               <option value="allow_pending">
                 Разрешить pending — проверить после синхронизации
@@ -224,7 +260,7 @@ export default function QuestCreate({ session }) {
             min="0"
             value={maxAttempts}
             onChange={(e) => setMaxAttempts(e.target.value)}
-            className="w-full border p-2 rounded"
+            className="w-full border p-2 rounded-sm"
           />
           <p className="text-sm text-gray-500 mt-1">0 — неограниченно. Если указано число, то при исчерпании попыток задание засчитывается как невыполненное.</p>
         </div>
@@ -236,21 +272,26 @@ export default function QuestCreate({ session }) {
             onChange={(e) => setIsPublic(e.target.checked)}
             id="isPublic"
           />
-          <label htmlFor="isPublic">Публичный квест</label>
+          <label htmlFor="isPublic">
+            <span className="block">Доступ без приглашения</span>
+            <span className="block text-sm font-normal text-gray-500">
+              Если выключено, участнику потребуется приглашение, ссылка или код доступа.
+            </span>
+          </label>
         </div>
 
         <div className="flex gap-2">
           <button
             type="submit"
-            disabled={loading}
-            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            disabled={loading || !currentOrganization}
+            className="bg-green-500 text-white px-4 py-2 rounded-sm hover:bg-green-600"
           >
             {loading ? 'Создание...' : 'Создать'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/quests')}
-            className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-sm hover:bg-gray-400"
           >
             Отмена
           </button>
