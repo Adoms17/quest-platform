@@ -16,6 +16,7 @@ export default function QuestEdit() {
   const [verificationMatchPolicy, setVerificationMatchPolicy] =
     useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
+  const [maxQuestAttempts, setMaxQuestAttempts] = useState(0)
   const [isOpen, setIsOpen] = useState(true)
   const [isPublic, setIsPublic] = useState(false)
   const [startAt, setStartAt] = useState('')
@@ -36,6 +37,7 @@ export default function QuestEdit() {
       if (questError) throw new Error('Квест не найден')
       setQuest(questData)
       setMaxAttempts(questData.max_attempts || 0)
+      setMaxQuestAttempts(questData.max_quest_attempts || 0)
       setQuestTitle(questData.title)
       setQuestDescription(questData.description || '')
       setIsOpen(questData.is_open !== undefined ? questData.is_open : true)
@@ -214,6 +216,22 @@ export default function QuestEdit() {
     }
   }
 
+  async function updateMaxQuestAttempts(value) {
+    const num = parseInt(value, 10) || 0
+    setMaxQuestAttempts(num)
+    try {
+      const { error } = await supabase
+        .from('quests')
+        .update({ max_quest_attempts: num })
+        .eq('id', id)
+      if (error) throw error
+      setQuest(previous => ({ ...previous, max_quest_attempts: num }))
+      toast.success('Лимит прохождений обновлён')
+    } catch (err) {
+      toast.error('Ошибка обновления: ' + err.message)
+    }
+  }
+
   async function updateAvailability(field, value) {
     let finalValue = value
     if ((field === 'start_at' || field === 'end_at') && value) {
@@ -330,6 +348,19 @@ export default function QuestEdit() {
               />
               <p className="text-sm text-gray-500 mt-1">0 — неограниченно</p>
             </div>
+            <div>
+              <label className="block font-medium mb-1">Лимит прохождений квеста участником</label>
+              <input
+                type="number"
+                min="0"
+                value={maxQuestAttempts}
+                onChange={(e) => updateMaxQuestAttempts(e.target.value)}
+                className="w-full border p-2 rounded-sm"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                0 — неограниченно. Учитываются все завершённые прохождения.
+              </p>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={updateQuest}
@@ -360,6 +391,7 @@ export default function QuestEdit() {
                 <li>Доступ: {quest.is_public ? 'Без приглашения' : 'По приглашению, ссылке или коду'}</li>
                 {quest.start_at && <li>Начало: {new Date(quest.start_at).toLocaleString()}</li>}
                 {quest.end_at && <li>Окончание: {new Date(quest.end_at).toLocaleString()}</li>}
+                <li>Прохождений на участника: {quest.max_quest_attempts || 'без ограничений'}</li>
               </ul>
             </div>
           </div>

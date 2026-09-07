@@ -165,6 +165,7 @@ docs            архитектура и развёртывание
 - [Развёртывание](docs/DEPLOYMENT.md)
 - [Модель доступа к квестам](docs/access/QUEST_ACCESS_GRANTS_DESIGN.md)
 - [Проверка и публикация доступа к квестам](docs/access/QUEST_ACCESS_GRANTS_ROLLOUT.md)
+- [План интерфейса участника квеста](docs/access/PARTICIPANT_QUEST_UX_PLAN.md)
 - [Правила работы агента](AGENTS.md)
 
 ## Статус

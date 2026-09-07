@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
+import QuestStartScreen from '../components/QuestStartScreen'
 import toast from 'react-hot-toast'
 import {
   getQuestFromDB,
@@ -25,6 +26,7 @@ import { isTransportError } from '../services/network'
 import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
 import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
 import { getQuestAvailability } from '../services/questAvailability'
+import { getAnswerResultMessage } from '../services/questResultPresentation'
 
 export default function QuestPlay({ session }) {
   const { id } = useParams()
@@ -38,7 +40,10 @@ export default function QuestPlay({ session }) {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [, setIsOnline] = useState(navigator.onLine)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [hasStarted, setHasStarted] = useState(false)
+  const [offlinePackageStatus, setOfflinePackageStatus] = useState('loading')
+  const [attemptLimitReached, setAttemptLimitReached] = useState(false)
 
   const [questAttemptId, setQuestAttemptId] = useState(null)
   const [totalTasks, setTotalTasks] = useState(0)
@@ -98,6 +103,9 @@ export default function QuestPlay({ session }) {
 
     async function loadQuest() {
       setLoading(true)
+      setHasStarted(false)
+      setAttemptLimitReached(false)
+      setOfflinePackageStatus('loading')
 
       try {
         let questData
@@ -146,8 +154,10 @@ export default function QuestPlay({ session }) {
 
             try {
               await saveQuestToDB(questData, tasksData)
+              setOfflinePackageStatus('ready')
             } catch (cacheError) {
               console.warn('Не удалось сохранить квест для offline:', cacheError)
+              setOfflinePackageStatus('unavailable')
             }
           } catch (remoteError) {
             if (!isTransportError(remoteError)) throw remoteError
@@ -158,11 +168,13 @@ export default function QuestPlay({ session }) {
             const cached = await loadCachedQuest()
             questData = cached.questData
             tasksData = cached.tasksData
+            setOfflinePackageStatus('ready')
           }
         } else {
           const cached = await loadCachedQuest()
           questData = cached.questData
           tasksData = cached.tasksData
+          setOfflinePackageStatus('ready')
         }
 
         setQuest(questData)
@@ -291,7 +303,7 @@ export default function QuestPlay({ session }) {
 
   // ----- Инициализация попытки (исправленная офлайн-логика) -----
   const initializeAttempt = useCallback(async () => {
-    if (!isAvailable || !quest || tasks.length === 0 || initAttemptDone) return
+    if (!hasStarted || !isAvailable || !quest || tasks.length === 0 || initAttemptDone) return
 
     const userId = session?.user?.id
     if (!userId) {
@@ -385,21 +397,28 @@ export default function QuestPlay({ session }) {
     setStartTime(Date.now())
     setInitAttemptDone(true)
     toast.success('🔓 Квест открыт!')
-  }, [isAvailable, quest, tasks, id, session, initAttemptDone, loadTaskAttempts])
+  }, [hasStarted, isAvailable, quest, tasks, id, session, initAttemptDone, loadTaskAttempts])
 
   // Запуск инициализации
   useEffect(() => {
-    if (isAvailable && !initAttemptDone) {
+    if (hasStarted && isAvailable && !initAttemptDone) {
       const timeout = setTimeout(() => {
         initializeAttempt().catch(err => {
           attemptInitializationKeyRef.current = null
-          toast.error(`Не удалось открыть квест: ${err.message}`)
+          if (err.message?.includes('quest completion limit reached')) {
+            setAttemptLimitReached(true)
+            setHasStarted(false)
+            toast.error('Лимит прохождений этого квеста исчерпан')
+          } else {
+            setHasStarted(false)
+            toast.error(`Не удалось открыть квест: ${err.message}`)
+          }
         })
       }, 0)
 
       return () => clearTimeout(timeout)
     }
-  }, [isAvailable, initAttemptDone, initializeAttempt])
+  }, [hasStarted, isAvailable, initAttemptDone, initializeAttempt])
 
   // Таймер
   useEffect(() => {
@@ -763,17 +782,13 @@ export default function QuestPlay({ session }) {
         setTotalAttempts(serverAttempt.total_attempts || 0)
         setTotalTime(serverAttempt.total_time || 0)
 
-        if (serverState.correct) {
-          toast.success('✅ Правильный ответ!')
-        } else if (serverState.failed) {
-          toast.error('❌ Сервер отклонил ответ: лимит попыток исчерпан.')
+        const answerResult = getAnswerResultMessage(serverState)
+        if (answerResult.type === 'success') {
+          toast.success(`✅ ${answerResult.message}`)
+        } else if (answerResult.type === 'terminal') {
+          toast(answerResult.message, { icon: '⚠️' })
         } else {
-          const remaining = serverState.remaining_attempts
-          toast.error(
-            remaining === null || remaining === undefined
-              ? '❌ Неправильный ответ, попробуйте ещё раз'
-              : `❌ Неправильный ответ. Осталось попыток: ${remaining}`
-          )
+          toast.error(`❌ ${answerResult.message}`)
         }
 
         if (serverState.terminal) {
@@ -921,6 +936,25 @@ export default function QuestPlay({ session }) {
   if (!quest || tasks.length === 0) {
     return <div className="p-8">В этом квесте пока нет заданий</div>
   }
+  if (!hasStarted) {
+    return (
+      <QuestStartScreen
+        quest={quest}
+        taskCount={tasks.length}
+        isOnline={isOnline}
+        offlinePackageStatus={offlinePackageStatus}
+        hasExistingAttempt={Boolean(sessionStorage.getItem(`questAttempt_${id}`))}
+        startDisabled={attemptLimitReached}
+        startMessage={attemptLimitReached
+          ? 'Вы использовали все доступные прохождения этого квеста.'
+          : ''}
+        onStart={() => setHasStarted(true)}
+      />
+    )
+  }
+  if (!initAttemptDone) {
+    return <Loader text="Открываем квест..." />
+  }
   if (finished) {
     const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
     return (
@@ -937,10 +971,15 @@ export default function QuestPlay({ session }) {
             ? '⏳ Квест ожидает проверки'
             : '🏁 Квест завершён!'}
         </h1>
-        <p className="text-xl mt-4">Вы прошли {completedTasks} из {totalTasks} заданий</p>
+        <p className="text-xl mt-4">Завершено заданий: {completedTasks + failedTasks} из {totalTasks}</p>
         <p className="text-lg mt-2">✅ Успешно: {completedTasks} | ❌ Неуспешно: {failedTasks}</p>
         <p className="text-lg">⏱️ Время: {elapsedSeconds} секунд</p>
         <p className="text-lg">🎯 Процент успеха: {percent}%</p>
+        {!hasPendingConfirmation && (
+          <p className="mt-4 rounded-lg bg-white px-4 py-2 text-green-800 shadow-sm">
+            ✅ Результат сохранён и подтверждён сервером
+          </p>
+        )}
         <button onClick={() => navigate('/')} className="mt-6 bg-blue-500 text-white px-6 py-3 rounded-sm hover:bg-blue-600">
           На главную
         </button>

@@ -15,6 +15,7 @@ export default function QuestCreate({ session }) {
   const [verificationMatchPolicy, setVerificationMatchPolicy] =
     useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
+  const [maxQuestAttempts, setMaxQuestAttempts] = useState(0)
   const [verificationMode, setVerificationMode] =
     useState('online')
   const [offlineProgressPolicy, setOfflineProgressPolicy] =
@@ -83,6 +84,7 @@ export default function QuestCreate({ session }) {
         offline_progress_policy: offlineProgressPolicy,
         location_options: locationOptions,
         max_attempts: parseInt(maxAttempts, 10) || 0,
+        max_quest_attempts: parseInt(maxQuestAttempts, 10) || 0,
       })
       .select()
 
@@ -263,6 +265,17 @@ export default function QuestCreate({ session }) {
             className="w-full border p-2 rounded-sm"
           />
           <p className="text-sm text-gray-500 mt-1">0 — неограниченно. Если указано число, то при исчерпании попыток задание засчитывается как невыполненное.</p>
+          <label className="block font-medium mb-1 mt-4">Лимит прохождений квеста участником</label>
+          <input
+            type="number"
+            min="0"
+            value={maxQuestAttempts}
+            onChange={(e) => setMaxQuestAttempts(e.target.value)}
+            className="w-full border p-2 rounded-sm"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            0 — неограниченно. Учитываются завершённые успешные и неуспешные прохождения.
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
