@@ -37,10 +37,8 @@ export default function OrganizationTeam() {
   const [editingMemberId, setEditingMemberId] = useState(null)
   const [memberRoleKeys, setMemberRoleKeys] = useState([])
   const [savingMemberId, setSavingMemberId] = useState(null)
-  const [linkVersion, setLinkVersion] = useState(0)
+  const [savedInvitationLinks, setSavedInvitationLinks] = useState({})
   const linkScope = `organization:${currentOrganization?.id || 'none'}`
-  void linkVersion
-  const savedInvitationLinks = loadLocalSecretLinks(linkScope)
 
   const pendingInvitations = useMemo(
     () => invitations.filter(invitation => invitation.status === 'pending'),
@@ -83,6 +81,14 @@ export default function OrganizationTeam() {
     return () => clearTimeout(timeout)
   }, [loadTeam])
 
+  useEffect(() => {
+    let active = true
+    void loadLocalSecretLinks(linkScope).then(links => {
+      if (active) setSavedInvitationLinks(links)
+    })
+    return () => { active = false }
+  }, [linkScope])
+
   const toggleRole = roleKey => {
     setSelectedRoles(current => current.includes(roleKey)
       ? current.filter(key => key !== roleKey)
@@ -102,8 +108,7 @@ export default function OrganizationTeam() {
         roleKeys: selectedRoles,
       })
       const link = `${window.location.origin}/invitations/accept?token=${encodeURIComponent(invitation.invitation_token)}`
-      saveLocalSecretLink(linkScope, invitation.invitation_id, link)
-      setLinkVersion(version => version + 1)
+      setSavedInvitationLinks(await saveLocalSecretLink(linkScope, invitation.invitation_id, link))
       setInvitationLink(link)
       setEmail('')
       toast.success('Приглашение создано')
@@ -123,8 +128,7 @@ export default function OrganizationTeam() {
   const handleRevokeInvitation = async invitationId => {
     try {
       await revokeOrganizationInvitation(invitationId)
-      removeLocalSecretLink(linkScope, invitationId)
-      setLinkVersion(version => version + 1)
+      setSavedInvitationLinks(await removeLocalSecretLink(linkScope, invitationId))
       toast.success('Приглашение отозвано')
       await loadTeam()
     } catch (nextError) {

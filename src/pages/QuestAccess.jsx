@@ -20,7 +20,7 @@ export default function QuestAccess() {
   const [email, setEmail] = useState('')
   const [limit, setLimit] = useState(1)
   const linkScope = `quest:${id}`
-  const [credentialLinks, setCredentialLinks] = useState(() => loadLocalSecretLinks(linkScope))
+  const [credentialLinks, setCredentialLinks] = useState({})
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -32,6 +32,13 @@ export default function QuestAccess() {
     const timeout = setTimeout(() => void load(), 0)
     return () => clearTimeout(timeout)
   }, [load])
+  useEffect(() => {
+    let active = true
+    void loadLocalSecretLinks(linkScope).then(links => {
+      if (active) setCredentialLinks(links)
+    })
+    return () => { active = false }
+  }, [linkScope])
 
   const create = async event => {
     event.preventDefault()
@@ -40,7 +47,7 @@ export default function QuestAccess() {
       const secret = kind === 'code'
         ? result.credential_token
         : `${window.location.origin}/access/redeem?token=${encodeURIComponent(result.credential_token)}`
-      setCredentialLinks(saveLocalSecretLink(linkScope, result.credential_id, secret))
+      setCredentialLinks(await saveLocalSecretLink(linkScope, result.credential_id, secret))
       toast.success('Доступ создан')
       await load()
     } catch (error) { toast.error(error.message || 'Не удалось создать доступ') }
@@ -58,7 +65,7 @@ export default function QuestAccess() {
       </form>
       <p className="mt-4 text-sm text-gray-600">Ссылки и коды сохраняются только в этом браузере. На другом устройстве выпустите новый способ доступа.</p>
     </section>
-    <section><h2 className="mb-3 text-lg font-semibold">Способы входа</h2>{loading ? <p>Загрузка...</p> : data.credentials.map(item => { const cardLabel = getCredentialCardLabel(item, credentialLinks[item.id]); return <div key={item.id} className="mb-2 flex flex-col justify-between gap-3 rounded-lg border bg-white p-4 sm:flex-row"><div><p className="font-medium">{labels[item.kind]}{cardLabel ? ` · ${cardLabel}` : ''}</p><p className="text-sm text-gray-600">Создано {formatDate(item.created_at)} · действует до {formatDate(item.expires_at)}</p><p className="text-sm text-gray-600">Использовано {item.redemption_count} из {item.max_redemptions ?? '∞'} · {statusLabels[item.status] || item.status}</p></div><span className="flex gap-4">{credentialLinks[item.id] && <button onClick={async () => { await navigator.clipboard.writeText(credentialLinks[item.id]); toast.success(item.kind === 'code' ? 'Код скопирован' : 'Ссылка скопирована') }} className="text-blue-700">{item.kind === 'code' ? 'Копировать код' : 'Копировать ссылку'}</button>}{item.status === 'active' && <button onClick={async () => { await revokeQuestAccessCredential(item.id); setCredentialLinks(removeLocalSecretLink(linkScope, item.id)); await load() }} className="text-red-700">Отозвать</button>}</span></div> })}</section>
+    <section><h2 className="mb-3 text-lg font-semibold">Способы входа</h2>{loading ? <p>Загрузка...</p> : data.credentials.map(item => { const cardLabel = getCredentialCardLabel(item, credentialLinks[item.id]); return <div key={item.id} className="mb-2 flex flex-col justify-between gap-3 rounded-lg border bg-white p-4 sm:flex-row"><div><p className="font-medium">{labels[item.kind]}{cardLabel ? ` · ${cardLabel}` : ''}</p><p className="text-sm text-gray-600">Создано {formatDate(item.created_at)} · действует до {formatDate(item.expires_at)}</p><p className="text-sm text-gray-600">Использовано {item.redemption_count} из {item.max_redemptions ?? '∞'} · {statusLabels[item.status] || item.status}</p></div><span className="flex gap-4">{credentialLinks[item.id] && <button onClick={async () => { await navigator.clipboard.writeText(credentialLinks[item.id]); toast.success(item.kind === 'code' ? 'Код скопирован' : 'Ссылка скопирована') }} className="text-blue-700">{item.kind === 'code' ? 'Копировать код' : 'Копировать ссылку'}</button>}{item.status === 'active' && <button onClick={async () => { await revokeQuestAccessCredential(item.id); setCredentialLinks(await removeLocalSecretLink(linkScope, item.id)); await load() }} className="text-red-700">Отозвать</button>}</span></div> })}</section>
     <section><h2 className="mb-3 text-lg font-semibold">Выданные права</h2>{data.grants.length === 0 ? <p className="text-gray-500">Права ещё не выдавались.</p> : data.grants.map(item => <div key={item.grant_id} className="mb-2 flex flex-col justify-between gap-3 rounded-lg border bg-white p-4 sm:flex-row"><div><p className="font-medium">{item.username || item.email || 'Участник'}</p><p className="text-sm text-gray-600">{item.email} · выдано {formatDate(item.granted_at)}</p><p className="text-sm text-gray-600">Источник: {labels[item.credential_kind] || 'вручную'} · {statusLabels[item.status] || item.status}</p><p className="text-xs text-gray-400">ID участника: {item.user_id.slice(0, 8)}…</p></div>{item.status === 'active' && <button onClick={async () => { await revokeQuestAccessGrant(item.grant_id); await load() }} className="self-start text-red-700">Отозвать</button>}</div>)}</section>
   </div>
 }
