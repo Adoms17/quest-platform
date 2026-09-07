@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
 import { getAuthErrorMessage, logAuthError } from '../services/authErrors'
@@ -7,6 +7,7 @@ import { withAuthTimeout } from '../services/authRequest'
 
 export default function Login({ setSession }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -60,7 +61,8 @@ export default function Login({ setSession }) {
       }
 
       setSession(data.session)
-      navigate('/quests')
+      const returnPath = location.state?.from
+      navigate(typeof returnPath === 'string' && returnPath.startsWith('/') ? returnPath : '/quests')
     } catch (error) {
       logAuthError('Ошибка входа', error)
       toast.error(getAuthErrorMessage(error))

@@ -20,6 +20,8 @@ const QuestStats = lazy(() => import('./pages/QuestStats'))
 const Downloads = lazy(() => import('./pages/Downloads'))
 const TaskManager = lazy(() => import('./pages/TaskManager'))
 const TaskForm = lazy(() => import('./pages/TaskForm'))
+const OrganizationTeam = lazy(() => import('./pages/OrganizationTeam'))
+const AcceptOrganizationInvitation = lazy(() => import('./pages/AcceptOrganizationInvitation'))
 
 function Layout({ children, session }) {
   return (
@@ -186,6 +188,26 @@ function App() {
             <ProtectedRoute session={session}>
               <Layout session={session}>
                 <TaskForm session={session} />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/invitations/accept"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout session={session}>
+                <AcceptOrganizationInvitation />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organization/team"
+          element={
+            <ProtectedRoute session={session}>
+              <Layout session={session}>
+                <OrganizationTeam />
               </Layout>
             </ProtectedRoute>
           }
