@@ -15,13 +15,25 @@ export async function listOrganizations() {
 
   if (error) throw error
 
-  return (data || [])
+  return Array.from((data || [])
     .filter(membership => membership.organizations)
-    .map(membership => ({
-      ...membership.organizations,
-      roles: (membership.membership_roles || [])
+    .reduce((organizationsById, membership) => {
+      const organization = membership.organizations
+      const existing = organizationsById.get(organization.id)
+      const roles = (membership.membership_roles || [])
         .map(item => item.roles)
-        .filter(Boolean),
-    }))
-}
+        .filter(Boolean)
 
+      if (!existing) {
+        organizationsById.set(organization.id, { ...organization, roles })
+        return organizationsById
+      }
+
+      const rolesByKey = new Map(
+        [...existing.roles, ...roles].map(role => [role.key, role])
+      )
+      existing.roles = Array.from(rolesByKey.values())
+      return organizationsById
+    }, new Map())
+    .values())
+}

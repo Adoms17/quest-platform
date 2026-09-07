@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mocks.navigate,
+  useLocation: () => ({ state: null }),
 }))
 
 vi.mock('../supabaseClient', () => ({

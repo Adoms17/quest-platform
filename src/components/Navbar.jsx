@@ -16,6 +16,9 @@ export default function Navbar({ session }) {
     organizationError,
     selectOrganization,
   } = useOrganization()
+  const canManageTeam = currentOrganization?.roles?.some(
+    role => role.key === 'owner' || role.key === 'admin'
+  )
 
   // Загружаем профиль пользователя
   useEffect(() => {
@@ -82,6 +85,11 @@ export default function Navbar({ session }) {
         <Link to="/downloads" className="block px-4 py-2 hover:bg-gray-100">
           📥 Мои загрузки
         </Link>
+        {canManageTeam && (
+          <Link to="/organization/team" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
+            👥 Команда
+          </Link>
+        )}
         {organizations.length > 0 && (
           <label className="hidden md:flex items-center gap-2 text-sm">
             <span className="sr-only">Текущая организация</span>
@@ -95,6 +103,10 @@ export default function Navbar({ session }) {
               {organizations.map(organization => (
                 <option key={organization.id} value={organization.id}>
                   {organization.name}
+                  {' · '}
+                  {organization.personal_owner_id === session.user.id
+                    ? 'личная'
+                    : 'по приглашению'}
                 </option>
               ))}
             </select>
@@ -142,6 +154,15 @@ export default function Navbar({ session }) {
               <p className="font-medium">{displayName}</p>
               <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
             </div>
+            {canManageTeam && (
+              <Link
+                to="/organization/team"
+                onClick={() => setMenuOpen(false)}
+                className="block px-4 py-2 hover:bg-gray-100 transition"
+              >
+                👥 Команда
+              </Link>
+            )}
             <button
               onClick={handleLogout}
               className="block w-full text-left px-4 py-2 hover:bg-gray-100 transition"
