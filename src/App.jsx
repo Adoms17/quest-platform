@@ -22,6 +22,9 @@ const TaskManager = lazy(() => import('./pages/TaskManager'))
 const TaskForm = lazy(() => import('./pages/TaskForm'))
 const OrganizationTeam = lazy(() => import('./pages/OrganizationTeam'))
 const AcceptOrganizationInvitation = lazy(() => import('./pages/AcceptOrganizationInvitation'))
+const QuestAccess = lazy(() => import('./pages/QuestAccess'))
+const RedeemQuestAccess = lazy(() => import('./pages/RedeemQuestAccess'))
+const RedeemQuestCode = lazy(() => import('./pages/RedeemQuestCode'))
 
 function Layout({ children, session }) {
   return (
@@ -211,6 +214,18 @@ function App() {
               </Layout>
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/quests/:id/access"
+          element={<ProtectedRoute session={session}><Layout session={session}><QuestAccess /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/access/redeem"
+          element={<ProtectedRoute session={session}><Layout session={session}><RedeemQuestAccess /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/access/code"
+          element={<ProtectedRoute session={session}><Layout session={session}><RedeemQuestCode /></Layout></ProtectedRoute>}
         />
         <Route
           path="/quests/:id/tasks/:taskId/edit"

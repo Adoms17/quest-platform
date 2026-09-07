@@ -272,7 +272,12 @@ export default function QuestCreate({ session }) {
             onChange={(e) => setIsPublic(e.target.checked)}
             id="isPublic"
           />
-          <label htmlFor="isPublic">Публичный квест</label>
+          <label htmlFor="isPublic">
+            <span className="block">Доступ без приглашения</span>
+            <span className="block text-sm font-normal text-gray-500">
+              Если выключено, участнику потребуется приглашение, ссылка или код доступа.
+            </span>
+          </label>
         </div>
 
         <div className="flex gap-2">
