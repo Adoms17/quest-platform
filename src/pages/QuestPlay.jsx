@@ -15,12 +15,14 @@ import {
 } from '../services/db'
 import {
   loadParticipantTasks,
+  loadQuestEntryStatus,
   startServerQuestAttempt,
   submitTaskEvent,
 } from '../services/questApi'
 import { verifyHybridCandidate } from '../services/hybridVerification'
 import { usesAnyLocationVerification } from '../services/verificationPolicy'
 import { isTransportError } from '../services/network'
+import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
 import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
 import { getQuestAvailability } from '../services/questAvailability'
 
@@ -116,6 +118,18 @@ export default function QuestPlay({ session }) {
 
         if (isOnlineRef.current) {
           try {
+            const entryStatus = await loadQuestEntryStatus(id)
+            const entryAvailability = getQuestAvailability(entryStatus)
+
+            if (!entryAvailability.isAvailable) {
+              questData = entryStatus
+              tasksData = []
+              setQuest(questData)
+              setTasks(tasksData)
+              setTotalTasks(0)
+              return
+            }
+
             const { data: remoteQuest, error: questError } = await supabase
               .from('quests')
               .select('*')
@@ -156,7 +170,12 @@ export default function QuestPlay({ session }) {
         setTotalTasks(tasksData.length)
       } catch (err) {
         setError(err.message)
-        toast.error(`Ошибка загрузки: ${err.message}`)
+        const accessErrorMessage = getQuestAccessErrorMessage(err.message)
+        toast.error(
+          accessErrorMessage
+            ? 'Нет активного доступа к квесту'
+            : 'Не удалось загрузить квест. Попробуйте ещё раз.'
+        )
       } finally {
         setLoading(false)
       }
@@ -864,9 +883,22 @@ export default function QuestPlay({ session }) {
 
   // ----- Рендеры -----
   if (loading) return <Loader text="Загрузка квеста..." />
-  if (error) return <div className="p-8 text-red-500">Ошибка: {error}</div>
-  if (!quest || tasks.length === 0) {
-    return <div className="p-8">В этом квесте пока нет заданий</div>
+  if (error) {
+    const accessErrorMessage = getQuestAccessErrorMessage(error)
+    if (accessErrorMessage) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50">
+          <div className="bg-white p-8 rounded-sm shadow-sm max-w-md text-center">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">⛔ Квест недоступен</h2>
+            <p className="text-gray-700">{accessErrorMessage}</p>
+            <button onClick={() => navigate('/quests')} className="mt-6 bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600">
+              На главную
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return <div className="p-8 text-red-500">Не удалось загрузить квест. Попробуйте ещё раз.</div>
   }
   if (!isAvailable) {
     return (
@@ -885,6 +917,9 @@ export default function QuestPlay({ session }) {
         </div>
       </div>
     )
+  }
+  if (!quest || tasks.length === 0) {
+    return <div className="p-8">В этом квесте пока нет заданий</div>
   }
   if (finished) {
     const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
