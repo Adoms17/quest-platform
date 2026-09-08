@@ -1,9 +1,28 @@
 begin;
 
-select plan(6);
+select plan(10);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values ('9a000000-0000-4000-8000-000000000001', 'gateway-user@example.test', '{"username":"Gateway user"}'::jsonb);
+
+select isnt(
+  has_function_privilege('authenticated', 'public.redeem_quest_access_code(text)', 'execute'),
+  true,
+  'authenticated clients cannot execute direct self-profile code redemption'
+);
+select isnt(
+  has_function_privilege('authenticated', 'public.redeem_quest_access_code_for_participant(text,uuid)', 'execute'),
+  true,
+  'authenticated clients cannot execute direct participant code redemption'
+);
+select ok(
+  has_function_privilege('service_role', 'public.redeem_quest_access_code(text)', 'execute'),
+  'service role retains internal self-profile code redemption access'
+);
+select ok(
+  has_function_privilege('service_role', 'public.redeem_quest_access_code_for_participant(text,uuid)', 'execute'),
+  'service role retains internal participant code redemption access'
+);
 
 select set_config('request.jwt.claim.sub', '9a000000-0000-4000-8000-000000000001', true);
 set local role authenticated;
