@@ -334,6 +334,23 @@ test('redeems a short code through the local edge gateway', async ({ page }, tes
   const ownerEmail = `edge-owner-${suffix}@example.test`
   const participantEmail = `edge-participant-${suffix}@example.test`
 
+  const preflight = await page.request.fetch(
+    'http://127.0.0.1:54321/functions/v1/redeem-quest-code',
+    {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'http://127.0.0.1:4173',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization,apikey,content-type,x-client-info,x-supabase-api-version,x-qvesta-device-id',
+      },
+    },
+  )
+  expect(preflight.status()).toBe(200)
+  const allowedHeaders = preflight.headers()['access-control-allow-headers']
+  expect(allowedHeaders).toContain('x-client-info')
+  expect(allowedHeaders).toContain('x-supabase-api-version')
+  expect(allowedHeaders).toContain('x-qvesta-device-id')
+
   await page.goto('/login')
   const code = await page.evaluate(async ({ email, password: userPassword }) => {
     const { supabase } = await import('/src/supabaseClient.js')
