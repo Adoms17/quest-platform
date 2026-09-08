@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  getDownloadedQuests,
+  getDownloadedQuestPackages,
   removeQuestFromDB,
-  getQuestFromDB,
   clearAllLocalData,
   getPendingResults,
 } from '../services/db'
+import { listMyParticipantProfiles } from '../services/participantGroupApi'
 import { 
   syncPendingResults, 
   SYNC_COMPLETE_EVENT} from '../services/sync'
@@ -25,22 +25,34 @@ export default function Downloads({ session }) {
 
   const loadDownloads = useCallback(async () => {
     try {
-      const downloaded = await getDownloadedQuests()
+      const downloaded = await getDownloadedQuestPackages()
       const pending = userId
         ? await getPendingResults(userId)
         : []
-      const questsWithStatus = []
-      for (const d of downloaded) {
-        const localQuest = await getQuestFromDB(d.questId)
-        const hasUnsynced = pending.some(p => p.questId === d.questId && !p.synced)
-        questsWithStatus.push({
-          questId: d.questId,
-          downloadedAt: d.downloadedAt,
-          lastSyncDate: d.lastSyncDate || null,
-          title: localQuest?.title || 'Без названия',
-          hasUnsynced,
-        })
+      let profileNames = new Map()
+      if (navigator.onLine) {
+        try {
+          const profiles = await listMyParticipantProfiles()
+          profileNames = new Map(profiles.map(profile => [
+            profile.participant_profile_id,
+            profile.display_name,
+          ]))
+        } catch {
+          // Пакеты остаются видимыми offline без загрузки имён с сервера.
+        }
       }
+      const questsWithStatus = downloaded.map(item => ({
+        ...item,
+        participantName: profileNames.get(item.participantProfileId) ||
+          (item.participantProfileId
+            ? `Профиль …${item.participantProfileId.slice(-6)}`
+            : 'Старый пакет'),
+        hasUnsynced: pending.some(result =>
+          result.questId === item.questId &&
+          !result.synced &&
+          (result.participantProfileId || result.userId) === item.participantProfileId
+        ),
+      }))
       setQuests(questsWithStatus)
     } catch (err) {
       toast.error('Ошибка загрузки списка: ' + err.message)
@@ -136,7 +148,7 @@ export default function Downloads({ session }) {
         <ul className="space-y-4">
           {quests.map(q => {
             const hasError = !!syncErrors[q.questId]
-            const canPlay = !q.hasUnsynced && !hasError
+            const canPlay = q.isFresh && !q.hasUnsynced && !hasError
             const canSync = q.hasUnsynced && !syncing
 
             return (
@@ -145,7 +157,18 @@ export default function Downloads({ session }) {
                   <div>
                     <h3 className="font-medium text-lg">{q.title}</h3>
                     <div className="text-sm text-gray-500 space-y-1">
+                      <div>Участник: {q.participantName}</div>
                       <div>Скачан: {new Date(q.downloadedAt).toLocaleString()}</div>
+                      {q.expiresAt && (
+                        <div>Офлайн-доступ до: {new Date(q.expiresAt).toLocaleString()}</div>
+                      )}
+                      {!q.isFresh && (
+                        <div className="font-medium text-amber-700">
+                          {q.legacy
+                            ? 'Пакет нужно обновить онлайн'
+                            : 'Срок офлайн-доступа истёк'}
+                        </div>
+                      )}
                       {q.lastSyncDate && (
                         <div>Последняя синхронизация: {new Date(q.lastSyncDate).toLocaleString()}</div>
                       )}
@@ -170,14 +193,18 @@ export default function Downloads({ session }) {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => navigate(`/play/${q.questId}`)}
+                      onClick={() => navigate(`/play/${q.questId}?participant=${encodeURIComponent(q.participantProfileId)}`)}
                       disabled={!canPlay}
                       className={`px-3 py-1 rounded-sm text-sm ${
                         canPlay
                           ? 'bg-blue-500 text-white hover:bg-blue-600'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
-                      title={!canPlay && q.hasUnsynced ? 'Сначала синхронизируйте результаты' : ''}
+                      title={!q.isFresh
+                        ? 'Подключитесь к интернету и обновите пакет'
+                        : !canPlay && q.hasUnsynced
+                          ? 'Сначала синхронизируйте результаты'
+                          : ''}
                     >
                       🚀 Пройти офлайн
                     </button>

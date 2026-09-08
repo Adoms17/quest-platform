@@ -27,9 +27,11 @@ describe('listOrganizations', () => {
             name: 'Personal organization',
             personal_owner_id: 'user-1',
           },
-          membership_roles: [{
-            roles: { key: 'owner', name: 'Владелец' },
-          }],
+          membership_roles: [{ roles: {
+            key: 'owner',
+            name: 'Владелец',
+            role_permissions: [{ permissions: { key: 'members.manage' } }],
+          } }],
         }],
         error: null,
       })),
@@ -41,6 +43,7 @@ describe('listOrganizations', () => {
       name: 'Personal organization',
       personal_owner_id: 'user-1',
       roles: [{ key: 'owner', name: 'Владелец' }],
+      permissions: ['members.manage'],
     }])
     expect(mocks.from).toHaveBeenCalledWith('organization_memberships')
     expect(query.eq).toHaveBeenCalledWith('status', 'active')
@@ -66,11 +69,11 @@ describe('listOrganizations', () => {
         data: [
           {
             organizations: { id: 'organization-1', name: 'Team' },
-            membership_roles: [{ roles: { key: 'admin', name: 'Администратор' } }],
+            membership_roles: [{ roles: { key: 'admin', name: 'Администратор', role_permissions: [] } }],
           },
           {
             organizations: { id: 'organization-1', name: 'Team' },
-            membership_roles: [{ roles: { key: 'host', name: 'Ведущий' } }],
+            membership_roles: [{ roles: { key: 'host', name: 'Ведущий', role_permissions: [] } }],
           },
         ],
         error: null,
@@ -85,6 +88,7 @@ describe('listOrganizations', () => {
         { key: 'admin', name: 'Администратор' },
         { key: 'host', name: 'Ведущий' },
       ],
+      permissions: [],
     }])
   })
 })

@@ -12,6 +12,14 @@ export async function listOrganizationTeam(organizationId) {
   return unwrap(result) || []
 }
 
+export async function listOrganizationAuditEvents(organizationId, limit = 50) {
+  const result = await supabase.rpc('get_organization_audit_feed', {
+    p_organization_id: organizationId,
+    p_limit: limit,
+  })
+  return unwrap(result) || []
+}
+
 export async function listOrganizationInvitations(organizationId) {
   const result = await supabase
     .from('organization_invitations')

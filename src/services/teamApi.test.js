@@ -13,6 +13,7 @@ import {
   acceptOrganizationInvitation,
   createOrganizationInvitation,
   listOrganizationInvitations,
+  listOrganizationAuditEvents,
   listOrganizationTeam,
   setOrganizationMemberRoles,
 } from './teamApi'
@@ -30,6 +31,17 @@ describe('teamApi', () => {
     await expect(listOrganizationTeam('organization-1')).resolves.toEqual(members)
     expect(mocks.rpc).toHaveBeenCalledWith('get_organization_team', {
       p_organization_id: 'organization-1',
+    })
+  })
+
+  it('loads a bounded audit feed through the permission-checked RPC', async () => {
+    const events = [{ id: 1, action: 'invitation.created' }]
+    mocks.rpc.mockResolvedValue({ data: events, error: null })
+
+    await expect(listOrganizationAuditEvents('organization-1')).resolves.toEqual(events)
+    expect(mocks.rpc).toHaveBeenCalledWith('get_organization_audit_feed', {
+      p_organization_id: 'organization-1',
+      p_limit: 50,
     })
   })
 
