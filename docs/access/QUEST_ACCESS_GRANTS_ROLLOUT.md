@@ -81,7 +81,22 @@
 - прямые RPC активации короткого кода недоступны роли `authenticated`;
 - CORS разрешает служебные заголовки Supabase SDK и `x-qvesta-device-id`;
 - ручной smoke создания и активации кода пройден после CORS hotfix;
-- production не изменён и требует отдельного решения Go.
+- принято отдельное решение Go для production.
+
+### Результат production rollout — 8 сентября 2026 года
+
+- workflow `Deploy Supabase production` успешно завершён после ручного
+  подтверждения GitHub Environment `production`;
+- применены 26 ожидавших миграций, database/RLS-тесты завершились успешно;
+- отдельный `QUEST_ACCESS_FINGERPRINT_SECRET` настроен для production;
+- Edge Function `redeem-quest-code` опубликована в production;
+- внешний CORS preflight с origin `https://app.qvesta.ru` подтверждён;
+- production frontend отвечает успешно, использует production Supabase и не
+  содержит ссылок на stage или локальную среду;
+- ручной smoke пройден: одноразовый код создаётся и активируется, квест
+  открывается, раздел «Моя группа» доступен, повторное применение кода
+  блокируется, отзыв права прекращает доступ;
+- фазы 3 и 4 приняты в production.
 
 ## Запланированное продолжение
 
