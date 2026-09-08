@@ -39,7 +39,7 @@ select is((select email from public.quest_access_credentials
   'server ignores an email accidentally supplied for a shared code');
 
 select set_config('request.jwt.claim.sub', '1e000000-0000-4000-8000-000000000003', true);
-set local role authenticated;
+set local role service_role;
 select is((select error_code from public.redeem_quest_access_code('BAD001')), 'invalid', 'first bad code is rejected');
 select is((select error_code from public.redeem_quest_access_code('BAD002')), 'invalid', 'second bad code is rejected');
 select is((select error_code from public.redeem_quest_access_code('BAD003')), 'invalid', 'third bad code is rejected');
@@ -49,12 +49,14 @@ select is((select error_code from public.redeem_quest_access_code(current_settin
   'rate_limited', 'sixth attempt is blocked even when the code is valid');
 select ok((select retry_after_seconds > 0 from public.redeem_quest_access_code('BAD006')),
   'rate limit returns a positive retry delay');
+reset role;
+set local role authenticated;
 select ok(not has_table_privilege('quest_access_code_attempts', 'select'),
   'participant has no read privilege for the attempt log');
 reset role;
 
 select set_config('request.jwt.claim.sub', '1e000000-0000-4000-8000-000000000002', true);
-set local role authenticated;
+set local role service_role;
 select ok((select success from public.redeem_quest_access_code(current_setting('app.test_short_code'))),
   'another user can redeem a valid formatted code');
 select ok((select success from public.redeem_quest_access_code(replace(current_setting('app.test_short_code'), '-', ''))),

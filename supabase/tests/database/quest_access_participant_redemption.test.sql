@@ -60,6 +60,8 @@ select lives_ok(
   format($$select * from public.redeem_quest_access_credential_for_participant(%L, '8f200000-0000-4000-8000-000000000001')$$, current_setting('app.test_profile_link_token')),
   'repeated redemption returns the existing participant grant'
 );
+reset role;
+set local role service_role;
 select is(
   (select success from public.redeem_quest_access_code_for_participant(current_setting('app.test_profile_code'), '8f000000-0000-4000-8000-000000000002')),
   true,
@@ -74,6 +76,8 @@ select throws_ok(
   '42501', 'participant profile access denied',
   'outsider cannot redeem a link for another participant profile'
 );
+reset role;
+set local role service_role;
 select throws_ok(
   format($$select * from public.redeem_quest_access_code_for_participant(%L, '8f200000-0000-4000-8000-000000000001')$$, current_setting('app.test_profile_code')),
   '42501', 'participant profile access denied',
