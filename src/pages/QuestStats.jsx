@@ -36,7 +36,7 @@ export default function QuestStats() {
           .from('quest_attempts')
           .select(`
             *,
-            profiles:user_id (id, username),
+            executor_profiles:user_id (id, username),
             task_attempts (
               id,
               opened,
@@ -54,7 +54,18 @@ export default function QuestStats() {
           .order('created_at', { ascending: false })
 
         if (attemptsError) throw attemptsError
-        setAttempts(attemptsData || [])
+
+        const { data: participantLabels, error: participantLabelsError } = await supabase
+          .rpc('get_quest_participant_labels', { p_quest_id: id })
+        if (participantLabelsError) throw participantLabelsError
+
+        const labelByProfileId = new Map(
+          (participantLabels || []).map(profile => [profile.participant_profile_id, profile.display_name])
+        )
+        setAttempts((attemptsData || []).map(attempt => ({
+          ...attempt,
+          participant_display_name: labelByProfileId.get(attempt.participant_profile_id) || null,
+        })))
       } catch (err) {
         toast.error('Ошибка загрузки статистики: ' + err.message)
         navigate('/quests')
@@ -101,8 +112,8 @@ export default function QuestStats() {
     let aVal = a[sortField] ?? 0
     let bVal = b[sortField] ?? 0
     if (sortField === 'username') {
-      aVal = a.profiles?.username || 'Аноним'
-      bVal = b.profiles?.username || 'Аноним'
+      aVal = a.participant_display_name || a.executor_profiles?.username || 'Аноним'
+      bVal = b.participant_display_name || b.executor_profiles?.username || 'Аноним'
       return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
     }
     if (sortField === 'percent_success') {
@@ -151,7 +162,7 @@ export default function QuestStats() {
             <thead>
               <tr className="bg-gray-100">
                 <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('username')}>
-                  Пользователь {sortField === 'username' && (sortDirection === 'asc' ? '▲' : '▼')}
+                  Участник {sortField === 'username' && (sortDirection === 'asc' ? '▲' : '▼')}
                 </th>
                 <th className="py-2 px-4 border cursor-pointer hover:bg-gray-200" onClick={() => handleSort('started_at')}>
                   Начало {sortField === 'started_at' && (sortDirection === 'asc' ? '▲' : '▼')}
@@ -191,7 +202,14 @@ export default function QuestStats() {
                 const taskDetails = attempt.task_attempts || []
                 return (
                   <tr key={attempt.id} className="hover:bg-gray-50">
-                    <td className="py-2 px-4 border">{attempt.profiles?.username || 'Аноним'}</td>
+                    <td className="py-2 px-4 border">
+                      <div>{attempt.participant_display_name || attempt.executor_profiles?.username || 'Аноним'}</div>
+                      {attempt.executor_profiles?.username && (
+                        <div className="text-xs text-gray-500">
+                          Аккаунт: {attempt.executor_profiles.username}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-2 px-4 border">{new Date(attempt.started_at).toLocaleString()}</td>
                     <td className="py-2 px-4 border">
                       {attempt.finished_at ? new Date(attempt.finished_at).toLocaleString() : '—'}

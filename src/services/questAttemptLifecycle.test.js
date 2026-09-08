@@ -38,4 +38,15 @@ describe('finalizeTrustedQuestAttempt', () => {
     expect(sessionStorage.getItem('questAttempt_quest-1'))
       .toBe('attempt-2')
   })
+
+  it('removes only the selected participant profile pointer', async () => {
+    sessionStorage.setItem('questAttempt_quest-1_child-1', 'attempt-1')
+    sessionStorage.setItem('questAttempt_quest-1_child-2', 'attempt-2')
+
+    await finalizeTrustedQuestAttempt('attempt-1', 'quest-1', 'child-1')
+
+    expect(sessionStorage.getItem('questAttempt_quest-1_child-1')).toBeNull()
+    expect(sessionStorage.getItem('questAttempt_quest-1_child-2'))
+      .toBe('attempt-2')
+  })
 })

@@ -4,6 +4,7 @@ import { useOrganization } from '../contexts/useOrganization'
 import {
   createOrganizationInvitation,
   listAssignableOrganizationRoles,
+  listOrganizationAuditEvents,
   listOrganizationInvitations,
   listOrganizationTeam,
   revokeOrganizationInvitation,
@@ -11,6 +12,7 @@ import {
   setOrganizationMemberRoles,
 } from '../services/teamApi'
 import { loadLocalSecretLinks, removeLocalSecretLink, saveLocalSecretLink } from '../services/localSecretLinks'
+import { hasOrganizationPermission } from '../services/organizationPermissions'
 
 function roleNames(roles) {
   return roles?.map(role => role.name).join(', ') || 'Без роли'
@@ -23,11 +25,24 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
+const auditActionLabels = {
+  'invitation.created': 'Создано приглашение в команду',
+  'invitation.accepted': 'Приглашение принято',
+  'invitation.revoked': 'Приглашение отозвано',
+  'membership.roles_changed': 'Изменены роли участника команды',
+  'membership.revoked': 'Отозван доступ участника команды',
+  'quest_access.credential_created': 'Создан способ доступа к квесту',
+  'quest_access.credential_redeemed': 'Активирован доступ к квесту',
+  'quest_access.credential_revoked': 'Отозван способ доступа к квесту',
+  'quest_access.grant_revoked': 'Отозван выданный доступ к квесту',
+}
+
 export default function OrganizationTeam() {
   const { currentOrganization, loadingOrganizations } = useOrganization()
   const [members, setMembers] = useState([])
   const [invitations, setInvitations] = useState([])
   const [availableRoles, setAvailableRoles] = useState([])
+  const [auditEvents, setAuditEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [email, setEmail] = useState('')
@@ -39,6 +54,7 @@ export default function OrganizationTeam() {
   const [savingMemberId, setSavingMemberId] = useState(null)
   const [savedInvitationLinks, setSavedInvitationLinks] = useState({})
   const linkScope = `organization:${currentOrganization?.id || 'none'}`
+  const canManageTeam = hasOrganizationPermission(currentOrganization, 'members.manage')
 
   const pendingInvitations = useMemo(
     () => invitations.filter(invitation => invitation.status === 'pending'),
@@ -46,7 +62,7 @@ export default function OrganizationTeam() {
   )
 
   const loadTeam = useCallback(async () => {
-    if (!currentOrganization?.id) {
+    if (!currentOrganization?.id || !hasOrganizationPermission(currentOrganization, 'members.manage')) {
       setMembers([])
       setInvitations([])
       setLoading(false)
@@ -56,14 +72,16 @@ export default function OrganizationTeam() {
     setLoading(true)
     setError(null)
     try {
-      const [nextMembers, nextInvitations, nextRoles] = await Promise.all([
+      const [nextMembers, nextInvitations, nextRoles, nextAuditEvents] = await Promise.all([
         listOrganizationTeam(currentOrganization.id),
         listOrganizationInvitations(currentOrganization.id),
         listAssignableOrganizationRoles(),
+        listOrganizationAuditEvents(currentOrganization.id),
       ])
       setMembers(nextMembers)
       setInvitations(nextInvitations)
       setAvailableRoles(nextRoles)
+      setAuditEvents(nextAuditEvents)
       setSelectedRoles(current => current.length ? current : [nextRoles[0]?.key].filter(Boolean))
     } catch (nextError) {
       console.error('Ошибка загрузки команды:', {
@@ -179,6 +197,10 @@ export default function OrganizationTeam() {
 
   if (!currentOrganization) {
     return <div className="mx-auto max-w-6xl p-6">Нет доступной организации.</div>
+  }
+
+  if (!canManageTeam) {
+    return <div className="mx-auto max-w-6xl p-6">Нет доступа к управлению командой.</div>
   }
 
   if (error) {
@@ -332,6 +354,34 @@ export default function OrganizationTeam() {
               </div>
             ))}
           </div>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold">Журнал действий</h2>
+          <button type="button" onClick={() => void loadTeam()} className="text-sm text-blue-700 hover:underline">
+            Обновить
+          </button>
+        </div>
+        {auditEvents.length === 0 ? (
+          <p className="text-sm text-gray-500">Событий пока нет.</p>
+        ) : (
+          <ol className="space-y-2">
+            {auditEvents.map(event => (
+              <li key={event.id} className="rounded-lg border bg-white p-4">
+                <p className="font-medium">{auditActionLabels[event.action] || event.action}</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {formatDate(event.created_at)} · {event.actor_username || 'Системное действие'}
+                </p>
+                {event.participant_display_name && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Участник: {event.participant_display_name}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ol>
         )}
       </section>
     </div>

@@ -28,6 +28,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_ID: szjiwamevblkpjmmeonf
+      QUEST_ACCESS_FINGERPRINT_SECRET: ${{ secrets.QUEST_ACCESS_FINGERPRINT_SECRET }}
 
     steps:
       - name: Checkout repository
@@ -47,6 +48,9 @@ jobs:
         run: |
           test -n "$SUPABASE_ACCESS_TOKEN"
           test -n "$SUPABASE_DB_PASSWORD"
+          if [ "${{ inputs.operation }}" = "deploy" ]; then
+            test -n "$QUEST_ACCESS_FINGERPRINT_SECRET"
+          fi
 
       - name: Link production project
         run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
@@ -66,3 +70,11 @@ jobs:
       - name: Run database and RLS tests
         if: inputs.operation == 'deploy'
         run: npx supabase test db --linked
+
+      - name: Configure Edge Function secrets
+        if: inputs.operation == 'deploy'
+        run: npx supabase secrets set QUEST_ACCESS_FINGERPRINT_SECRET="$QUEST_ACCESS_FINGERPRINT_SECRET" --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Deploy quest code gateway
+        if: inputs.operation == 'deploy'
+        run: npx supabase functions deploy redeem-quest-code --project-ref "$SUPABASE_PROJECT_ID"

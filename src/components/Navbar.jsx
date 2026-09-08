@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
 import { useOrganization } from '../contexts/useOrganization'
+import { hasOrganizationPermission } from '../services/organizationPermissions'
 
 export default function Navbar({ session }) {
   const navigate = useNavigate()
@@ -16,9 +17,7 @@ export default function Navbar({ session }) {
     organizationError,
     selectOrganization,
   } = useOrganization()
-  const canManageTeam = currentOrganization?.roles?.some(
-    role => role.key === 'owner' || role.key === 'admin'
-  )
+  const canManageTeam = hasOrganizationPermission(currentOrganization, 'members.manage')
 
   // Загружаем профиль пользователя
   useEffect(() => {
@@ -87,6 +86,12 @@ export default function Navbar({ session }) {
         </Link>
         <Link to="/access/code" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
           🔑 Ввести код
+        </Link>
+        <Link to="/participants/group" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
+          👨‍👩‍👧 Моя группа
+        </Link>
+        <Link to="/participants/history" className="hidden lg:block px-3 py-2 hover:bg-blue-700 rounded-sm">
+          📊 История
         </Link>
         {canManageTeam && (
           <Link to="/organization/team" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
@@ -166,6 +171,20 @@ export default function Navbar({ session }) {
                 👥 Команда
               </Link>
             )}
+            <Link
+              to="/participants/group"
+              onClick={() => setMenuOpen(false)}
+              className="block px-4 py-2 hover:bg-gray-100 transition"
+            >
+              👨‍👩‍👧 Моя группа
+            </Link>
+            <Link
+              to="/participants/history"
+              onClick={() => setMenuOpen(false)}
+              className="block px-4 py-2 hover:bg-gray-100 transition"
+            >
+              📊 История
+            </Link>
             <Link
               to="/access/code"
               onClick={() => setMenuOpen(false)}
