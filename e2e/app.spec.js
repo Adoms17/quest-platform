@@ -157,6 +157,7 @@ test('restores a participant attempt and unsynced event after reload', async ({ 
 })
 
 test('rechecks supervision during a real participant grant and retry flow', async ({ page }, testInfo) => {
+  test.skip(!process.env.RUN_LOCAL_SUPABASE_E2E, 'requires a running local Supabase stack')
   testInfo.setTimeout(90_000)
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`
   const ownerEmail = `e2e-owner-${suffix}@example.test`
