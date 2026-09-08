@@ -36,13 +36,14 @@ async function getServerAttemptId(localId, questId, userId) {
   }
 
   if (!localAttempt) {
-    await saveQuestAttempt(localId, questId, userId, null, false, false)
+    await saveQuestAttempt(localId, questId, userId, null, false, false, userId)
     localAttempt = await getQuestAttempt(localId)
   }
 
   // Сервер вернёт активную попытку либо создаст новую,
   // если прежняя уже завершена.
-  const serverAttempt = await startServerQuestAttempt(questId)
+  const participantProfileId = localAttempt.participantProfileId || userId
+  const serverAttempt = await startServerQuestAttempt(questId, participantProfileId)
 
   if (
     localAttempt?.serverId !== serverAttempt.id ||
@@ -51,14 +52,13 @@ async function getServerAttemptId(localId, questId, userId) {
     await markQuestAttemptSynced(localId, serverAttempt.id)
   }
 
+  const storageKey = `questAttempt_${questId}_${participantProfileId}`
+
   if (
     typeof window !== 'undefined' &&
-    window.sessionStorage.getItem(`questAttempt_${questId}`) === localId
+    window.sessionStorage.getItem(storageKey) === localId
   ) {
-    window.sessionStorage.setItem(
-      `questAttempt_${questId}`,
-      serverAttempt.id
-    )
+    window.sessionStorage.setItem(storageKey, serverAttempt.id)
   }
 
   return serverAttempt.id

@@ -4,10 +4,24 @@ function throwIfError(error) {
   if (error) throw error
 }
 
-export async function loadParticipantTasks(questId) {
-  const { data, error } = await supabase.rpc('get_participant_tasks', { p_quest_id: questId })
+export async function loadParticipantTasks(questId, participantProfileId = null) {
+  const { data, error } = participantProfileId
+    ? await supabase.rpc('get_participant_tasks_for_profile', {
+      p_quest_id: questId,
+      p_participant_profile_id: participantProfileId,
+    })
+    : await supabase.rpc('get_participant_tasks', { p_quest_id: questId })
   throwIfError(error)
   return data || []
+}
+
+export async function loadParticipantQuest(questId, participantProfileId) {
+  const { data, error } = await supabase.rpc('get_participant_quest_for_profile', {
+    p_quest_id: questId,
+    p_participant_profile_id: participantProfileId,
+  })
+  throwIfError(error)
+  return data
 }
 
 export async function loadQuestEntryStatus(questId) {
@@ -18,8 +32,13 @@ export async function loadQuestEntryStatus(questId) {
   return data
 }
 
-export async function startServerQuestAttempt(questId) {
-  const { data, error } = await supabase.rpc('start_quest_attempt', { p_quest_id: questId })
+export async function startServerQuestAttempt(questId, participantProfileId = null) {
+  const { data, error } = participantProfileId
+    ? await supabase.rpc('start_quest_attempt_for_participant', {
+      p_quest_id: questId,
+      p_participant_profile_id: participantProfileId,
+    })
+    : await supabase.rpc('start_quest_attempt', { p_quest_id: questId })
   throwIfError(error)
   const attempt = Array.isArray(data) ? data[0] : data
   if (!attempt) throw new Error('Сервер не вернул попытку квеста')

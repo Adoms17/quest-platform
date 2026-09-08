@@ -138,7 +138,7 @@ select throws_ok(
       '4b000000-0000-4000-8000-000000000001', 'open')$$,
     current_setting('app.test_granted_attempt_id')
   ),
-  '42501', 'quest access denied',
+  '42501', 'quest attempt access denied',
   'revocation blocks new progress in an already opened attempt'
 );
 

@@ -234,6 +234,23 @@ describe('syncPendingResults', () => {
     expect(mocks.submitTaskEvent).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps an offline event pending when participant access was revoked', async () => {
+    mocks.getPendingResults.mockResolvedValue([event({})])
+    const error = Object.assign(
+      new Error('quest attempt access denied'),
+      { code: '42501' }
+    )
+    mocks.submitTaskEvent.mockRejectedValue(error)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(syncPendingResults(session))
+      .rejects.toMatchObject({ code: '42501' })
+
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+    expect(mocks.clearSyncedResults).not.toHaveBeenCalled()
+    expect(mocks.updateQuestSyncDate).not.toHaveBeenCalled()
+  })
+
   it('cleans records left synced after an interrupted cleanup', async () => {
     mocks.getPendingResults.mockResolvedValue([
       event({ id: 1, synced: true }),

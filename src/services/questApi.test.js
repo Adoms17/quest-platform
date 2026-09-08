@@ -11,6 +11,7 @@ vi.mock('../supabaseClient', () => ({
 import {
   loadTaskEventReceipts,
   loadParticipantTasks,
+  loadParticipantQuest,
   loadQuestEntryStatus,
   startServerQuestAttempt,
   submitTaskEvent,
@@ -39,6 +40,27 @@ describe('questApi', () => {
     await expect(loadQuestEntryStatus('quest-1')).resolves.toEqual(status)
     expect(rpc).toHaveBeenCalledWith('get_quest_entry_status', {
       p_quest_id: 'quest-1',
+    })
+  })
+
+  it('loads quest content and tasks for an explicitly selected participant', async () => {
+    rpc.mockResolvedValueOnce({ data: { id: 'quest-1' }, error: null })
+    rpc.mockResolvedValueOnce({ data: [{ id: 'task-1' }], error: null })
+    await expect(loadParticipantQuest('quest-1', 'profile-1')).resolves.toEqual({ id: 'quest-1' })
+    await expect(loadParticipantTasks('quest-1', 'profile-1')).resolves.toEqual([{ id: 'task-1' }])
+    expect(rpc).toHaveBeenNthCalledWith(1, 'get_participant_quest_for_profile', {
+      p_quest_id: 'quest-1', p_participant_profile_id: 'profile-1',
+    })
+    expect(rpc).toHaveBeenNthCalledWith(2, 'get_participant_tasks_for_profile', {
+      p_quest_id: 'quest-1', p_participant_profile_id: 'profile-1',
+    })
+  })
+
+  it('starts an attempt for an explicitly selected participant', async () => {
+    rpc.mockResolvedValue({ data: [{ id: 'attempt-1' }], error: null })
+    await startServerQuestAttempt('quest-1', 'profile-1')
+    expect(rpc).toHaveBeenCalledWith('start_quest_attempt_for_participant', {
+      p_quest_id: 'quest-1', p_participant_profile_id: 'profile-1',
     })
   })
 

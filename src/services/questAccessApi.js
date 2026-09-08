@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient'
+import { getDeviceId } from './deviceIdentity'
 
 function unwrap({ data, error }) {
   if (error) throw error
@@ -22,12 +23,21 @@ export async function createQuestAccessCredential({ questId, kind, email, maxRed
   }).single())
 }
 
-export async function redeemQuestAccessCredential(token) {
-  return unwrap(await supabase.rpc('redeem_quest_access_credential', { p_token: token }).single())
+export async function redeemQuestAccessCredential(token, participantProfileId = null) {
+  const rpc = participantProfileId
+    ? supabase.rpc('redeem_quest_access_credential_for_participant', {
+      p_token: token,
+      p_participant_profile_id: participantProfileId,
+    })
+    : supabase.rpc('redeem_quest_access_credential', { p_token: token })
+  return unwrap(await rpc.single())
 }
 
-export async function redeemQuestAccessCode(code) {
-  return unwrap(await supabase.rpc('redeem_quest_access_code', { p_code: code }).single())
+export async function redeemQuestAccessCode(code, participantProfileId = null) {
+  return unwrap(await supabase.functions.invoke('redeem-quest-code', {
+    body: { code, participantProfileId },
+    headers: { 'x-qvesta-device-id': getDeviceId() },
+  }))
 }
 
 export async function loadQuestAccessPreview(token) {

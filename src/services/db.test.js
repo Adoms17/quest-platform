@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   createClientEventId,
+  hasFreshParticipantPackageAccess,
   hasUnsyncedQuestResults,
+  isActiveAttemptForParticipant,
+  PARTICIPANT_PACKAGE_ACCESS_TTL_MS,
   recoverPendingResultOwner,
   sanitizeParticipantTask,
+  shouldAdoptParticipantAttempt,
 } from './db'
 
 describe('createClientEventId', () => {
@@ -31,15 +35,33 @@ describe('pending result ownership', () => {
     })).toEqual({
       ...legacy,
       userId: 'user-1',
+      participantProfileId: 'user-1',
     })
   })
 
   it('does not reassign an event that already has an owner', () => {
-    const record = { id: 1, userId: 'user-1' }
+    const record = {
+      id: 1,
+      userId: 'user-1',
+      participantProfileId: 'profile-1',
+    }
 
     expect(recoverPendingResultOwner(record, {
       userId: 'user-2',
     })).toBe(record)
+  })
+
+  it('recovers a missing participant scope from the local attempt', () => {
+    expect(recoverPendingResultOwner({
+      id: 1,
+      userId: 'adult-1',
+    }, {
+      userId: 'adult-1',
+      participantProfileId: 'child-1',
+    })).toMatchObject({
+      userId: 'adult-1',
+      participantProfileId: 'child-1',
+    })
   })
 
   it('detects unsynchronized results before cache deletion', () => {
@@ -81,5 +103,68 @@ describe('sanitizeParticipantTask', () => {
     expect(safeTask).not.toHaveProperty('required_photo_hash')
     expect(safeTask).not.toHaveProperty('answer_verifier')
     expect(safeTask).not.toHaveProperty('code_verifier')
+  })
+})
+
+describe('participant-scoped offline data', () => {
+  const validatedAt = '2026-09-07T12:00:00.000Z'
+  const now = new Date(validatedAt).getTime()
+
+  it('allows a fresh package only for the participant that downloaded it', () => {
+    const quest = {
+      participantAccess: {
+        'profile-a': validatedAt,
+      },
+    }
+
+    expect(hasFreshParticipantPackageAccess(quest, 'profile-a', now)).toBe(true)
+    expect(hasFreshParticipantPackageAccess(quest, 'profile-b', now)).toBe(false)
+  })
+
+  it('expires participant package authorization after 24 hours', () => {
+    const quest = {
+      participantAccess: {
+        'profile-a': validatedAt,
+      },
+    }
+
+    expect(hasFreshParticipantPackageAccess(
+      quest,
+      'profile-a',
+      now + PARTICIPANT_PACKAGE_ACCESS_TTL_MS + 1
+    )).toBe(false)
+  })
+
+  it('does not resume another participant profile attempt', () => {
+    const attempt = {
+      questId: 'quest-1',
+      userId: 'adult-1',
+      participantProfileId: 'child-1',
+      finished: false,
+    }
+
+    expect(isActiveAttemptForParticipant(
+      attempt,
+      'quest-1',
+      'adult-1',
+      'child-1'
+    )).toBe(true)
+    expect(isActiveAttemptForParticipant(
+      attempt,
+      'quest-1',
+      'adult-1',
+      'child-2'
+    )).toBe(false)
+  })
+
+  it('adopts only attempts that belong to the claimed participant profile', () => {
+    expect(shouldAdoptParticipantAttempt({
+      participantProfileId: 'child-1',
+      userId: 'parent-1',
+    }, 'child-1')).toBe(true)
+    expect(shouldAdoptParticipantAttempt({
+      participantProfileId: 'child-2',
+      userId: 'parent-1',
+    }, 'child-1')).toBe(false)
   })
 })
