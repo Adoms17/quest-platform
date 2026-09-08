@@ -3,6 +3,7 @@ import { notifyPendingResultEnqueued } from './syncSignals'
 
 const DB_NAME = 'QuestPlatformDB'
 const DB_VERSION = 8
+export const PARTICIPANT_PACKAGE_ACCESS_TTL_MS = 24 * 60 * 60 * 1000
 
 export const UNSYNCED_QUEST_RESULTS_ERROR =
   'UNSYNCED_QUEST_RESULTS'
@@ -35,18 +36,57 @@ export function createClientEventId() {
 }
 
 export function recoverPendingResultOwner(record, localAttempt) {
-  if (record.userId || !localAttempt?.userId) return record
+  if (!localAttempt?.userId) return record
 
-  return {
+  const recovered = {
     ...record,
-    userId: localAttempt.userId,
+    userId: record.userId || localAttempt.userId,
+    participantProfileId: record.participantProfileId ||
+      localAttempt.participantProfileId ||
+      localAttempt.userId,
   }
+
+  return recovered.userId === record.userId &&
+    recovered.participantProfileId === record.participantProfileId
+    ? record
+    : recovered
 }
 
 export function hasUnsyncedQuestResults(records, questId) {
   return records.some(record => (
     record.questId === questId && record.synced !== true
   ))
+}
+
+export function hasFreshParticipantPackageAccess(
+  quest,
+  participantProfileId,
+  now = Date.now()
+) {
+  if (!participantProfileId) return true
+
+  const validatedAt = quest?.participantAccess?.[participantProfileId]
+  if (!validatedAt) return false
+
+  const validatedAtMs = new Date(validatedAt).getTime()
+  return Number.isFinite(validatedAtMs) &&
+    now - validatedAtMs <= PARTICIPANT_PACKAGE_ACCESS_TTL_MS
+}
+
+export function isActiveAttemptForParticipant(
+  attempt,
+  questId,
+  userId,
+  participantProfileId = userId
+) {
+  return attempt.questId === questId &&
+    attempt.userId === userId &&
+    !attempt.finished &&
+    (attempt.participantProfileId || attempt.userId) === participantProfileId
+}
+
+export function shouldAdoptParticipantAttempt(attempt, participantProfileId) {
+  return attempt?.participantProfileId === participantProfileId
 }
 
 export function sanitizeParticipantTask(task, quest = {}) {
@@ -148,13 +188,17 @@ export async function initDB() {
 }
 
 // ---------- Квесты ----------
-export async function saveQuestToDB(questData, tasks) {
+export async function saveQuestToDB(questData, tasks, participantProfileId = null) {
   const db = await initDB()
+  const existingQuest = await db.get('quests', questData.id)
+  const participantAccess = { ...(existingQuest?.participantAccess || {}) }
+  if (participantProfileId) participantAccess[participantProfileId] = new Date().toISOString()
   const safeTasks = tasks.map(task => sanitizeParticipantTask(task, questData))
   const questWithTasks = {
     ...questData,
     tasks: safeTasks,
     downloadedAt: new Date().toISOString(),
+    participantAccess,
   }
   await db.put('quests', questWithTasks)
   const existing = await db.get('downloadedQuests', questData.id)
@@ -165,10 +209,11 @@ export async function saveQuestToDB(questData, tasks) {
   })
 }
 
-export async function getQuestFromDB(questId) {
+export async function getQuestFromDB(questId, participantProfileId = null) {
   const db = await initDB()
   const quest = await db.get('quests', questId)
   if (!quest) return quest
+  if (!hasFreshParticipantPackageAccess(quest, participantProfileId)) return null
 
   const safeTasks = (quest.tasks || []).map(task =>
     sanitizeParticipantTask(task, quest)
@@ -183,6 +228,52 @@ export async function getQuestFromDB(questId) {
 export async function getDownloadedQuests() {
   const db = await initDB()
   return db.getAll('downloadedQuests')
+}
+
+export async function getDownloadedQuestPackages(now = Date.now()) {
+  const db = await initDB()
+  const downloads = await db.getAll('downloadedQuests')
+  const packages = []
+
+  for (const download of downloads) {
+    const quest = await db.get('quests', download.questId)
+    if (!quest) continue
+
+    const participantEntries = Object.entries(quest.participantAccess || {})
+    if (participantEntries.length === 0) {
+      packages.push({
+        ...download,
+        title: quest.title || 'Без названия',
+        participantProfileId: null,
+        validatedAt: null,
+        expiresAt: null,
+        isFresh: false,
+        legacy: true,
+      })
+      continue
+    }
+
+    for (const [participantProfileId, validatedAt] of participantEntries) {
+      const validatedAtMs = new Date(validatedAt).getTime()
+      packages.push({
+        ...download,
+        title: quest.title || 'Без названия',
+        participantProfileId,
+        validatedAt,
+        expiresAt: Number.isFinite(validatedAtMs)
+          ? new Date(validatedAtMs + PARTICIPANT_PACKAGE_ACCESS_TTL_MS).toISOString()
+          : null,
+        isFresh: hasFreshParticipantPackageAccess(
+          quest,
+          participantProfileId,
+          now
+        ),
+        legacy: false,
+      })
+    }
+  }
+
+  return packages
 }
 
 export async function updateQuestSyncDate(questId, syncDate) {
@@ -243,6 +334,7 @@ export async function upsertPendingResult(questId, taskId, localQuestAttemptId, 
     localQuestAttemptId,
     clientEventId: existing?.clientEventId || createClientEventId(),
     userId: localAttempt.userId,
+    participantProfileId: localAttempt.participantProfileId || localAttempt.userId,
     ...data,
     synced: false,
     updatedAt: new Date().toISOString(),
@@ -281,6 +373,7 @@ export async function enqueuePendingEvent(
     localQuestAttemptId,
     clientEventId: data.clientEventId || createClientEventId(),
     userId: localAttempt.userId,
+    participantProfileId: localAttempt.participantProfileId || localAttempt.userId,
     synced: false,
     createdAt: now,
     updatedAt: now,
@@ -309,7 +402,10 @@ export async function getPendingResults(userId = null) {
       changed = true
     }
 
-    if (!record.userId && record.localQuestAttemptId) {
+    if (
+      (!record.userId || !record.participantProfileId) &&
+      record.localQuestAttemptId
+    ) {
       const localAttempt = await attemptStore.get(
         record.localQuestAttemptId
       )
@@ -372,12 +468,13 @@ export async function clearSyncedResults(userId = null) {
 }
 
 // ---------- Локальные попытки прохождения (questAttempts) ----------
-export async function saveQuestAttempt(localId, questId, userId, serverId = null, synced = false, finished = false) {
+export async function saveQuestAttempt(localId, questId, userId, serverId = null, synced = false, finished = false, participantProfileId = userId) {
   const db = await initDB()
   await db.put('questAttempts', {
     localId,
     questId,
     userId,
+    participantProfileId,
     serverId,
     synced,
     finished,
@@ -390,14 +487,19 @@ export async function getQuestAttempt(localId) {
   return db.get('questAttempts', localId)
 }
 
-export async function getActiveLocalQuestAttempt(questId, userId) {
+export async function getActiveLocalQuestAttempt(questId, userId, participantProfileId = userId) {
   const db = await initDB()
   const tx = db.transaction('questAttempts', 'readonly')
   const store = tx.objectStore('questAttempts')
   const index = store.index('by_quest_user')
   let cursor = await index.openCursor([questId, userId])
   while (cursor) {
-    if (!cursor.value.finished) {
+    if (isActiveAttemptForParticipant(
+      cursor.value,
+      questId,
+      userId,
+      participantProfileId
+    )) {
       return cursor.value
     }
     cursor = await cursor.continue()
@@ -482,4 +584,57 @@ export async function clearFinishedQuestAttempts() {
     }
   }
   await tx.done
+}
+
+export async function adoptParticipantOfflineData(
+  participantProfileId,
+  newUserId
+) {
+  const db = await initDB()
+  const tx = db.transaction(
+    ['questAttempts', 'pendingResults'],
+    'readwrite'
+  )
+  const attemptStore = tx.objectStore('questAttempts')
+  const pendingStore = tx.objectStore('pendingResults')
+  const adoptedAttemptIds = new Set()
+  let adoptedAttempts = 0
+  let adoptedEvents = 0
+  let attemptCursor = await attemptStore.openCursor()
+
+  while (attemptCursor) {
+    const attempt = attemptCursor.value
+    if (shouldAdoptParticipantAttempt(attempt, participantProfileId)) {
+      adoptedAttemptIds.add(attempt.localId)
+      if (attempt.userId !== newUserId) {
+        await attemptCursor.update({
+          ...attempt,
+          userId: newUserId,
+          updatedAt: new Date().toISOString(),
+        })
+        adoptedAttempts += 1
+      }
+    }
+    attemptCursor = await attemptCursor.continue()
+  }
+
+  let pendingCursor = await pendingStore.openCursor()
+  while (pendingCursor) {
+    const event = pendingCursor.value
+    if (
+      adoptedAttemptIds.has(event.localQuestAttemptId) &&
+      event.userId !== newUserId
+    ) {
+      await pendingCursor.update({
+        ...event,
+        userId: newUserId,
+        updatedAt: new Date().toISOString(),
+      })
+      adoptedEvents += 1
+    }
+    pendingCursor = await pendingCursor.continue()
+  }
+
+  await tx.done
+  return { adoptedAttempts, adoptedEvents }
 }

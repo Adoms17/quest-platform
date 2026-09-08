@@ -382,8 +382,11 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+[functions.redeem-quest-code]
+verify_jwt = true
+
+[edge_runtime.secrets]
+QUEST_ACCESS_FINGERPRINT_SECRET = "env(QUEST_ACCESS_FINGERPRINT_SECRET)"
 
 [analytics]
 enabled = true

@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
+import QuestStartScreen from '../components/QuestStartScreen'
+import ParticipantProfileSelect from '../components/ParticipantProfileSelect'
 import toast from 'react-hot-toast'
 import {
   getQuestFromDB,
@@ -15,6 +17,7 @@ import {
 } from '../services/db'
 import {
   loadParticipantTasks,
+  loadParticipantQuest,
   loadQuestEntryStatus,
   startServerQuestAttempt,
   submitTaskEvent,
@@ -25,9 +28,17 @@ import { isTransportError } from '../services/network'
 import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
 import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
 import { getQuestAvailability } from '../services/questAvailability'
+import { getAnswerResultMessage } from '../services/questResultPresentation'
+import {
+  enableParticipantMode,
+  getParticipantModeLock,
+  isValidParticipantModePin,
+} from '../services/participantMode'
 
 export default function QuestPlay({ session }) {
   const { id } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const participantProfileId = searchParams.get('participant')
   const navigate = useNavigate()
   const isOnlineRef = useRef(navigator.onLine)
   const questLoadKeyRef = useRef(null)
@@ -38,7 +49,15 @@ export default function QuestPlay({ session }) {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [, setIsOnline] = useState(navigator.onLine)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [hasStarted, setHasStarted] = useState(false)
+  const [offlinePackageStatus, setOfflinePackageStatus] = useState('loading')
+  const [attemptLimitReached, setAttemptLimitReached] = useState(false)
+  const [hasExistingAttempt, setHasExistingAttempt] = useState(false)
+  const [participantProfiles, setParticipantProfiles] = useState([])
+  const [participantModePin, setParticipantModePin] = useState('')
+  const [participantModePinConfirmation, setParticipantModePinConfirmation] = useState('')
+  const [participantModeError, setParticipantModeError] = useState('')
 
   const [questAttemptId, setQuestAttemptId] = useState(null)
   const [totalTasks, setTotalTasks] = useState(0)
@@ -69,6 +88,51 @@ export default function QuestPlay({ session }) {
 
   const currentTask = tasks[currentTaskIndex] || null
   const maxAttempts = quest?.max_attempts || 0
+  const selectedParticipantProfile = participantProfiles.find(
+    profile => profile.participant_profile_id === participantProfileId
+  )
+  const existingParticipantMode = getParticipantModeLock()
+  const participantModeIsActive = Boolean(
+    existingParticipantMode?.actorUserId === session?.user?.id &&
+    existingParticipantMode?.participantProfileId === participantProfileId &&
+    existingParticipantMode?.questId === id
+  )
+
+  const handleParticipantChange = useCallback((nextParticipantProfileId) => {
+    const nextSearchParams = new URLSearchParams(searchParams)
+    if (nextParticipantProfileId) {
+      nextSearchParams.set('participant', nextParticipantProfileId)
+    } else {
+      nextSearchParams.delete('participant')
+    }
+    setSearchParams(nextSearchParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  const handleProfilesLoaded = useCallback(profiles => {
+    setParticipantProfiles(profiles)
+  }, [])
+
+  const handleStart = async () => {
+    if (selectedParticipantProfile?.relationship !== 'self' && !participantModeIsActive) {
+      if (!isValidParticipantModePin(participantModePin)) {
+        setParticipantModeError('Укажите PIN взрослого из 4–6 цифр.')
+        return
+      }
+      if (participantModePin !== participantModePinConfirmation) {
+        setParticipantModeError('PIN и подтверждение не совпадают.')
+        return
+      }
+      await enableParticipantMode({
+        actorUserId: session.user.id,
+        participantProfileId,
+        participantDisplayName: selectedParticipantProfile.display_name,
+        questId: id,
+        pin: participantModePin,
+      })
+    }
+    setParticipantModeError('')
+    setHasStarted(true)
+  }
 
   const [openingTask, setOpeningTask] = useState(false)
   // ----- Онлайн/офлайн -----
@@ -91,20 +155,28 @@ export default function QuestPlay({ session }) {
 
   // ----- Загрузка квеста -----
   useEffect(() => {
-    const loadKey = `${id}:${session?.user?.id || 'anonymous'}`
+    const loadKey = `${id}:${session?.user?.id || 'anonymous'}:${participantProfileId || 'self'}`
 
     if (questLoadKeyRef.current === loadKey) return
     questLoadKeyRef.current = loadKey
 
     async function loadQuest() {
       setLoading(true)
+      setError(null)
+      setHasStarted(false)
+      setInitAttemptDone(false)
+      setFinished(false)
+      setQuestAttemptId(null)
+      setAttemptLimitReached(false)
+      setHasExistingAttempt(false)
+      setOfflinePackageStatus('loading')
 
       try {
         let questData
         let tasksData
 
         async function loadCachedQuest() {
-          const localQuest = await getQuestFromDB(id)
+          const localQuest = await getQuestFromDB(id, participantProfileId)
 
           if (!localQuest) {
             throw new Error('Квест не загружен для работы без интернета')
@@ -130,24 +202,26 @@ export default function QuestPlay({ session }) {
               return
             }
 
-            const { data: remoteQuest, error: questError } = await supabase
-              .from('quests')
-              .select('*')
-              .eq('id', id)
-              .single()
-
-            if (questError) {
-              if (isTransportError(questError)) throw questError
-              throw new Error('Квест не найден или недоступен')
+            if (participantProfileId) {
+              questData = await loadParticipantQuest(id, participantProfileId)
+              tasksData = await loadParticipantTasks(id, participantProfileId)
+            } else {
+              const { data: remoteQuest, error: questError } = await supabase
+                .from('quests').select('*').eq('id', id).single()
+              if (questError) {
+                if (isTransportError(questError)) throw questError
+                throw new Error('Квест не найден или недоступен')
+              }
+              questData = remoteQuest
+              tasksData = await loadParticipantTasks(id)
             }
 
-            questData = remoteQuest
-            tasksData = await loadParticipantTasks(id)
-
             try {
-              await saveQuestToDB(questData, tasksData)
+              await saveQuestToDB(questData, tasksData, participantProfileId)
+              setOfflinePackageStatus('ready')
             } catch (cacheError) {
               console.warn('Не удалось сохранить квест для offline:', cacheError)
+              setOfflinePackageStatus('unavailable')
             }
           } catch (remoteError) {
             if (!isTransportError(remoteError)) throw remoteError
@@ -158,16 +232,29 @@ export default function QuestPlay({ session }) {
             const cached = await loadCachedQuest()
             questData = cached.questData
             tasksData = cached.tasksData
+            setOfflinePackageStatus('ready')
           }
         } else {
           const cached = await loadCachedQuest()
           questData = cached.questData
           tasksData = cached.tasksData
+          setOfflinePackageStatus('ready')
         }
 
         setQuest(questData)
         setTasks(tasksData)
         setTotalTasks(tasksData.length)
+
+        const currentUserId = session?.user?.id
+        if (currentUserId) {
+          const effectiveParticipantProfileId = participantProfileId || currentUserId
+          const localAttempt = await getActiveLocalQuestAttempt(
+            id,
+            currentUserId,
+            effectiveParticipantProfileId
+          )
+          setHasExistingAttempt(Boolean(localAttempt))
+        }
       } catch (err) {
         setError(err.message)
         const accessErrorMessage = getQuestAccessErrorMessage(err.message)
@@ -182,7 +269,7 @@ export default function QuestPlay({ session }) {
     }
 
     loadQuest()
-  }, [id, session])
+  }, [id, session, participantProfileId])
 
   // ----- Доступность -----
   const { isAvailable, availabilityMessage, timeUntilStart } = useMemo(() => {
@@ -291,7 +378,7 @@ export default function QuestPlay({ session }) {
 
   // ----- Инициализация попытки (исправленная офлайн-логика) -----
   const initializeAttempt = useCallback(async () => {
-    if (!isAvailable || !quest || tasks.length === 0 || initAttemptDone) return
+    if (!hasStarted || !isAvailable || !quest || tasks.length === 0 || initAttemptDone) return
 
     const userId = session?.user?.id
     if (!userId) {
@@ -299,7 +386,8 @@ export default function QuestPlay({ session }) {
       return
     }
 
-    const initializationKey = `${id}:${userId}`
+    const effectiveParticipantProfileId = participantProfileId || userId
+    const initializationKey = `${id}:${userId}:${effectiveParticipantProfileId}`
 
     if (attemptInitializationKeyRef.current === initializationKey) return
     attemptInitializationKeyRef.current = initializationKey
@@ -310,7 +398,7 @@ export default function QuestPlay({ session }) {
     if (online) {
       try {
           // Сервер атомарно создаёт либо возвращает активную попытку.
-          const serverAttempt = await startServerQuestAttempt(id)
+          const serverAttempt = await startServerQuestAttempt(id, participantProfileId)
 
           attemptId = serverAttempt.id
 
@@ -327,10 +415,11 @@ export default function QuestPlay({ session }) {
             userId,
             attemptId,
             true,
-            Boolean(serverAttempt.finished_at)
+            Boolean(serverAttempt.finished_at),
+            effectiveParticipantProfileId
           )
 
-          sessionStorage.setItem(`questAttempt_${id}`, attemptId)
+          sessionStorage.setItem(`questAttempt_${id}_${effectiveParticipantProfileId}`, attemptId)
       } catch (error) {
         if (!isTransportError(error)) throw error
 
@@ -342,7 +431,7 @@ export default function QuestPlay({ session }) {
 
     if (!online) {
       // Офлайн-режим
-      const storageKey = `questAttempt_${id}`
+      const storageKey = `questAttempt_${id}_${effectiveParticipantProfileId}`
       let stored = sessionStorage.getItem(storageKey)
       let localAttempt = null
 
@@ -362,11 +451,11 @@ export default function QuestPlay({ session }) {
       }
 
       if (!stored) {
-        localAttempt = await getActiveLocalQuestAttempt(id, userId)
+        localAttempt = await getActiveLocalQuestAttempt(id, userId, effectiveParticipantProfileId)
         if (!localAttempt || localAttempt.finished) {
           const localId = `local-${Date.now()}`
-          await saveQuestAttempt(localId, id, userId, null, false, false)
-          localAttempt = await getActiveLocalQuestAttempt(id, userId)
+          await saveQuestAttempt(localId, id, userId, null, false, false, effectiveParticipantProfileId)
+          localAttempt = await getActiveLocalQuestAttempt(id, userId, effectiveParticipantProfileId)
         }
         attemptId = localAttempt.localId
         sessionStorage.setItem(storageKey, attemptId)
@@ -381,25 +470,33 @@ export default function QuestPlay({ session }) {
     }
 
     setQuestAttemptId(attemptId)
+    setHasExistingAttempt(true)
     await loadTaskAttempts(attemptId)
     setStartTime(Date.now())
     setInitAttemptDone(true)
     toast.success('🔓 Квест открыт!')
-  }, [isAvailable, quest, tasks, id, session, initAttemptDone, loadTaskAttempts])
+  }, [hasStarted, isAvailable, quest, tasks, id, session, initAttemptDone, loadTaskAttempts, participantProfileId])
 
   // Запуск инициализации
   useEffect(() => {
-    if (isAvailable && !initAttemptDone) {
+    if (hasStarted && isAvailable && !initAttemptDone) {
       const timeout = setTimeout(() => {
         initializeAttempt().catch(err => {
           attemptInitializationKeyRef.current = null
-          toast.error(`Не удалось открыть квест: ${err.message}`)
+          if (err.message?.includes('quest completion limit reached')) {
+            setAttemptLimitReached(true)
+            setHasStarted(false)
+            toast.error('Лимит прохождений этого квеста исчерпан')
+          } else {
+            setHasStarted(false)
+            toast.error(`Не удалось открыть квест: ${err.message}`)
+          }
         })
       }, 0)
 
       return () => clearTimeout(timeout)
     }
-  }, [isAvailable, initAttemptDone, initializeAttempt])
+  }, [hasStarted, isAvailable, initAttemptDone, initializeAttempt])
 
   // Таймер
   useEffect(() => {
@@ -763,17 +860,13 @@ export default function QuestPlay({ session }) {
         setTotalAttempts(serverAttempt.total_attempts || 0)
         setTotalTime(serverAttempt.total_time || 0)
 
-        if (serverState.correct) {
-          toast.success('✅ Правильный ответ!')
-        } else if (serverState.failed) {
-          toast.error('❌ Сервер отклонил ответ: лимит попыток исчерпан.')
+        const answerResult = getAnswerResultMessage(serverState)
+        if (answerResult.type === 'success') {
+          toast.success(`✅ ${answerResult.message}`)
+        } else if (answerResult.type === 'terminal') {
+          toast(answerResult.message, { icon: '⚠️' })
         } else {
-          const remaining = serverState.remaining_attempts
-          toast.error(
-            remaining === null || remaining === undefined
-              ? '❌ Неправильный ответ, попробуйте ещё раз'
-              : `❌ Неправильный ответ. Осталось попыток: ${remaining}`
-          )
+          toast.error(`❌ ${answerResult.message}`)
         }
 
         if (serverState.terminal) {
@@ -785,8 +878,10 @@ export default function QuestPlay({ session }) {
             try {
               await finalizeTrustedQuestAttempt(
                 questAttemptId,
-                id
+                id,
+                participantProfileId || session?.user?.id
               )
+              setHasExistingAttempt(false)
             } catch (cleanupError) {
               console.error(
                 'Не удалось очистить завершённую локальную попытку:',
@@ -877,9 +972,33 @@ export default function QuestPlay({ session }) {
   }
 
   const handleExit = () => {
-    sessionStorage.removeItem(`questAttempt_${id}`)
+    sessionStorage.removeItem(`questAttempt_${id}_${participantProfileId || session?.user?.id}`)
     navigate('/quests')
   }
+
+  const participantSelector = (
+    <div className="mx-auto max-w-3xl px-4 pt-4 sm:px-8 sm:pt-8">
+      <div className="rounded-xl border bg-white p-4 shadow-sm">
+        <ParticipantProfileSelect
+          value={participantProfileId || ''}
+          onChange={handleParticipantChange}
+          onProfilesLoaded={handleProfilesLoaded}
+          label="Участник квеста"
+        />
+        {selectedParticipantProfile?.relationship !== 'self' && !participantModeIsActive && (
+          <div className="mt-4 rounded-lg bg-amber-50 p-4">
+            <p className="font-medium text-amber-950">Защитите кабинет взрослого</p>
+            <p className="mt-1 text-sm text-amber-900">Придумайте временный PIN из 4–6 цифр. Он потребуется для выхода из детского режима.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label><span className="text-sm">PIN</span><input type="password" inputMode="numeric" autoComplete="off" value={participantModePin} onChange={event => setParticipantModePin(event.target.value.replace(/\D/g, '').slice(0, 6))} className="mt-1 w-full rounded-lg border p-2" /></label>
+              <label><span className="text-sm">Повторите PIN</span><input type="password" inputMode="numeric" autoComplete="off" value={participantModePinConfirmation} onChange={event => setParticipantModePinConfirmation(event.target.value.replace(/\D/g, '').slice(0, 6))} className="mt-1 w-full rounded-lg border p-2" /></label>
+            </div>
+            {participantModeError && <p role="alert" className="mt-2 text-sm text-red-700">{participantModeError}</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 
   // ----- Рендеры -----
   if (loading) return <Loader text="Загрузка квеста..." />
@@ -887,13 +1006,16 @@ export default function QuestPlay({ session }) {
     const accessErrorMessage = getQuestAccessErrorMessage(error)
     if (accessErrorMessage) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50">
+        <div className="min-h-screen bg-gray-50">
+          {participantSelector}
+          <div className="flex flex-col items-center justify-center p-8">
           <div className="bg-white p-8 rounded-sm shadow-sm max-w-md text-center">
             <h2 className="text-2xl font-bold text-red-600 mb-4">⛔ Квест недоступен</h2>
             <p className="text-gray-700">{accessErrorMessage}</p>
             <button onClick={() => navigate('/quests')} className="mt-6 bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600">
               На главную
             </button>
+          </div>
           </div>
         </div>
       )
@@ -921,6 +1043,28 @@ export default function QuestPlay({ session }) {
   if (!quest || tasks.length === 0) {
     return <div className="p-8">В этом квесте пока нет заданий</div>
   }
+  if (!hasStarted) {
+    return (
+      <>
+        {participantSelector}
+        <QuestStartScreen
+          quest={quest}
+          taskCount={tasks.length}
+          isOnline={isOnline}
+          offlinePackageStatus={offlinePackageStatus}
+          hasExistingAttempt={hasExistingAttempt}
+          startDisabled={attemptLimitReached}
+          startMessage={attemptLimitReached
+            ? 'Вы использовали все доступные прохождения этого квеста.'
+            : ''}
+          onStart={() => void handleStart()}
+        />
+      </>
+    )
+  }
+  if (!initAttemptDone) {
+    return <Loader text="Открываем квест..." />
+  }
   if (finished) {
     const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
     return (
@@ -937,10 +1081,15 @@ export default function QuestPlay({ session }) {
             ? '⏳ Квест ожидает проверки'
             : '🏁 Квест завершён!'}
         </h1>
-        <p className="text-xl mt-4">Вы прошли {completedTasks} из {totalTasks} заданий</p>
+        <p className="text-xl mt-4">Завершено заданий: {completedTasks + failedTasks} из {totalTasks}</p>
         <p className="text-lg mt-2">✅ Успешно: {completedTasks} | ❌ Неуспешно: {failedTasks}</p>
         <p className="text-lg">⏱️ Время: {elapsedSeconds} секунд</p>
         <p className="text-lg">🎯 Процент успеха: {percent}%</p>
+        {!hasPendingConfirmation && (
+          <p className="mt-4 rounded-lg bg-white px-4 py-2 text-green-800 shadow-sm">
+            ✅ Результат сохранён и подтверждён сервером
+          </p>
+        )}
         <button onClick={() => navigate('/')} className="mt-6 bg-blue-500 text-white px-6 py-3 rounded-sm hover:bg-blue-600">
           На главную
         </button>

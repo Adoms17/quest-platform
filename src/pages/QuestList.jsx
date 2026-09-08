@@ -83,6 +83,7 @@ export default function QuestList({ session }) {
         verification_options: original.verification_options,
         location_options: original.location_options,
         max_attempts: original.max_attempts,
+        max_quest_attempts: original.max_quest_attempts,
         is_open: original.is_open,
         start_at: original.start_at,
         end_at: original.end_at,

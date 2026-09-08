@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { loadQuestAccessPreview, redeemQuestAccessCredential } from '../services/questAccessApi'
+import ParticipantProfileSelect from '../components/ParticipantProfileSelect'
 
 const verificationLabels = { gps: 'GPS', code: 'код на месте', answer: 'ответы' }
 
@@ -34,6 +35,7 @@ export default function RedeemQuestAccess() {
   const [error, setError] = useState(''); const [loading, setLoading] = useState(false)
   const [questId, setQuestId] = useState(null)
   const [preview, setPreview] = useState(null)
+  const [participantProfileId, setParticipantProfileId] = useState('')
   const initialToken = params.get('token') || ''
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function RedeemQuestAccess() {
     return () => { active = false }
   }, [initialToken])
 
-  const submit = async event => { event.preventDefault(); setLoading(true); setError(''); try { const grant = await redeemQuestAccessCredential(token.trim()); setQuestId(grant.quest_id) } catch { setError('Ссылка или код недействителен, истёк либо предназначен другому аккаунту.') } finally { setLoading(false) } }
-  if (questId) return <div className="mx-auto max-w-2xl space-y-4 p-6"><QuestPreview preview={preview} /><div className="rounded-xl border bg-green-50 p-6 text-center"><div className="mb-3 text-4xl">✅</div><h1 className="text-2xl font-bold">Доступ выдан</h1><p className="mt-3 text-gray-700">Право на квест добавлено вашему аккаунту. Сам квест может быть закрыт организатором или ограничен расписанием.</p><Link to={`/play/${questId}`} className="mt-5 inline-block rounded-lg bg-blue-600 px-4 py-2 text-white">Открыть квест</Link></div></div>
-  return <div className="mx-auto max-w-2xl space-y-4 p-6"><h1 className="text-2xl font-bold">Получить доступ к квесту</h1><QuestPreview preview={preview} /><form onSubmit={submit} className="space-y-4 rounded-xl border bg-white p-5"><label className="block">Код или токен<input required value={token} onChange={e => setToken(e.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>{error && <p className="text-red-700">{error}</p>}<button disabled={loading} className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50">{loading ? 'Проверка...' : 'Активировать'}</button></form></div>
+  const submit = async event => { event.preventDefault(); setLoading(true); setError(''); try { const grant = await redeemQuestAccessCredential(token.trim(), participantProfileId); setQuestId(grant.quest_id) } catch { setError('Ссылка недействительна, истекла либо выбранный профиль недоступен.') } finally { setLoading(false) } }
+  if (questId) return <div className="mx-auto max-w-2xl space-y-4 p-6"><QuestPreview preview={preview} /><div className="rounded-xl border bg-green-50 p-6 text-center"><div className="mb-3 text-4xl">✅</div><h1 className="text-2xl font-bold">Доступ выдан</h1><p className="mt-3 text-gray-700">Право на квест добавлено выбранному участнику. Сам квест может быть закрыт организатором или ограничен расписанием.</p><Link to={`/play/${questId}?participant=${encodeURIComponent(participantProfileId)}`} className="mt-5 inline-block rounded-lg bg-blue-600 px-4 py-2 text-white">Открыть квест</Link></div></div>
+  return <div className="mx-auto max-w-2xl space-y-4 p-6"><h1 className="text-2xl font-bold">Получить доступ к квесту</h1><QuestPreview preview={preview} /><form onSubmit={submit} className="space-y-4 rounded-xl border bg-white p-5"><ParticipantProfileSelect value={participantProfileId} onChange={setParticipantProfileId} /><label className="block">Токен приглашения<input required value={token} onChange={e => setToken(e.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>{error && <p className="text-red-700">{error}</p>}<button disabled={loading || !participantProfileId} className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50">{loading ? 'Проверка...' : 'Активировать'}</button></form></div>
 }

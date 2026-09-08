@@ -7,7 +7,13 @@ export async function listOrganizations() {
       organization_id,
       organizations:organization_id (id, name, personal_owner_id),
       membership_roles (
-        roles:role_id (key, name)
+        roles:role_id (
+          key,
+          name,
+          role_permissions (
+            permissions:permission_id (key)
+          )
+        )
       )
     `)
     .eq('status', 'active')
@@ -23,9 +29,17 @@ export async function listOrganizations() {
       const roles = (membership.membership_roles || [])
         .map(item => item.roles)
         .filter(Boolean)
+        .map(role => ({ key: role.key, name: role.name }))
+      const permissions = Array.from(new Set(
+        (membership.membership_roles || []).flatMap(item =>
+          (item.roles?.role_permissions || [])
+            .map(rolePermission => rolePermission.permissions?.key)
+            .filter(Boolean)
+        )
+      ))
 
       if (!existing) {
-        organizationsById.set(organization.id, { ...organization, roles })
+        organizationsById.set(organization.id, { ...organization, roles, permissions })
         return organizationsById
       }
 
@@ -33,6 +47,10 @@ export async function listOrganizations() {
         [...existing.roles, ...roles].map(role => [role.key, role])
       )
       existing.roles = Array.from(rolesByKey.values())
+      existing.permissions = Array.from(new Set([
+        ...existing.permissions,
+        ...permissions,
+      ]))
       return organizationsById
     }, new Map())
     .values())

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppToaster from './components/Toaster'
@@ -10,6 +10,12 @@ import { isTransportError } from './services/network'
 import { createSyncCoordinator } from './services/syncCoordinator'
 import { PENDING_RESULT_ENQUEUED_EVENT } from './services/syncSignals'
 import { OrganizationProvider } from './contexts/OrganizationContext'
+import {
+  clearParticipantMode,
+  getParticipantModeLock,
+  PARTICIPANT_MODE_CHANGED_EVENT,
+} from './services/participantMode'
+import ParticipantModeBar from './components/ParticipantModeBar'
 
 const Login = lazy(() => import('./pages/Login'))
 const QuestList = lazy(() => import('./pages/QuestList'))
@@ -25,11 +31,38 @@ const AcceptOrganizationInvitation = lazy(() => import('./pages/AcceptOrganizati
 const QuestAccess = lazy(() => import('./pages/QuestAccess'))
 const RedeemQuestAccess = lazy(() => import('./pages/RedeemQuestAccess'))
 const RedeemQuestCode = lazy(() => import('./pages/RedeemQuestCode'))
+const ParticipantGroup = lazy(() => import('./pages/ParticipantGroup'))
+const AcceptParticipantInvitation = lazy(() => import('./pages/AcceptParticipantInvitation'))
+const ParticipantHistory = lazy(() => import('./pages/ParticipantHistory'))
 
 function Layout({ children, session }) {
+  const location = useLocation()
+  const [participantMode, setParticipantMode] = useState(() => getParticipantModeLock())
+
+  useEffect(() => {
+    const refresh = () => setParticipantMode(getParticipantModeLock())
+    window.addEventListener(PARTICIPANT_MODE_CHANGED_EVENT, refresh)
+    return () => window.removeEventListener(PARTICIPANT_MODE_CHANGED_EVENT, refresh)
+  }, [])
+
+  useEffect(() => {
+    if (participantMode && participantMode.actorUserId !== session?.user?.id) {
+      clearParticipantMode()
+    }
+  }, [participantMode, session])
+
+  if (participantMode?.actorUserId === session?.user?.id) {
+    const questPath = `/play/${participantMode.questId}`
+    if (location.pathname !== questPath) {
+      return <Navigate to={`${questPath}?participant=${encodeURIComponent(participantMode.participantProfileId)}`} replace />
+    }
+  }
+
   return (
     <>
-      <Navbar session={session} />
+      {participantMode
+        ? <ParticipantModeBar lock={participantMode} />
+        : <Navbar session={session} />}
       <main>{children}</main>
     </>
   )
@@ -226,6 +259,18 @@ function App() {
         <Route
           path="/access/code"
           element={<ProtectedRoute session={session}><Layout session={session}><RedeemQuestCode /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/participants/group"
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantGroup /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/participants/invitations/accept"
+          element={<ProtectedRoute session={session}><Layout session={session}><AcceptParticipantInvitation session={session} /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/participants/history"
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantHistory /></Layout></ProtectedRoute>}
         />
         <Route
           path="/quests/:id/tasks/:taskId/edit"
