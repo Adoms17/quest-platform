@@ -8,6 +8,7 @@ import { hasOrganizationPermission } from '../services/organizationPermissions'
 export default function Navbar({ session }) {
   const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
+  const [personalProfileName, setPersonalProfileName] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const {
@@ -19,7 +20,6 @@ export default function Navbar({ session }) {
   } = useOrganization()
   const canManageTeam = hasOrganizationPermission(currentOrganization, 'members.manage')
 
-  // Загружаем профиль пользователя
   useEffect(() => {
     async function fetchProfile() {
       if (!session?.user?.id) {
@@ -34,13 +34,18 @@ export default function Navbar({ session }) {
           .single()
         if (error) throw error
         setProfile(data)
+        const { data: participantProfiles, error: participantError } = await supabase.rpc('get_my_participant_profiles')
+        if (participantError) throw participantError
+        setPersonalProfileName(participantProfiles?.find(item => item.relationship === 'self')?.display_name || '')
       } catch (err) {
         console.error('Ошибка загрузки профиля:', err)
       } finally {
         setLoading(false)
       }
     }
-    fetchProfile()
+    void fetchProfile()
+    window.addEventListener('participant-profile-updated', fetchProfile)
+    return () => window.removeEventListener('participant-profile-updated', fetchProfile)
   }, [session])
 
   const handleLogout = async () => {
@@ -54,7 +59,7 @@ export default function Navbar({ session }) {
   }
 
   // Отображаемое имя: username или email или 'Пользователь'
-  const displayName = profile?.username || session?.user?.email?.split('@')[0] || 'Пользователь'
+  const displayName = personalProfileName || profile?.username || session?.user?.email?.split('@')[0] || 'Пользователь'
   const avatarUrl = profile?.avatar_url || null
 
   // Закрываем меню при клике вне
@@ -81,14 +86,14 @@ export default function Navbar({ session }) {
         <span className="hidden sm:inline text-sm opacity-80">
           {loading ? '...' : displayName}
         </span>
-        <Link to="/downloads" className="block px-4 py-2 hover:bg-gray-100">
+        <Link to="/downloads" className="block rounded-sm px-4 py-2 hover:bg-blue-700">
           📥 Мои загрузки
         </Link>
         <Link to="/access/code" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
           🔑 Ввести код
         </Link>
         <Link to="/participants/group" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
-          👨‍👩‍👧 Моя группа
+          👨‍👩‍👧 Мои группы
         </Link>
         <Link to="/participants/history" className="hidden lg:block px-3 py-2 hover:bg-blue-700 rounded-sm">
           📊 История
@@ -176,7 +181,7 @@ export default function Navbar({ session }) {
               onClick={() => setMenuOpen(false)}
               className="block px-4 py-2 hover:bg-gray-100 transition"
             >
-              👨‍👩‍👧 Моя группа
+              👨‍👩‍👧 Мои группы
             </Link>
             <Link
               to="/participants/history"

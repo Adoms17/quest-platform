@@ -45,6 +45,12 @@ export async function loadQuestEntryStatus(questId) {
   return data
 }
 
+export async function listAccessiblePrivateQuests() {
+  const { data, error } = await supabase.rpc('get_my_accessible_private_quests')
+  throwIfError(error)
+  return data || []
+}
+
 export async function startServerQuestAttempt(questId, participantProfileId = null) {
   const { data, error } = participantProfileId
     ? await supabase.rpc('start_quest_attempt_for_participant', {

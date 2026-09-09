@@ -8,10 +8,11 @@ function collectPageErrors(page) {
 
 async function expectLoginPage(page) {
   await expect(page.getByRole('heading', { name: 'Quest Platform' })).toBeVisible()
-  await expect(page.getByPlaceholder('Email')).toBeVisible()
-  await expect(page.getByPlaceholder('Пароль')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Регистрация' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Вход', exact: true })).toBeVisible()
+  await expect(page.getByLabel('Email')).toBeVisible()
+  await expect(page.getByLabel('Пароль', { exact: true })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Регистрация' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Вход', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible()
 }
 
 test('opens the login page directly', async ({ page }) => {
@@ -223,7 +224,7 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
       request.onerror = () => reject(request.error)
     })
 
-    const dbModule = await import('/src/services/db.js?indexeddb-upgrade=9')
+    const dbModule = await import('/src/services/db.js?indexeddb-upgrade=10')
     const database = await dbModule.initDB()
     const [quest, attempt, pending] = await Promise.all([
       database.get('quests', 'quest-before-upgrade'),
@@ -238,6 +239,7 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
         .objectStore('downloadedQuests')
         .indexNames
         .contains('by_package_version'),
+      hasParticipantProfilesStore: database.objectStoreNames.contains('participantProfiles'),
       quest,
       attempt,
       pending,
@@ -246,8 +248,9 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
     return upgradedState
   })
 
-  expect(result.version).toBe(9)
+  expect(result.version).toBe(10)
   expect(result.hasPackageVersionIndex).toBe(true)
+  expect(result.hasParticipantProfilesStore).toBe(true)
   expect(result.quest?.title).toBe('Saved quest')
   expect(result.attempt).toMatchObject({
     localId: 'attempt-before-upgrade',

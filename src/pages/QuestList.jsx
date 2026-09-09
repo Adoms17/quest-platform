@@ -6,11 +6,15 @@ import toast from 'react-hot-toast'
 import { saveQuestToDB } from '../services/db'
 import { useOrganization } from '../contexts/useOrganization'
 import QuickQuestAccessCode from '../components/QuickQuestAccessCode'
+import AccessiblePrivateQuests from '../components/AccessiblePrivateQuests'
+import { listAccessiblePrivateQuests } from '../services/questApi'
 
 export default function QuestList({ session }) {
   const navigate = useNavigate()
   const [quests, setQuests] = useState([])
   const [loading, setLoading] = useState(true)
+  const [accessibleQuests, setAccessibleQuests] = useState([])
+  const [accessibleQuestsLoading, setAccessibleQuestsLoading] = useState(true)
   const [copying, setCopying] = useState(null) // id квеста, который копируется
   const {
     currentOrganization,
@@ -47,11 +51,41 @@ export default function QuestList({ session }) {
     setLoading(false)
   }, [currentOrganizationId])
 
+  const fetchAccessibleQuests = useCallback(async () => {
+    setAccessibleQuestsLoading(true)
+    try {
+      setAccessibleQuests(await listAccessiblePrivateQuests())
+    } catch (error) {
+      console.error('Ошибка загрузки доступных приватных квестов:', error)
+      setAccessibleQuests([])
+      toast.error('Не удалось загрузить доступные приватные квесты')
+    } finally {
+      setAccessibleQuestsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!userId || loadingOrganizations) return
     const timeout = setTimeout(() => fetchQuests(), 0)
     return () => clearTimeout(timeout)
   }, [userId, loadingOrganizations, fetchQuests])
+
+  useEffect(() => {
+    if (!userId) return
+
+    const refresh = () => fetchAccessibleQuests()
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    const timeout = setTimeout(refresh, 0)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      clearTimeout(timeout)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [userId, fetchAccessibleQuests])
 
   async function handleDelete(id) {
     if (!confirm('Удалить квест?')) return
@@ -166,6 +200,11 @@ export default function QuestList({ session }) {
 
       <QuickQuestAccessCode
         onContinue={code => navigate(`/access/code?code=${encodeURIComponent(code)}`)}
+      />
+
+      <AccessiblePrivateQuests
+        quests={accessibleQuests}
+        loading={accessibleQuestsLoading}
       />
 
       {quests.length === 0 ? (
