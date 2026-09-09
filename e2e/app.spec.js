@@ -156,6 +156,111 @@ test('restores a participant attempt and unsynced event after reload', async ({ 
   })
 })
 
+test('upgrades IndexedDB without losing offline or pending data', async ({ page }) => {
+  await page.goto('/login')
+
+  const result = await page.evaluate(async () => {
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase('QuestPlatformDB')
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+      request.onblocked = () => reject(new Error('IndexedDB deletion was blocked'))
+    })
+
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open('QuestPlatformDB', 8)
+      request.onupgradeneeded = () => {
+        const database = request.result
+        database.createObjectStore('quests', { keyPath: 'id' })
+        const pending = database.createObjectStore('pendingResults', {
+          keyPath: 'id',
+          autoIncrement: true,
+        })
+        pending.createIndex('by_quest_id', 'questId')
+        pending.createIndex('by_synced', 'synced')
+        pending.createIndex('by_local_attempt', 'localQuestAttemptId')
+        pending.createIndex('by_client_event_id', 'clientEventId', { unique: true })
+        pending.createIndex('by_user_id', 'userId')
+        const downloads = database.createObjectStore('downloadedQuests', { keyPath: 'questId' })
+        downloads.createIndex('by_downloaded_at', 'downloadedAt')
+        const attempts = database.createObjectStore('questAttempts', { keyPath: 'localId' })
+        attempts.createIndex('by_quest_user', ['questId', 'userId'])
+        attempts.createIndex('by_synced', 'synced')
+      }
+      request.onsuccess = () => {
+        const database = request.result
+        const transaction = database.transaction(
+          ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts'],
+          'readwrite'
+        )
+        transaction.objectStore('quests').put({ id: 'quest-before-upgrade', title: 'Saved quest' })
+        transaction.objectStore('downloadedQuests').put({
+          questId: 'quest-before-upgrade',
+          downloadedAt: '2026-09-09T06:00:00.000Z',
+        })
+        transaction.objectStore('questAttempts').put({
+          localId: 'attempt-before-upgrade',
+          questId: 'quest-before-upgrade',
+          userId: 'adult-1',
+          participantProfileId: 'child-1',
+          finished: false,
+          synced: false,
+        })
+        transaction.objectStore('pendingResults').put({
+          clientEventId: 'event-before-upgrade',
+          questId: 'quest-before-upgrade',
+          localQuestAttemptId: 'attempt-before-upgrade',
+          userId: 'adult-1',
+          participantProfileId: 'child-1',
+          synced: false,
+        })
+        transaction.oncomplete = () => {
+          database.close()
+          resolve()
+        }
+        transaction.onerror = () => reject(transaction.error)
+      }
+      request.onerror = () => reject(request.error)
+    })
+
+    const dbModule = await import('/src/services/db.js?indexeddb-upgrade=9')
+    const database = await dbModule.initDB()
+    const [quest, attempt, pending] = await Promise.all([
+      database.get('quests', 'quest-before-upgrade'),
+      database.get('questAttempts', 'attempt-before-upgrade'),
+      database.getFromIndex('pendingResults', 'by_client_event_id', 'event-before-upgrade'),
+    ])
+
+    const upgradedState = {
+      version: database.version,
+      hasPackageVersionIndex: database
+        .transaction('downloadedQuests')
+        .objectStore('downloadedQuests')
+        .indexNames
+        .contains('by_package_version'),
+      quest,
+      attempt,
+      pending,
+    }
+    database.close()
+    return upgradedState
+  })
+
+  expect(result.version).toBe(9)
+  expect(result.hasPackageVersionIndex).toBe(true)
+  expect(result.quest?.title).toBe('Saved quest')
+  expect(result.attempt).toMatchObject({
+    localId: 'attempt-before-upgrade',
+    participantProfileId: 'child-1',
+    synced: false,
+  })
+  expect(result.pending).toMatchObject({
+    clientEventId: 'event-before-upgrade',
+    participantProfileId: 'child-1',
+    synced: false,
+  })
+})
+
 test('rechecks supervision during a real participant grant and retry flow', async ({ page }, testInfo) => {
   test.skip(!process.env.RUN_LOCAL_SUPABASE_E2E, 'requires a running local Supabase stack')
   testInfo.setTimeout(90_000)

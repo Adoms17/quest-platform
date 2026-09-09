@@ -9,6 +9,7 @@ export default function QuestCreate({ session }) {
   const { currentOrganization, loadingOrganizations } = useOrganization()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [coverImageUrl, setCoverImageUrl] = useState('')
   const [isPublic, setIsPublic] = useState(false)
   const [locationOptions, setLocationOptions] = useState(['gps'])
   const [verificationOptions, setVerificationOptions] = useState(['gps'])
@@ -16,6 +17,8 @@ export default function QuestCreate({ session }) {
     useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
   const [maxQuestAttempts, setMaxQuestAttempts] = useState(0)
+  const [taskNavigationMode, setTaskNavigationMode] =
+    useState('sequential')
   const [verificationMode, setVerificationMode] =
     useState('online')
   const [offlineProgressPolicy, setOfflineProgressPolicy] =
@@ -77,6 +80,7 @@ export default function QuestCreate({ session }) {
         organization_id: currentOrganization.id,
         title: title.trim(),
         description: description.trim() || null,
+        cover_image_url: coverImageUrl.trim() || null,
         is_public: isPublic,
         verification_options: verificationOptions,
         verification_match_policy: verificationMatchPolicy,
@@ -85,6 +89,7 @@ export default function QuestCreate({ session }) {
         location_options: locationOptions,
         max_attempts: parseInt(maxAttempts, 10) || 0,
         max_quest_attempts: parseInt(maxQuestAttempts, 10) || 0,
+        task_navigation_mode: taskNavigationMode,
       })
       .select()
 
@@ -123,6 +128,19 @@ export default function QuestCreate({ session }) {
             className="w-full border p-2 rounded-sm"
             rows="3"
           />
+        </div>
+        <div>
+          <label className="block font-medium mb-1">Обложка квеста</label>
+          <input
+            type="url"
+            value={coverImageUrl}
+            onChange={(e) => setCoverImageUrl(e.target.value)}
+            className="w-full border p-2 rounded-sm"
+            placeholder="https://example.com/quest-cover.jpg"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            Укажите прямую HTTPS-ссылку на изображение. Обложка будет показана участнику перед стартом.
+          </p>
         </div>
 
         <div>
@@ -207,6 +225,27 @@ export default function QuestCreate({ session }) {
                 </p>
               </div>
             )}
+        </div>
+
+        <div>
+          <label className="block font-medium mb-1">
+            Порядок прохождения заданий
+          </label>
+          <select
+            value={taskNavigationMode}
+            onChange={event => setTaskNavigationMode(event.target.value)}
+            className="w-full border p-2 rounded-sm"
+          >
+            <option value="sequential">
+              Последовательно — следующее задание открывается после текущего
+            </option>
+            <option value="free">
+              Произвольно — участник выбирает доступное задание
+            </option>
+          </select>
+          <p className="text-sm text-gray-500 mt-1">
+            В последовательном режиме будущие задания не будут показаны до их открытия.
+          </p>
         </div>
 
         <div>

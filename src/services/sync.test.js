@@ -170,6 +170,72 @@ describe('syncPendingResults', () => {
     expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
   })
 
+  it('restores a missing local attempt for the pending participant profile', async () => {
+    mocks.getPendingResults.mockResolvedValue([
+      event({ participantProfileId: 'profile-child' }),
+    ])
+    mocks.getQuestAttempt
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        localId: 'local-1',
+        serverId: null,
+        userId: 'user-1',
+        participantProfileId: 'profile-child',
+      })
+    mocks.saveQuestAttempt.mockResolvedValue(undefined)
+
+    await syncPendingResults(session)
+
+    expect(mocks.saveQuestAttempt).toHaveBeenCalledWith(
+      'local-1',
+      'quest-1',
+      'user-1',
+      null,
+      false,
+      false,
+      'profile-child'
+    )
+    expect(mocks.startServerQuestAttempt)
+      .toHaveBeenCalledWith('quest-1', 'profile-child')
+  })
+
+  it('does not combine participant profiles in one local attempt', async () => {
+    mocks.getPendingResults.mockResolvedValue([
+      event({ id: 1, participantProfileId: 'profile-child-1' }),
+      event({
+        id: 2,
+        clientEventId: 'event-2',
+        participantProfileId: 'profile-child-2',
+      }),
+    ])
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(syncPendingResults(session))
+      .rejects.toThrow('разных профилей участников')
+
+    expect(mocks.startServerQuestAttempt).not.toHaveBeenCalled()
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+  })
+
+  it('does not resend an event found by receipt after reconnect', async () => {
+    const pendingEvent = event({ participantProfileId: 'profile-child' })
+    mocks.getPendingResults.mockResolvedValue([pendingEvent])
+    mocks.reconcilePendingReceipts.mockResolvedValue({
+      unresolvedEvents: [],
+      contexts: new Map(),
+      syncedEvents: 1,
+      syncedQuestIds: ['quest-1'],
+      finishedLocalAttemptIds: [],
+    })
+
+    await expect(syncPendingResults(session)).resolves.toMatchObject({
+      syncedEvents: 1,
+    })
+
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+    expect(mocks.clearSyncedResults).toHaveBeenCalledWith('user-1')
+  })
+
   it('preserves legacy records that have no event type', async () => {
     mocks.getPendingResults.mockResolvedValue([
       event({ eventType: undefined }),

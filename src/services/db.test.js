@@ -84,6 +84,8 @@ describe('sanitizeParticipantTask', () => {
       correct_answer: 'Секретный ответ',
       static_code: '1234',
       gps_point: { coordinates: [33.5, 44.6] },
+      location_latitude: 44.6,
+      location_longitude: 33.5,
       required_photo_hash: 'private-hash',
       answer_verifier: { digest: 'answer-digest' },
       code_verifier: { digest: 'code-digest' },
@@ -96,6 +98,8 @@ describe('sanitizeParticipantTask', () => {
       requires_answer: true,
       requires_code: true,
       requires_gps: true,
+      location_latitude: 44.6,
+      location_longitude: 33.5,
     })
     expect(safeTask).not.toHaveProperty('correct_answer')
     expect(safeTask).not.toHaveProperty('static_code')

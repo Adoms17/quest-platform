@@ -26,7 +26,12 @@ function getEventValue(record, field) {
   return record.payload?.[field] ?? record[field] ?? null
 }
 
-async function getServerAttemptId(localId, questId, userId) {
+async function getServerAttemptId(
+  localId,
+  questId,
+  userId,
+  participantProfileId
+) {
   let localAttempt = await getQuestAttempt(localId)
 
   if (localAttempt && localAttempt.userId !== userId) {
@@ -36,14 +41,35 @@ async function getServerAttemptId(localId, questId, userId) {
   }
 
   if (!localAttempt) {
-    await saveQuestAttempt(localId, questId, userId, null, false, false, userId)
+    await saveQuestAttempt(
+      localId,
+      questId,
+      userId,
+      null,
+      false,
+      false,
+      participantProfileId
+    )
     localAttempt = await getQuestAttempt(localId)
+  }
+
+  if (
+    localAttempt?.participantProfileId &&
+    localAttempt.participantProfileId !== participantProfileId
+  ) {
+    throw new Error(
+      'Локальная попытка принадлежит другому профилю участника'
+    )
   }
 
   // Сервер вернёт активную попытку либо создаст новую,
   // если прежняя уже завершена.
-  const participantProfileId = localAttempt.participantProfileId || userId
-  const serverAttempt = await startServerQuestAttempt(questId, participantProfileId)
+  const resolvedParticipantProfileId =
+    localAttempt.participantProfileId || participantProfileId
+  const serverAttempt = await startServerQuestAttempt(
+    questId,
+    resolvedParticipantProfileId
+  )
 
   if (
     localAttempt?.serverId !== serverAttempt.id ||
@@ -52,7 +78,7 @@ async function getServerAttemptId(localId, questId, userId) {
     await markQuestAttemptSynced(localId, serverAttempt.id)
   }
 
-  const storageKey = `questAttempt_${questId}_${participantProfileId}`
+  const storageKey = `questAttempt_${questId}_${resolvedParticipantProfileId}`
 
   if (
     typeof window !== 'undefined' &&
@@ -128,10 +154,20 @@ export async function syncPendingResults(
 
     for (const [localId, records] of groups) {
       const questId = records[0].questId
+      const participantProfileId =
+        records[0].participantProfileId || user.id
 
       if (records.some(record => record.questId !== questId)) {
         throw new Error(
           'Локальная попытка содержит события разных квестов'
+        )
+      }
+
+      if (records.some(record => (
+        (record.participantProfileId || user.id) !== participantProfileId
+      ))) {
+        throw new Error(
+          'Локальная попытка содержит события разных профилей участников'
         )
       }
 
@@ -162,7 +198,8 @@ export async function syncPendingResults(
         serverAttemptId = await getServerAttemptId(
           localId,
           questId,
-          user.id
+          user.id,
+          participantProfileId
         )
       }
 
