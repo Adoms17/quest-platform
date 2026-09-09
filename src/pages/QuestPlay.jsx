@@ -3,10 +3,13 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import QuestStartScreen from '../components/QuestStartScreen'
+import QuestTaskSummary from '../components/QuestTaskSummary'
+import TaskLocationMap from '../components/TaskLocationMap'
 import ParticipantProfileSelect from '../components/ParticipantProfileSelect'
 import toast from 'react-hot-toast'
 import {
   getQuestFromDB,
+  getQuestPackageMetadata,
   saveQuestToDB,
   getActiveLocalQuestAttempt,
   saveQuestAttempt,
@@ -18,17 +21,25 @@ import {
 import {
   loadParticipantTasks,
   loadParticipantQuest,
+  loadParticipantQuestSummary,
   loadQuestEntryStatus,
   startServerQuestAttempt,
   submitTaskEvent,
 } from '../services/questApi'
 import { verifyHybridCandidate } from '../services/hybridVerification'
-import { usesAnyLocationVerification } from '../services/verificationPolicy'
+import {
+  getGeolocationErrorMessage,
+  usesAnyLocationVerification,
+} from '../services/verificationPolicy'
 import { isTransportError } from '../services/network'
 import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
 import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
 import { getQuestAvailability } from '../services/questAvailability'
 import { getAnswerResultMessage } from '../services/questResultPresentation'
+import {
+  buildQuestTaskSummary,
+  countOpenedQuestTasks,
+} from '../services/questTaskSummary'
 import {
   enableParticipantMode,
   getParticipantModeLock,
@@ -51,7 +62,10 @@ export default function QuestPlay({ session }) {
   const [error, setError] = useState(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [hasStarted, setHasStarted] = useState(false)
+  const [showTaskSummary, setShowTaskSummary] = useState(true)
+  const [questSummary, setQuestSummary] = useState(null)
   const [offlinePackageStatus, setOfflinePackageStatus] = useState('loading')
+  const [offlinePackageMetadata, setOfflinePackageMetadata] = useState(null)
   const [attemptLimitReached, setAttemptLimitReached] = useState(false)
   const [hasExistingAttempt, setHasExistingAttempt] = useState(false)
   const [participantProfiles, setParticipantProfiles] = useState([])
@@ -87,6 +101,14 @@ export default function QuestPlay({ session }) {
   const [availabilityNow, setAvailabilityNow] = useState(() => Date.now())
 
   const currentTask = tasks[currentTaskIndex] || null
+  const progressTasks = useMemo(() => buildQuestTaskSummary({
+    tasks,
+    taskAttemptsMap,
+    navigationMode: quest?.task_navigation_mode || 'sequential',
+    serverSummary: questSummary,
+  }), [quest?.task_navigation_mode, questSummary, taskAttemptsMap, tasks])
+  const openedTaskCount = countOpenedQuestTasks(progressTasks, currentTask?.id)
+  const progressTaskCount = tasks.length || totalTasks
   const maxAttempts = quest?.max_attempts || 0
   const selectedParticipantProfile = participantProfiles.find(
     profile => profile.participant_profile_id === participantProfileId
@@ -164,12 +186,15 @@ export default function QuestPlay({ session }) {
       setLoading(true)
       setError(null)
       setHasStarted(false)
+      setShowTaskSummary(true)
+      setQuestSummary(null)
       setInitAttemptDone(false)
       setFinished(false)
       setQuestAttemptId(null)
       setAttemptLimitReached(false)
       setHasExistingAttempt(false)
       setOfflinePackageStatus('loading')
+      setOfflinePackageMetadata(null)
 
       try {
         let questData
@@ -182,6 +207,10 @@ export default function QuestPlay({ session }) {
             throw new Error('Квест не загружен для работы без интернета')
           }
 
+          setOfflinePackageMetadata(await getQuestPackageMetadata(
+            id,
+            participantProfileId
+          ))
           return {
             questData: localQuest,
             tasksData: localQuest.tasks || [],
@@ -206,18 +235,28 @@ export default function QuestPlay({ session }) {
               questData = await loadParticipantQuest(id, participantProfileId)
               tasksData = await loadParticipantTasks(id, participantProfileId)
             } else {
-              const { data: remoteQuest, error: questError } = await supabase
-                .from('quests').select('*').eq('id', id).single()
-              if (questError) {
-                if (isTransportError(questError)) throw questError
-                throw new Error('Квест не найден или недоступен')
-              }
-              questData = remoteQuest
+              questData = await loadParticipantQuest(id)
               tasksData = await loadParticipantTasks(id)
             }
 
+            const effectiveParticipantProfileId = participantProfileId || session?.user?.id
+            if (effectiveParticipantProfileId) {
+              setQuestSummary(await loadParticipantQuestSummary(
+                id,
+                effectiveParticipantProfileId
+              ))
+            }
+
             try {
-              await saveQuestToDB(questData, tasksData, participantProfileId)
+              const packageMetadata = await saveQuestToDB(
+                questData,
+                tasksData,
+                participantProfileId
+              )
+              setOfflinePackageMetadata(await getQuestPackageMetadata(
+                id,
+                participantProfileId
+              ) || packageMetadata)
               setOfflinePackageStatus('ready')
             } catch (cacheError) {
               console.warn('Не удалось сохранить квест для offline:', cacheError)
@@ -736,9 +775,7 @@ export default function QuestPlay({ session }) {
       },
       error => {
         toast.dismiss('geolocation')
-        toast.error(
-          `Не удалось определить местоположение: ${error.message}`
-        )
+        toast.error(getGeolocationErrorMessage(error))
       },
       {
         enableHighAccuracy: true,
@@ -1052,6 +1089,7 @@ export default function QuestPlay({ session }) {
           taskCount={tasks.length}
           isOnline={isOnline}
           offlinePackageStatus={offlinePackageStatus}
+          offlinePackageMetadata={offlinePackageMetadata}
           hasExistingAttempt={hasExistingAttempt}
           startDisabled={attemptLimitReached}
           startMessage={attemptLimitReached
@@ -1097,25 +1135,61 @@ export default function QuestPlay({ session }) {
     )
   }
 
+  if (showTaskSummary) {
+    return (
+      <QuestTaskSummary
+        quest={quest}
+        tasks={tasks}
+        taskAttemptsMap={taskAttemptsMap}
+        serverSummary={questSummary}
+        isOnline={isOnline}
+        onSelectTask={index => {
+          setCurrentTaskIndex(index)
+          setShowTaskSummary(false)
+        }}
+        onExit={handleExit}
+      />
+    )
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
         <h1 className="text-2xl font-bold">{quest.title}</h1>
-        <button
-          onClick={handleExit}
-          className="text-red-500 hover:text-red-700 text-sm border border-red-500 px-3 py-1 rounded-sm hover:bg-red-50"
-        >
-          ✕ Выйти из квеста
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowTaskSummary(true)}
+            className="rounded-sm border border-blue-500 px-3 py-1 text-sm text-blue-600 hover:bg-blue-50"
+          >
+            К списку заданий
+          </button>
+          <button
+            type="button"
+            onClick={handleExit}
+            className="text-red-500 hover:text-red-700 text-sm border border-red-500 px-3 py-1 rounded-sm hover:bg-red-50"
+          >
+            ✕ Выйти из квеста
+          </button>
+        </div>
       </div>
       <div className="flex justify-between items-center mb-2 text-sm text-gray-600">
-        <span>Задание {currentTaskIndex + 1} из {tasks.length}</span>
+        <span>Прогресс</span>
+        <span>{openedTaskCount} из {progressTaskCount}</span>
         <span>⏱️ {elapsedSeconds} сек</span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+      <div
+        className="w-full bg-gray-200 rounded-full h-2.5 mb-4"
+        role="progressbar"
+        aria-label="Прогресс по открытым заданиям"
+        aria-valuemin="0"
+        aria-valuemax={progressTaskCount}
+        aria-valuenow={openedTaskCount}
+        aria-valuetext={`${openedTaskCount} из ${progressTaskCount}`}
+      >
         <div
           className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-          style={{ width: `${((currentTaskIndex) / tasks.length) * 100}%` }}
+          style={{ width: `${progressTaskCount > 0 ? openedTaskCount / progressTaskCount * 100 : 0}%` }}
         />
       </div>
       <div className="bg-white shadow-sm rounded-sm p-6">
@@ -1141,12 +1215,20 @@ export default function QuestPlay({ session }) {
             )}
           </div>
         )}
+        <TaskLocationMap
+          latitude={currentTask.location_latitude}
+          longitude={currentTask.location_longitude}
+          isOnline={isOnline}
+          taskNumber={currentTaskIndex + 1}
+          verificationRadiusMeters={currentTask.requires_gps ? 50 : null}
+        />
         {isLocationPhase && (
           <div className="border-t border-blue-200 pt-4 mt-4">
             <p className="text-gray-700 mb-3">Для доступа к заданию необходимо подтвердить нахождение на месте:</p>
             {quest.verification_options.includes('gps') && (
               <div className="mb-3">
                 <button
+                  type="button"
                   onClick={checkLocation}
                   disabled={locationVerified || openingTask}
                   className={`px-4 py-2 rounded-sm ${locationVerified ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
@@ -1156,8 +1238,12 @@ export default function QuestPlay({ session }) {
               </div>
             )}
             {currentTask.requires_code && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+                <label htmlFor="task-access-code" className="sr-only">
+                  Код доступа к заданию
+                </label>
                 <input
+                  id="task-access-code"
                   type="text"
                   placeholder="Введите код доступа"
                   value={codeInput}
@@ -1166,9 +1252,10 @@ export default function QuestPlay({ session }) {
                   className="border p-2 rounded-sm flex-1"
                 />
                 <button
+                  type="button"
                   onClick={checkCode}
                   disabled={codeVerified || openingTask}
-                  className="bg-yellow-500 text-white px-4 py-2 rounded-sm hover:bg-yellow-600"
+                  className="bg-amber-700 text-white px-4 py-2 rounded-sm hover:bg-amber-800"
                 >
                   {codeVerified ? '✅ Код принят' : 'Проверить код'}
                 </button>
@@ -1205,12 +1292,14 @@ export default function QuestPlay({ session }) {
             {currentTask.requires_answer && (
               <div className="mb-3">
                 {currentTask.options && Array.isArray(currentTask.options) && currentTask.options.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="font-medium">Выберите правильный вариант:</p>
+                  <fieldset className="space-y-2">
+                    <legend className="font-medium">Выберите правильный вариант:</legend>
                     {currentTask.options.map((opt, idx) => (
                       <button
                         key={idx}
+                        type="button"
                         onClick={() => setSelectedOption(opt)}
+                        aria-pressed={selectedOption === opt}
                         className={`block w-full text-left p-2 border rounded-sm transition ${
                           selectedOption === opt ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'
                         }`}
@@ -1218,16 +1307,22 @@ export default function QuestPlay({ session }) {
                         {opt}
                       </button>
                     ))}
-                  </div>
+                  </fieldset>
                 ) : (
-                  <input
-                    type="text"
-                    placeholder="Введите ваш ответ"
-                    value={answerInput}
-                    onChange={(e) => setAnswerInput(e.target.value)}
-                    disabled={taskCompleted || taskFailed}
-                    className="w-full border p-2 rounded-sm"
-                  />
+                  <div>
+                    <label htmlFor="task-answer" className="sr-only">
+                      Ответ на задание
+                    </label>
+                    <input
+                      id="task-answer"
+                      type="text"
+                      placeholder="Введите ваш ответ"
+                      value={answerInput}
+                      onChange={(e) => setAnswerInput(e.target.value)}
+                      disabled={taskCompleted || taskFailed}
+                      className="w-full border p-2 rounded-sm"
+                    />
+                  </div>
                 )}
                 {maxAttempts > 0 && (
                   <p className="text-sm text-gray-500 mt-1">Попыток: {taskAttemptsUsed} / {maxAttempts}</p>
@@ -1235,6 +1330,7 @@ export default function QuestPlay({ session }) {
               </div>
             )}
             <button
+              type="button"
               onClick={completeTask}
               disabled={taskCompleted || taskFailed}
               className={`w-full py-3 rounded-sm text-white ${

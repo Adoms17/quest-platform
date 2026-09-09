@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test'
 
 const isCI = Boolean(process.env.CI)
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+const chromiumLaunchOptions = executablePath
+  ? { launchOptions: { executablePath } }
+  : {}
 
 export default defineConfig({
   testDir: './e2e',
@@ -19,7 +22,22 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        ...(executablePath ? { launchOptions: { executablePath } } : {}),
+        ...chromiumLaunchOptions,
+      },
+    },
+    {
+      name: 'android-chrome-layout',
+      use: {
+        ...devices['Pixel 7'],
+        ...chromiumLaunchOptions,
+      },
+    },
+    {
+      name: 'ios-safari-layout',
+      use: {
+        ...devices['iPhone 13'],
+        browserName: 'chromium',
+        ...chromiumLaunchOptions,
       },
     },
   ],

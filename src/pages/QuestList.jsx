@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 import { saveQuestToDB } from '../services/db'
 import { useOrganization } from '../contexts/useOrganization'
+import QuickQuestAccessCode from '../components/QuickQuestAccessCode'
 
 export default function QuestList({ session }) {
+  const navigate = useNavigate()
   const [quests, setQuests] = useState([])
   const [loading, setLoading] = useState(true)
   const [copying, setCopying] = useState(null) // id квеста, который копируется
@@ -161,6 +163,10 @@ export default function QuestList({ session }) {
           + Создать квест
         </Link>
       </div>
+
+      <QuickQuestAccessCode
+        onContinue={code => navigate(`/access/code?code=${encodeURIComponent(code)}`)}
+      />
 
       {quests.length === 0 ? (
         <p className="text-gray-500">У вас пока нет квестов. Создайте первый!</p>

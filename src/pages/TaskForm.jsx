@@ -37,6 +37,7 @@ export default function TaskForm() {
     hint: '',
     gps_lat: '',
     gps_lng: '',
+    show_location_on_map: false,
     static_code: '',
     correct_answer: '',
     options: '',
@@ -71,6 +72,7 @@ export default function TaskForm() {
         hint: data.hint || '',
         gps_lat: lat,
         gps_lng: lng,
+        show_location_on_map: Boolean(data.show_location_on_map),
         static_code: data.static_code || '',
         correct_answer: data.correct_answer || '',
         options: optionsText,
@@ -220,6 +222,7 @@ export default function TaskForm() {
       gps_point: (gps_lat && gps_lng)
         ? `POINT(${parseFloat(gps_lng)} ${parseFloat(gps_lat)})`
         : null,
+      show_location_on_map: Boolean(taskForm.show_location_on_map),
       static_code: taskForm.static_code.trim() || null,
       correct_answer: taskForm.correct_answer.trim() || null,
       answer_client_verifier: answerClientVerifier,
@@ -228,7 +231,7 @@ export default function TaskForm() {
       media: mediaData,
       location_text: taskForm.location_text.trim() || null,
       location_image_url: taskForm.location_image_url.trim() || null,
-      order_index: taskForm.order_index || 0,
+      ...(isEdit ? { order_index: taskForm.order_index } : {}),
     }
 
     try {
@@ -398,6 +401,25 @@ export default function TaskForm() {
               initialLng={taskForm.gps_lng ? parseFloat(taskForm.gps_lng) : null}
               onSelect={handleMapSelect}
             />
+            <label className="flex items-start gap-2 rounded-sm border border-blue-200 bg-blue-50 p-3">
+              <input
+                type="checkbox"
+                checked={taskForm.show_location_on_map}
+                onChange={e => setTaskForm({
+                  ...taskForm,
+                  show_location_on_map: e.target.checked,
+                })}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium text-blue-900">
+                  Показывать точку на карте участнику
+                </span>
+                <span className="block text-xs text-blue-700">
+                  Координаты войдут в офлайн-пакет и будут доступны участнику до проверки местоположения.
+                </span>
+              </span>
+            </label>
           </>
         )}
 

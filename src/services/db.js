@@ -2,7 +2,8 @@ import { openDB } from 'idb'
 import { notifyPendingResultEnqueued } from './syncSignals'
 
 const DB_NAME = 'QuestPlatformDB'
-const DB_VERSION = 8
+const DB_VERSION = 9
+export const OFFLINE_PACKAGE_VERSION = 1
 export const PARTICIPANT_PACKAGE_ACCESS_TTL_MS = 24 * 60 * 60 * 1000
 
 export const UNSYNCED_QUEST_RESULTS_ERROR =
@@ -153,6 +154,9 @@ export async function initDB() {
       if (!dlStore.indexNames.contains('by_downloaded_at')) {
         dlStore.createIndex('by_downloaded_at', 'downloadedAt')
       }
+      if (!dlStore.indexNames.contains('by_package_version')) {
+        dlStore.createIndex('by_package_version', 'packageVersion')
+      }
 
       const qaStore = db.objectStoreNames.contains('questAttempts')
         ? transaction.objectStore('questAttempts')
@@ -200,13 +204,44 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
     downloadedAt: new Date().toISOString(),
     participantAccess,
   }
+  const serializedPackage = JSON.stringify(questWithTasks)
+  const packageSizeBytes = new TextEncoder().encode(serializedPackage).byteLength
+  const downloadedAt = new Date().toISOString()
   await db.put('quests', questWithTasks)
   const existing = await db.get('downloadedQuests', questData.id)
-  await db.put('downloadedQuests', {
+  const packageMetadata = {
     questId: questData.id,
-    downloadedAt: new Date().toISOString(),
+    packageVersion: OFFLINE_PACKAGE_VERSION,
+    packageSizeBytes,
+    downloadedAt,
     lastSyncDate: existing?.lastSyncDate || null,
-  })
+  }
+  await db.put('downloadedQuests', packageMetadata)
+  return packageMetadata
+}
+
+export async function getQuestPackageMetadata(questId, participantProfileId = null) {
+  const db = await initDB()
+  const [download, quest] = await Promise.all([
+    db.get('downloadedQuests', questId),
+    db.get('quests', questId),
+  ])
+  if (!download || !quest) return null
+
+  const validatedAt = participantProfileId
+    ? quest.participantAccess?.[participantProfileId] || null
+    : download.downloadedAt || null
+  const validatedAtMs = validatedAt ? new Date(validatedAt).getTime() : NaN
+
+  return {
+    ...download,
+    packageVersion: download.packageVersion || null,
+    packageSizeBytes: download.packageSizeBytes || null,
+    validatedAt,
+    expiresAt: participantProfileId && Number.isFinite(validatedAtMs)
+      ? new Date(validatedAtMs + PARTICIPANT_PACKAGE_ACCESS_TTL_MS).toISOString()
+      : null,
+  }
 }
 
 export async function getQuestFromDB(questId, participantProfileId = null) {
