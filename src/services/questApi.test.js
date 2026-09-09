@@ -9,6 +9,7 @@ vi.mock('../supabaseClient', () => ({
 }))
 
 import {
+  listAccessiblePrivateQuests,
   loadTaskEventReceipts,
   loadParticipantTasks,
   loadParticipantQuest,
@@ -42,6 +43,12 @@ describe('questApi', () => {
     expect(rpc).toHaveBeenCalledWith('get_quest_entry_status', {
       p_quest_id: 'quest-1',
     })
+  })
+
+  it('lists private quests available to controlled profiles', async () => {
+    rpc.mockResolvedValue({ data: [{ quest_id: 'quest-1' }], error: null })
+    await expect(listAccessiblePrivateQuests()).resolves.toEqual([{ quest_id: 'quest-1' }])
+    expect(rpc).toHaveBeenCalledWith('get_my_accessible_private_quests')
   })
 
   it('loads quest content and tasks for an explicitly selected participant', async () => {

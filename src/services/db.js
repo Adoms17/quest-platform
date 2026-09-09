@@ -2,7 +2,7 @@ import { openDB } from 'idb'
 import { notifyPendingResultEnqueued } from './syncSignals'
 
 const DB_NAME = 'QuestPlatformDB'
-const DB_VERSION = 9
+const DB_VERSION = 10
 export const OFFLINE_PACKAGE_VERSION = 1
 export const PARTICIPANT_PACKAGE_ACCESS_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -168,6 +168,10 @@ export async function initDB() {
         qaStore.createIndex('by_synced', 'synced')
       }
 
+      if (!db.objectStoreNames.contains('participantProfiles')) {
+        db.createObjectStore('participantProfiles', { keyPath: 'userId' })
+      }
+
       if (oldVersion < 8) {
         let cursor = await pendingStore.openCursor()
 
@@ -189,6 +193,32 @@ export async function initDB() {
       }
     },
   })
+}
+
+// ---------- Профили участников ----------
+export async function saveParticipantProfiles(userId, profiles) {
+  if (!userId) return
+
+  const safeProfiles = (profiles || []).map(profile => ({
+    participant_profile_id: profile.participant_profile_id,
+    display_name: profile.display_name || 'Участник',
+    relationship: profile.relationship || null,
+    supervision_status: profile.supervision_status || null,
+  })).filter(profile => profile.participant_profile_id)
+
+  const db = await initDB()
+  await db.put('participantProfiles', {
+    userId,
+    profiles: safeProfiles,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export async function getParticipantProfiles(userId) {
+  if (!userId) return []
+  const db = await initDB()
+  const record = await db.get('participantProfiles', userId)
+  return Array.isArray(record?.profiles) ? record.profiles : []
 }
 
 // ---------- Квесты ----------
@@ -599,7 +629,7 @@ export async function finishQuestAttemptAliases(localId, serverId = null) {
 
 export async function clearAllLocalData() {
   const db = await initDB()
-  const stores = ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts']
+  const stores = ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts', 'participantProfiles']
   const tx = db.transaction(stores, 'readwrite')
   for (const store of stores) {
     await tx.objectStore(store).clear()

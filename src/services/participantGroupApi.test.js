@@ -7,13 +7,19 @@ import {
   createDependentParticipantProfile,
   createParticipantGroup,
   createParticipantProfileInvitation,
+  updateParticipantProfileName,
   listMyParticipantGroups,
   listMyParticipantProfiles,
   listManagedParticipantSupervisors,
   listMyParticipantAuditEvents,
   revokeParticipantSupervisor,
+  revokeMyParticipantSupervision,
+  restoreOrphanedParticipantSupervision,
   setMyParticipantSupervisionStatus,
   setParticipantGroupMember,
+  createParticipantGroupInvitation,
+  acceptParticipantGroupInvitation,
+  leaveParticipantGroup,
 } from './participantGroupApi'
 
 describe('participantGroupApi', () => {
@@ -42,6 +48,26 @@ describe('participantGroupApi', () => {
     })
   })
 
+  it('requests recovery of an orphaned profile through a protected RPC', async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+
+    await restoreOrphanedParticipantSupervision('participant-1')
+
+    expect(rpc).toHaveBeenCalledWith('restore_orphaned_participant_supervision', {
+      p_participant_profile_id: 'participant-1',
+    })
+  })
+
+  it('lets an adult revoke their own supervision through a protected RPC', async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+
+    await revokeMyParticipantSupervision('participant-1')
+
+    expect(rpc).toHaveBeenCalledWith('revoke_my_participant_supervision', {
+      p_participant_profile_id: 'participant-1',
+    })
+  })
+
   it('loads the private participant audit feed through a bounded RPC', async () => {
     rpc.mockResolvedValue({ data: [{ action: 'supervision.added' }], error: null })
 
@@ -57,6 +83,15 @@ describe('participantGroupApi', () => {
     await expect(createDependentParticipantProfile({ displayName: 'Миша', ageGroup: 'child', groupId: 'group-1' })).resolves.toBe('profile-1')
     expect(rpc).toHaveBeenLastCalledWith('create_dependent_participant_profile', {
       p_display_name: 'Миша', p_age_group: 'child', p_group_id: 'group-1',
+    })
+  })
+
+  it('renames an owned participant profile through a protected RPC', async () => {
+    rpc.mockResolvedValue({ data: null, error: null })
+    await updateParticipantProfileName('profile-1', 'Новое имя')
+    expect(rpc).toHaveBeenCalledWith('update_my_participant_profile_name', {
+      p_participant_profile_id: 'profile-1',
+      p_display_name: 'Новое имя',
     })
   })
 
@@ -94,5 +129,17 @@ describe('participantGroupApi', () => {
       p_member_role: 'leader',
       p_status: 'active',
     })
+  })
+
+  it('creates, accepts and leaves participant group membership through RPCs', async () => {
+    rpc.mockResolvedValueOnce({ data: [{ invitation_id: 'invite-1' }], error: null })
+      .mockResolvedValueOnce({ data: 'group-1', error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+    await createParticipantGroupInvitation({ groupId: 'group-1', email: 'member@example.test' })
+    await acceptParticipantGroupInvitation('token')
+    await leaveParticipantGroup('group-1')
+    expect(rpc).toHaveBeenNthCalledWith(1, 'create_participant_group_invitation', { p_group_id: 'group-1', p_email: 'member@example.test' })
+    expect(rpc).toHaveBeenNthCalledWith(2, 'accept_participant_group_invitation', { p_token: 'token' })
+    expect(rpc).toHaveBeenNthCalledWith(3, 'leave_participant_group', { p_group_id: 'group-1' })
   })
 })

@@ -34,6 +34,7 @@ const RedeemQuestCode = lazy(() => import('./pages/RedeemQuestCode'))
 const ParticipantGroup = lazy(() => import('./pages/ParticipantGroup'))
 const AcceptParticipantInvitation = lazy(() => import('./pages/AcceptParticipantInvitation'))
 const ParticipantHistory = lazy(() => import('./pages/ParticipantHistory'))
+const AcceptParticipantGroupInvitation = lazy(() => import('./pages/AcceptParticipantGroupInvitation'))
 
 function Layout({ children, session }) {
   const location = useLocation()
@@ -262,7 +263,7 @@ function App() {
         />
         <Route
           path="/participants/group"
-          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantGroup /></Layout></ProtectedRoute>}
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantGroup session={session} /></Layout></ProtectedRoute>}
         />
         <Route
           path="/participants/invitations/accept"
@@ -272,6 +273,7 @@ function App() {
           path="/participants/history"
           element={<ProtectedRoute session={session}><Layout session={session}><ParticipantHistory /></Layout></ProtectedRoute>}
         />
+        <Route path="/participants/groups/invitations/accept" element={<ProtectedRoute session={session}><Layout session={session}><AcceptParticipantGroupInvitation /></Layout></ProtectedRoute>} />
         <Route
           path="/quests/:id/tasks/:taskId/edit"
           element={

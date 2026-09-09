@@ -119,6 +119,39 @@ export default function QuestPlay({ session }) {
     existingParticipantMode?.participantProfileId === participantProfileId &&
     existingParticipantMode?.questId === id
   )
+  const offlineFallbackProfiles = useMemo(() => {
+    if (!participantProfileId) return []
+    if (participantProfileId === session?.user?.id) {
+      return [{
+        participant_profile_id: participantProfileId,
+        display_name: session.user.user_metadata?.username || session.user.email || 'Мой профиль',
+        relationship: 'self',
+        supervision_status: 'active',
+      }]
+    }
+
+    const isLockedProfile = existingParticipantMode?.actorUserId === session?.user?.id &&
+      existingParticipantMode?.participantProfileId === participantProfileId &&
+      existingParticipantMode?.questId === id
+    return [{
+      participant_profile_id: participantProfileId,
+      display_name: isLockedProfile
+        ? existingParticipantMode.participantDisplayName || 'Участник'
+        : 'Сохранённый профиль',
+      relationship: 'supervised',
+      supervision_status: 'active',
+    }]
+  }, [
+    existingParticipantMode?.actorUserId,
+    existingParticipantMode?.participantDisplayName,
+    existingParticipantMode?.participantProfileId,
+    existingParticipantMode?.questId,
+    id,
+    participantProfileId,
+    session?.user?.email,
+    session?.user?.id,
+    session?.user?.user_metadata?.username,
+  ])
 
   const handleParticipantChange = useCallback((nextParticipantProfileId) => {
     const nextSearchParams = new URLSearchParams(searchParams)
@@ -1020,6 +1053,8 @@ export default function QuestPlay({ session }) {
           value={participantProfileId || ''}
           onChange={handleParticipantChange}
           onProfilesLoaded={handleProfilesLoaded}
+          userId={session?.user?.id}
+          fallbackProfiles={offlineFallbackProfiles}
           label="Участник квеста"
         />
         {selectedParticipantProfile?.relationship !== 'self' && !participantModeIsActive && (

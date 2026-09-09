@@ -1,6 +1,6 @@
 begin;
 
-select plan(13);
+select plan(15);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -45,13 +45,15 @@ select ok(
   public.can_manage_participant_group(current_setting('app.test_participant_group_id')::uuid),
   'group creator can manage the group'
 );
-select lives_ok(
+select throws_ok(
   format(
     $$select public.set_participant_group_member(%L::uuid, %L::uuid, 'leader', 'active')$$,
     current_setting('app.test_participant_group_id'),
     current_setting('app.test_dependent_profile_id')
   ),
-  'group creator can appoint an accessible participant as leader'
+  '22023',
+  'participant group leader requires account',
+  'a dependent profile without an account cannot become group leader'
 );
 select throws_ok(
   $$insert into public.participant_profiles (display_name, created_by_user_id) values ('Bypass', auth.uid())$$,
@@ -82,13 +84,27 @@ values (
 select set_config('request.jwt.claim.sub', '5f000000-0000-4000-8000-000000000003', true);
 set local role authenticated;
 select ok(
-  public.can_manage_participant_group(current_setting('app.test_participant_group_id')::uuid),
-  'account controlling a leader profile can manage the group'
+  not public.can_manage_participant_group(current_setting('app.test_participant_group_id')::uuid),
+  'account controlling a leader profile does not inherit management of its group'
+);
+select is(
+  (select count(*) from public.get_my_participant_groups() where can_manage),
+  0::bigint,
+  'supervisor does not see the original account group'
+);
+select set_config('app.test_second_participant_group_id', public.create_participant_group('Вторая семья')::text, true);
+select lives_ok(
+  format(
+    $$select public.set_participant_group_member(%L::uuid, %L::uuid, 'member', 'active')$$,
+    current_setting('app.test_second_participant_group_id'),
+    current_setting('app.test_dependent_profile_id')
+  ),
+  'supervisor can add the child profile to a group they manage'
 );
 select is(
   (select count(*) from public.get_my_participant_groups() where can_manage),
   1::bigint,
-  'leader account sees the group as manageable'
+  'supervisor can manage their own participant group'
 );
 
 reset role;
