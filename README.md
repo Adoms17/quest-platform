@@ -167,4 +167,4 @@ docs            архитектура проекта
 
 ## Статус
 
-Стабильный развиваемый MVP с миграциями Supabase, RLS/pgTAP-тестами и раздельными frontend-окружениями. Фазы доступа 1–4 закрыты, фаза 5 находится на завершающей мобильной приёмке. Авторизованные participant, offline/recovery и group-management E2E реализованы; до production-ready стадии остаются полный Gate E на реальных Android/iOS устройствах и stage/production rollout текущей версии. Актуальный план и статусы ведутся в [Notion](https://app.notion.com/p/3d7511103a9a8109b25fc84f9611ee79).
+Стабильный развиваемый MVP с миграциями Supabase, RLS/pgTAP-тестами и раздельными frontend-окружениями. Фазы доступа 1–5 функционально закрыты, мобильный Gate E и stage smoke приняты. Авторизованные participant, offline/recovery и group-management E2E реализованы; production rollout текущей версии выполняется отдельно по защищённому процессу. Актуальный план и статусы ведутся в [Notion](https://app.notion.com/p/3d7511103a9a8109b25fc84f9611ee79).
