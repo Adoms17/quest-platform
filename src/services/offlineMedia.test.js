@@ -1,0 +1,70 @@
+import { describe, expect, it } from 'vitest'
+import {
+  assessOfflineMediaBudget,
+  collectOfflineMediaManifest,
+  downloadOfflineMediaAssets,
+  MAX_OFFLINE_MEDIA_BYTES,
+} from './offlineMedia'
+
+describe('offline media manifest', () => {
+  it('collects and deduplicates only remote participant media', () => {
+    expect(collectOfflineMediaManifest({
+      cover_image_url: 'https://media.test/cover.jpg',
+    }, [{
+      id: 'task-1',
+      media_url: 'https://media.test/audio.mp3',
+      location_image_url: 'https://media.test/cover.jpg',
+    }, {
+      id: 'task-2',
+      media_url: 'javascript:alert(1)',
+    }])).toEqual([
+      {
+        url: 'https://media.test/cover.jpg',
+        targets: [
+          { kind: 'cover', field: 'cover_image_url', taskId: null },
+          { kind: 'location-image', field: 'location_image_url', taskId: 'task-1' },
+        ],
+      },
+      {
+        url: 'https://media.test/audio.mp3',
+        targets: [{ kind: 'task-media', field: 'media_url', taskId: 'task-1' }],
+      },
+    ])
+  })
+
+  it('downloads each deduplicated asset and reports its actual size', async () => {
+    const result = await downloadOfflineMediaAssets([{
+      url: 'https://media.test/cover.jpg',
+      targets: [{ kind: 'cover', field: 'cover_image_url', taskId: null }],
+    }], {
+      fetchImpl: async () => ({
+        ok: true,
+        blob: async () => new Blob(['image'], { type: 'image/jpeg' }),
+      }),
+      storageEstimate: { quota: 100_000_000, usage: 0 },
+    })
+
+    expect(result.assetBytes).toBe(5)
+    expect(result.assets[0]).toMatchObject({ sizeBytes: 5, contentType: 'image/jpeg' })
+  })
+
+  it('rejects a package larger than the application limit', () => {
+    expect(assessOfflineMediaBudget({
+      assetBytes: MAX_OFFLINE_MEDIA_BYTES + 1,
+      storageEstimate: null,
+    })).toMatchObject({ allowed: false, reason: 'package_limit' })
+  })
+
+  it('keeps a reserve when checking browser storage quota', () => {
+    expect(assessOfflineMediaBudget({
+      assetBytes: 15,
+      storageEstimate: { quota: 100, usage: 80 },
+      maxPackageBytes: 100,
+      reserveBytes: 10,
+    })).toEqual({
+      allowed: false,
+      reason: 'storage_quota',
+      availableBytes: 10,
+    })
+  })
+})

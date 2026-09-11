@@ -1,52 +1,59 @@
 import { supabase } from '../supabaseClient'
+import { withAbortSignal } from './requestCancellation'
 
 function throwIfError(error) {
   if (error) throw error
 }
 
-export async function loadParticipantTasks(questId, participantProfileId = null) {
-  const { data, error } = participantProfileId
-    ? await supabase.rpc('get_participant_tasks_for_profile', {
+export async function loadParticipantTasks(questId, participantProfileId = null, signal = null) {
+  const query = participantProfileId
+    ? supabase.rpc('get_participant_tasks_for_profile', {
       p_quest_id: questId,
       p_participant_profile_id: participantProfileId,
     })
-    : await supabase.rpc('get_participant_tasks', { p_quest_id: questId })
+    : supabase.rpc('get_participant_tasks', { p_quest_id: questId })
+  const { data, error } = await withAbortSignal(query, signal)
   throwIfError(error)
   return data || []
 }
 
-export async function loadParticipantQuest(questId, participantProfileId) {
-  const { data, error } = participantProfileId
-    ? await supabase.rpc('get_participant_quest_for_profile', {
+export async function loadParticipantQuest(questId, participantProfileId, signal = null) {
+  const query = participantProfileId
+    ? supabase.rpc('get_participant_quest_for_profile', {
       p_quest_id: questId,
       p_participant_profile_id: participantProfileId,
     })
-    : await supabase.rpc('get_participant_quest', {
+    : supabase.rpc('get_participant_quest', {
       p_quest_id: questId,
     })
+  const { data, error } = await withAbortSignal(query, signal)
   throwIfError(error)
   return data
 }
 
-export async function loadParticipantQuestSummary(questId, participantProfileId) {
-  const { data, error } = await supabase.rpc('get_participant_quest_summary', {
+export async function loadParticipantQuestSummary(questId, participantProfileId, signal = null) {
+  const { data, error } = await withAbortSignal(supabase.rpc('get_participant_quest_summary', {
     p_quest_id: questId,
     p_participant_profile_id: participantProfileId,
-  })
+  }), signal)
   throwIfError(error)
   return data
 }
 
-export async function loadQuestEntryStatus(questId) {
-  const { data, error } = await supabase
+export async function loadQuestEntryStatus(questId, signal = null) {
+  const query = supabase
     .rpc('get_quest_entry_status', { p_quest_id: questId })
     .single()
+  const { data, error } = await withAbortSignal(query, signal)
   throwIfError(error)
   return data
 }
 
-export async function listAccessiblePrivateQuests() {
-  const { data, error } = await supabase.rpc('get_my_accessible_private_quests')
+export async function listAccessiblePrivateQuests(signal = null) {
+  const { data, error } = await withAbortSignal(
+    supabase.rpc('get_my_accessible_private_quests'),
+    signal,
+  )
   throwIfError(error)
   return data || []
 }

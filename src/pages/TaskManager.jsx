@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 import { getUserErrorMessage } from '../services/userErrorMessage'
+import { isAbortError, withAbortSignal } from '../services/requestCancellation'
 
 export default function TaskManager() {
   const { id } = useParams()
@@ -12,21 +13,25 @@ export default function TaskManager() {
   const [questTitle, setQuestTitle] = useState('')
   const [moving, setMoving] = useState(false)
 
-  const fetchQuestTitle = useCallback(async () => {
-    const { data, error } = await supabase
+  const fetchQuestTitle = useCallback(async (signal) => {
+    const query = supabase
       .from('quests')
       .select('title')
       .eq('id', id)
       .single()
+    const { data, error } = await withAbortSignal(query, signal)
+    if (signal?.aborted) return
     if (!error && data) setQuestTitle(data.title)
   }, [id])
 
-  const fetchTasks = useCallback(async () => {
-    const { data, error } = await supabase
+  const fetchTasks = useCallback(async (signal) => {
+    const query = supabase
       .from('tasks')
       .select('*')
       .eq('quest_id', id)
       .order('order_index', { ascending: true })
+    const { data, error } = await withAbortSignal(query, signal)
+    if (signal?.aborted) return
     if (error) {
       toast.error(getUserErrorMessage(error, 'Не удалось загрузить задания.'))
     } else {
@@ -37,10 +42,18 @@ export default function TaskManager() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      fetchQuestTitle()
-      fetchTasks()
+      void fetchQuestTitle(controller.signal).catch(error => {
+        if (!isAbortError(error, controller.signal)) throw error
+      })
+      void fetchTasks(controller.signal).catch(error => {
+        if (!isAbortError(error, controller.signal)) throw error
+      })
     }, 0)
-    return () => clearTimeout(timeout)
+    const controller = new AbortController()
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
   }, [fetchQuestTitle, fetchTasks])
 
   async function handleDelete(taskId) {

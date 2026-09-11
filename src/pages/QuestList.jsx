@@ -12,6 +12,7 @@ import QuickQuestAccessCode from '../components/QuickQuestAccessCode'
 import AccessiblePrivateQuests from '../components/AccessiblePrivateQuests'
 import { listAccessiblePrivateQuests } from '../services/questApi'
 import { getUserErrorMessage } from '../services/userErrorMessage'
+import { isAbortError, withAbortSignal } from '../services/requestCancellation'
 
 export default function QuestList({ session }) {
   const navigate = useNavigate()
@@ -33,7 +34,7 @@ export default function QuestList({ session }) {
 
   const userId = session?.user?.id
 
-  const fetchQuests = useCallback(async () => {
+  const fetchQuests = useCallback(async (signal) => {
     setLoading(true)
     if (!currentOrganizationId) {
       setQuests([])
@@ -41,11 +42,13 @@ export default function QuestList({ session }) {
       return
     }
 
-    const { data, error } = await supabase
+    const query = supabase
       .from('quests')
       .select('*')
       .eq('organization_id', currentOrganizationId)
       .order('created_at', { ascending: false })
+    const { data, error } = await withAbortSignal(query, signal)
+    if (signal?.aborted) return
 
     if (error) {
       console.error('Ошибка загрузки квестов:', error)
@@ -56,7 +59,7 @@ export default function QuestList({ session }) {
     setLoading(false)
   }, [currentOrganizationId])
 
-  const fetchAccessibleQuests = useCallback(async () => {
+  const fetchAccessibleQuests = useCallback(async (signal) => {
     setAccessibleQuestsLoading(true)
     const loadOfflineQuests = async () => {
       try {
@@ -68,16 +71,22 @@ export default function QuestList({ session }) {
 
     try {
       if (!navigator.onLine) {
-        setAccessibleQuests(await loadOfflineQuests())
+        const offlineQuests = await loadOfflineQuests()
+        if (signal?.aborted) return
+        setAccessibleQuests(offlineQuests)
         setUsingOfflineAccessibleQuests(true)
         return
       }
 
-      setAccessibleQuests(await listAccessiblePrivateQuests())
+      const remoteQuests = await listAccessiblePrivateQuests(signal)
+      if (signal?.aborted) return
+      setAccessibleQuests(remoteQuests)
       setUsingOfflineAccessibleQuests(false)
     } catch (error) {
+      if (isAbortError(error, signal)) return
       console.error('Ошибка загрузки доступных приватных квестов:', error)
       const offlineQuests = await loadOfflineQuests()
+      if (signal?.aborted) return
       setAccessibleQuests(offlineQuests)
       setUsingOfflineAccessibleQuests(true)
       if (navigator.onLine && offlineQuests.length === 0) {
@@ -87,20 +96,29 @@ export default function QuestList({ session }) {
         ))
       }
     } finally {
-      setAccessibleQuestsLoading(false)
+      if (!signal?.aborted) setAccessibleQuestsLoading(false)
     }
   }, [userId])
 
   useEffect(() => {
     if (!userId || loadingOrganizations) return
-    const timeout = setTimeout(() => fetchQuests(), 0)
-    return () => clearTimeout(timeout)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => fetchQuests(controller.signal), 0)
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
   }, [userId, loadingOrganizations, fetchQuests])
 
   useEffect(() => {
     if (!userId) return
 
-    const refresh = () => fetchAccessibleQuests()
+    let activeController = null
+    const refresh = () => {
+      activeController?.abort()
+      activeController = new AbortController()
+      return fetchAccessibleQuests(activeController.signal)
+    }
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') refresh()
     }
@@ -111,6 +129,7 @@ export default function QuestList({ session }) {
     document.addEventListener('visibilitychange', refreshWhenVisible)
     return () => {
       clearTimeout(timeout)
+      activeController?.abort()
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refresh)
       window.removeEventListener('offline', refresh)
