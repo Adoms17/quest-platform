@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('../supabaseClient', () => ({ supabase: {} }))
+
 import {
   buildTaskVerifierUpdates,
   requiresOnlineQuestStart,
