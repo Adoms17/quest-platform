@@ -16,7 +16,20 @@ export async function loadParticipantTasks(questId, participantProfileId = null)
 }
 
 export async function loadParticipantQuest(questId, participantProfileId) {
-  const { data, error } = await supabase.rpc('get_participant_quest_for_profile', {
+  const { data, error } = participantProfileId
+    ? await supabase.rpc('get_participant_quest_for_profile', {
+      p_quest_id: questId,
+      p_participant_profile_id: participantProfileId,
+    })
+    : await supabase.rpc('get_participant_quest', {
+      p_quest_id: questId,
+    })
+  throwIfError(error)
+  return data
+}
+
+export async function loadParticipantQuestSummary(questId, participantProfileId) {
+  const { data, error } = await supabase.rpc('get_participant_quest_summary', {
     p_quest_id: questId,
     p_participant_profile_id: participantProfileId,
   })
@@ -30,6 +43,12 @@ export async function loadQuestEntryStatus(questId) {
     .single()
   throwIfError(error)
   return data
+}
+
+export async function listAccessiblePrivateQuests() {
+  const { data, error } = await supabase.rpc('get_my_accessible_private_quests')
+  throwIfError(error)
+  return data || []
 }
 
 export async function startServerQuestAttempt(questId, participantProfileId = null) {

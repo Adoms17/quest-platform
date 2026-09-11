@@ -2,7 +2,8 @@ import { openDB } from 'idb'
 import { notifyPendingResultEnqueued } from './syncSignals'
 
 const DB_NAME = 'QuestPlatformDB'
-const DB_VERSION = 8
+const DB_VERSION = 10
+export const OFFLINE_PACKAGE_VERSION = 1
 export const PARTICIPANT_PACKAGE_ACCESS_TTL_MS = 24 * 60 * 60 * 1000
 
 export const UNSYNCED_QUEST_RESULTS_ERROR =
@@ -153,6 +154,9 @@ export async function initDB() {
       if (!dlStore.indexNames.contains('by_downloaded_at')) {
         dlStore.createIndex('by_downloaded_at', 'downloadedAt')
       }
+      if (!dlStore.indexNames.contains('by_package_version')) {
+        dlStore.createIndex('by_package_version', 'packageVersion')
+      }
 
       const qaStore = db.objectStoreNames.contains('questAttempts')
         ? transaction.objectStore('questAttempts')
@@ -162,6 +166,10 @@ export async function initDB() {
       }
       if (!qaStore.indexNames.contains('by_synced')) {
         qaStore.createIndex('by_synced', 'synced')
+      }
+
+      if (!db.objectStoreNames.contains('participantProfiles')) {
+        db.createObjectStore('participantProfiles', { keyPath: 'userId' })
       }
 
       if (oldVersion < 8) {
@@ -187,6 +195,32 @@ export async function initDB() {
   })
 }
 
+// ---------- Профили участников ----------
+export async function saveParticipantProfiles(userId, profiles) {
+  if (!userId) return
+
+  const safeProfiles = (profiles || []).map(profile => ({
+    participant_profile_id: profile.participant_profile_id,
+    display_name: profile.display_name || 'Участник',
+    relationship: profile.relationship || null,
+    supervision_status: profile.supervision_status || null,
+  })).filter(profile => profile.participant_profile_id)
+
+  const db = await initDB()
+  await db.put('participantProfiles', {
+    userId,
+    profiles: safeProfiles,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export async function getParticipantProfiles(userId) {
+  if (!userId) return []
+  const db = await initDB()
+  const record = await db.get('participantProfiles', userId)
+  return Array.isArray(record?.profiles) ? record.profiles : []
+}
+
 // ---------- Квесты ----------
 export async function saveQuestToDB(questData, tasks, participantProfileId = null) {
   const db = await initDB()
@@ -200,13 +234,44 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
     downloadedAt: new Date().toISOString(),
     participantAccess,
   }
+  const serializedPackage = JSON.stringify(questWithTasks)
+  const packageSizeBytes = new TextEncoder().encode(serializedPackage).byteLength
+  const downloadedAt = new Date().toISOString()
   await db.put('quests', questWithTasks)
   const existing = await db.get('downloadedQuests', questData.id)
-  await db.put('downloadedQuests', {
+  const packageMetadata = {
     questId: questData.id,
-    downloadedAt: new Date().toISOString(),
+    packageVersion: OFFLINE_PACKAGE_VERSION,
+    packageSizeBytes,
+    downloadedAt,
     lastSyncDate: existing?.lastSyncDate || null,
-  })
+  }
+  await db.put('downloadedQuests', packageMetadata)
+  return packageMetadata
+}
+
+export async function getQuestPackageMetadata(questId, participantProfileId = null) {
+  const db = await initDB()
+  const [download, quest] = await Promise.all([
+    db.get('downloadedQuests', questId),
+    db.get('quests', questId),
+  ])
+  if (!download || !quest) return null
+
+  const validatedAt = participantProfileId
+    ? quest.participantAccess?.[participantProfileId] || null
+    : download.downloadedAt || null
+  const validatedAtMs = validatedAt ? new Date(validatedAt).getTime() : NaN
+
+  return {
+    ...download,
+    packageVersion: download.packageVersion || null,
+    packageSizeBytes: download.packageSizeBytes || null,
+    validatedAt,
+    expiresAt: participantProfileId && Number.isFinite(validatedAtMs)
+      ? new Date(validatedAtMs + PARTICIPANT_PACKAGE_ACCESS_TTL_MS).toISOString()
+      : null,
+  }
 }
 
 export async function getQuestFromDB(questId, participantProfileId = null) {
@@ -274,6 +339,64 @@ export async function getDownloadedQuestPackages(now = Date.now()) {
   }
 
   return packages
+}
+
+export function buildOfflineAccessibleQuestRecord(quest, profiles, now = Date.now()) {
+  if (!quest || quest.is_public !== false || quest.is_open !== true) return null
+
+  const startAt = quest.start_at ? new Date(quest.start_at).getTime() : null
+  const endAt = quest.end_at ? new Date(quest.end_at).getTime() : null
+  if (Number.isFinite(startAt) && startAt > now) return null
+  if (Number.isFinite(endAt) && endAt < now) return null
+
+  const profilesById = new Map((profiles || []).map(profile => [
+    profile.participant_profile_id,
+    profile,
+  ]))
+  const participants = Object.keys(quest.participantAccess || {})
+    .filter(participantProfileId => (
+      profilesById.has(participantProfileId) &&
+      hasFreshParticipantPackageAccess(quest, participantProfileId, now)
+    ))
+    .map(participantProfileId => profilesById.get(participantProfileId))
+
+  if (participants.length === 0) return null
+
+  return {
+    quest_id: quest.id,
+    title: quest.title || 'Без названия',
+    description: quest.description || null,
+    start_at: quest.start_at || null,
+    end_at: quest.end_at || null,
+    participants,
+    offline_package: true,
+  }
+}
+
+export async function getOfflineAccessiblePrivateQuests(
+  userId,
+  now = Date.now()
+) {
+  if (!userId) return []
+
+  const db = await initDB()
+  const [downloads, profiles] = await Promise.all([
+    db.getAll('downloadedQuests'),
+    getParticipantProfiles(userId),
+  ])
+  const result = []
+
+  for (const download of downloads) {
+    const quest = await db.get('quests', download.questId)
+    const record = buildOfflineAccessibleQuestRecord(quest, profiles, now)
+    if (record) result.push(record)
+  }
+
+  return result.sort((left, right) => left.title.localeCompare(
+    right.title,
+    'ru',
+    { sensitivity: 'base' },
+  ))
 }
 
 export async function updateQuestSyncDate(questId, syncDate) {
@@ -564,7 +687,7 @@ export async function finishQuestAttemptAliases(localId, serverId = null) {
 
 export async function clearAllLocalData() {
   const db = await initDB()
-  const stores = ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts']
+  const stores = ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts', 'participantProfiles']
   const tx = db.transaction(stores, 'readwrite')
   for (const store of stores) {
     await tx.objectStore(store).clear()

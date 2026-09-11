@@ -3,6 +3,11 @@
 /* Leaflet */
 @import 'leaflet/dist/leaflet.css';
 
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 3px;
+}
+
 @layer base {
   *,
   ::after,
@@ -20,4 +25,37 @@
 
 .leaflet-control-container .leaflet-routing-container-hide {
   display: none;
+}
+
+.leaflet-tooltip.task-number-label {
+  min-width: 1.75rem;
+  border: 2px solid white;
+  border-radius: 9999px;
+  background: #2563eb;
+  color: white;
+  padding: 0.15rem 0.35rem;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.leaflet-tooltip.task-number-label::before {
+  display: none;
+}
+
+.leaflet-tooltip.task-number-label.task-number-label--completed {
+  background: #16a34a;
+}
+
+.leaflet-tooltip.task-number-label.task-number-label--locked {
+  background: #6b7280;
+}
+
+.leaflet-tooltip.task-number-label.task-number-label--failed {
+  background: #dc2626;
+}
+
+.leaflet-tooltip.task-number-label.task-number-label--pending {
+  background: #ca8a04;
 }

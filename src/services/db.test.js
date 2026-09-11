@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildOfflineAccessibleQuestRecord,
   createClientEventId,
   hasFreshParticipantPackageAccess,
   hasUnsyncedQuestResults,
@@ -84,6 +85,8 @@ describe('sanitizeParticipantTask', () => {
       correct_answer: 'Секретный ответ',
       static_code: '1234',
       gps_point: { coordinates: [33.5, 44.6] },
+      location_latitude: 44.6,
+      location_longitude: 33.5,
       required_photo_hash: 'private-hash',
       answer_verifier: { digest: 'answer-digest' },
       code_verifier: { digest: 'code-digest' },
@@ -96,6 +99,8 @@ describe('sanitizeParticipantTask', () => {
       requires_answer: true,
       requires_code: true,
       requires_gps: true,
+      location_latitude: 44.6,
+      location_longitude: 33.5,
     })
     expect(safeTask).not.toHaveProperty('correct_answer')
     expect(safeTask).not.toHaveProperty('static_code')
@@ -119,6 +124,49 @@ describe('participant-scoped offline data', () => {
 
     expect(hasFreshParticipantPackageAccess(quest, 'profile-a', now)).toBe(true)
     expect(hasFreshParticipantPackageAccess(quest, 'profile-b', now)).toBe(false)
+  })
+
+  it('builds an offline quest only for fresh profiles available to this user', () => {
+    const quest = {
+      id: 'quest-1',
+      title: 'Маршрут',
+      is_public: false,
+      is_open: true,
+      participantAccess: {
+        'profile-a': validatedAt,
+        'profile-b': validatedAt,
+      },
+    }
+
+    expect(buildOfflineAccessibleQuestRecord(quest, [{
+      participant_profile_id: 'profile-a',
+      display_name: 'Аня',
+    }], now)).toMatchObject({
+      quest_id: 'quest-1',
+      participants: [{ participant_profile_id: 'profile-a' }],
+      offline_package: true,
+    })
+  })
+
+  it('hides closed and expired offline quest access', () => {
+    const profile = { participant_profile_id: 'profile-a' }
+    const quest = {
+      id: 'quest-1',
+      is_public: false,
+      is_open: true,
+      participantAccess: { 'profile-a': validatedAt },
+    }
+
+    expect(buildOfflineAccessibleQuestRecord(
+      { ...quest, is_open: false },
+      [profile],
+      now,
+    )).toBeNull()
+    expect(buildOfflineAccessibleQuestRecord(
+      quest,
+      [profile],
+      now + PARTICIPANT_PACKAGE_ACCESS_TTL_MS + 1,
+    )).toBeNull()
   })
 
   it('expires participant package authorization after 24 hours', () => {

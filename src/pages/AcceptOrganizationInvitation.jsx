@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useOrganization } from '../contexts/useOrganization'
 import { acceptOrganizationInvitation } from '../services/teamApi'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function AcceptOrganizationInvitation() {
   const [searchParams] = useSearchParams()
@@ -30,7 +31,7 @@ export default function AcceptOrganizationInvitation() {
       } catch (error) {
         if (active) {
           setStatus('error')
-          setMessage(error?.message || 'Не удалось принять приглашение.')
+          setMessage(getUserErrorMessage(error, 'Не удалось принять приглашение.'))
         }
       }
     }

@@ -33,6 +33,13 @@ export async function createDependentParticipantProfile({ displayName, ageGroup,
   }))
 }
 
+export async function updateParticipantProfileName(participantProfileId, displayName) {
+  return unwrap(await supabase.rpc('update_my_participant_profile_name', {
+    p_participant_profile_id: participantProfileId,
+    p_display_name: displayName,
+  }))
+}
+
 export async function setMyParticipantSupervisionStatus(participantProfileId, status) {
   return unwrap(await supabase.rpc('set_my_participant_supervision_status', {
     p_participant_profile_id: participantProfileId,
@@ -54,6 +61,40 @@ export async function revokeParticipantSupervisor(participantProfileId, supervis
     p_participant_profile_id: participantProfileId,
     p_supervisor_user_id: supervisorUserId,
   }))
+}
+
+export async function revokeMyParticipantSupervision(participantProfileId) {
+  return unwrap(await supabase.rpc('revoke_my_participant_supervision', {
+    p_participant_profile_id: participantProfileId,
+  }))
+}
+
+export async function restoreOrphanedParticipantSupervision(participantProfileId) {
+  return unwrap(await supabase.rpc('restore_orphaned_participant_supervision', {
+    p_participant_profile_id: participantProfileId,
+  }))
+}
+
+export async function listMyParticipantGroupInvitations() {
+  return unwrap(await supabase.rpc('get_my_participant_group_invitations')) || []
+}
+
+export async function createParticipantGroupInvitation({ groupId, email }) {
+  const rows = unwrap(await supabase.rpc('create_participant_group_invitation', { p_group_id: groupId, p_email: email })) || []
+  return rows[0] || null
+}
+
+export async function previewParticipantGroupInvitation(token) {
+  const rows = unwrap(await supabase.rpc('get_participant_group_invitation_preview', { p_token: token })) || []
+  return rows[0] || null
+}
+
+export async function acceptParticipantGroupInvitation(token) {
+  return unwrap(await supabase.rpc('accept_participant_group_invitation', { p_token: token }))
+}
+
+export async function leaveParticipantGroup(groupId) {
+  return unwrap(await supabase.rpc('leave_participant_group', { p_group_id: groupId }))
 }
 
 export async function listMyParticipantProfileInvitations() {

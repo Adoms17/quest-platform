@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function TaskManager() {
   const { id } = useParams()
@@ -27,7 +28,7 @@ export default function TaskManager() {
       .eq('quest_id', id)
       .order('order_index', { ascending: true })
     if (error) {
-      toast.error('Ошибка загрузки заданий: ' + error.message)
+      toast.error(getUserErrorMessage(error, 'Не удалось загрузить задания.'))
     } else {
       setTasks(data || [])
     }
@@ -46,74 +47,38 @@ export default function TaskManager() {
     if (!confirm('Удалить задание?')) return
     const { error } = await supabase.from('tasks').delete().eq('id', taskId)
     if (error) {
-      toast.error('Ошибка удаления: ' + error.message)
+      toast.error(getUserErrorMessage(error, 'Не удалось удалить задание.'))
     } else {
       toast.success('Задание удалено')
       setTasks(tasks.filter(t => t.id !== taskId))
     }
   }
 
-  async function moveTaskUp(index) {
-    if (index === 0) return
+  async function moveTask(index, direction) {
+    const nextIndex = index + direction
+    if (nextIndex < 0 || nextIndex >= tasks.length) return
+
     setMoving(true)
-    const task = { ...tasks[index], order_index: tasks[index - 1].order_index }
-    const prevTask = { ...tasks[index - 1], order_index: tasks[index].order_index }
-
-    // Обновляем в БД
-    try {
-      const { error: err1 } = await supabase
-        .from('tasks')
-        .update({ order_index: task.order_index })
-        .eq('id', task.id)
-      if (err1) throw err1
-
-      const { error: err2 } = await supabase
-        .from('tasks')
-        .update({ order_index: prevTask.order_index })
-        .eq('id', prevTask.id)
-      if (err2) throw err2
-
-      // Обновляем локальное состояние
-      const newTasks = [...tasks]
-      newTasks[index] = prevTask
-      newTasks[index - 1] = task
-      setTasks(newTasks)
-      toast.success('Порядок обновлён')
-    } catch (err) {
-      toast.error('Ошибка перемещения: ' + err.message)
-      // Откатываем изменения в локальном состоянии (перезагружаем)
-      await fetchTasks()
-    } finally {
-      setMoving(false)
-    }
-  }
-
-  async function moveTaskDown(index) {
-    if (index === tasks.length - 1) return
-    setMoving(true)
-    const task = { ...tasks[index], order_index: tasks[index + 1].order_index }
-    const nextTask = { ...tasks[index + 1], order_index: tasks[index].order_index }
+    const nextTasks = [...tasks]
+    ;[nextTasks[index], nextTasks[nextIndex]] = [
+      nextTasks[nextIndex],
+      nextTasks[index],
+    ]
 
     try {
-      const { error: err1 } = await supabase
-        .from('tasks')
-        .update({ order_index: task.order_index })
-        .eq('id', task.id)
-      if (err1) throw err1
+      const { error } = await supabase.rpc('reorder_quest_tasks', {
+        p_quest_id: id,
+        p_task_ids: nextTasks.map(task => task.id),
+      })
+      if (error) throw error
 
-      const { error: err2 } = await supabase
-        .from('tasks')
-        .update({ order_index: nextTask.order_index })
-        .eq('id', nextTask.id)
-      if (err2) throw err2
-
-      const newTasks = [...tasks]
-      newTasks[index] = nextTask
-      newTasks[index + 1] = task
-      setTasks(newTasks)
+      setTasks(nextTasks.map((task, taskIndex) => ({
+        ...task,
+        order_index: taskIndex,
+      })))
       toast.success('Порядок обновлён')
     } catch (err) {
-      toast.error('Ошибка перемещения: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось изменить порядок заданий.'))
       await fetchTasks()
     } finally {
       setMoving(false)
@@ -164,7 +129,7 @@ export default function TaskManager() {
               </div>
               <div className="flex gap-1 items-center">
                 <button
-                  onClick={() => moveTaskUp(idx)}
+                  onClick={() => moveTask(idx, -1)}
                   disabled={idx === 0 || moving}
                   className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-sm disabled:opacity-40"
                   title="Переместить вверх"
@@ -172,7 +137,7 @@ export default function TaskManager() {
                   ↑
                 </button>
                 <button
-                  onClick={() => moveTaskDown(idx)}
+                  onClick={() => moveTask(idx, 1)}
                   disabled={idx === tasks.length - 1 || moving}
                   className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-sm disabled:opacity-40"
                   title="Переместить вниз"

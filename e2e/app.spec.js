@@ -8,10 +8,11 @@ function collectPageErrors(page) {
 
 async function expectLoginPage(page) {
   await expect(page.getByRole('heading', { name: 'Quest Platform' })).toBeVisible()
-  await expect(page.getByPlaceholder('Email')).toBeVisible()
-  await expect(page.getByPlaceholder('Пароль')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Регистрация' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Вход', exact: true })).toBeVisible()
+  await expect(page.getByLabel('Email')).toBeVisible()
+  await expect(page.getByLabel('Пароль', { exact: true })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Регистрация' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Вход', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible()
 }
 
 test('opens the login page directly', async ({ page }) => {
@@ -154,6 +155,487 @@ test('restores a participant attempt and unsynced event after reload', async ({ 
     eventType: 'open',
     synced: false,
   })
+})
+
+test('upgrades IndexedDB without losing offline or pending data', async ({ page }) => {
+  await page.goto('/login')
+
+  const result = await page.evaluate(async () => {
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase('QuestPlatformDB')
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+      request.onblocked = () => reject(new Error('IndexedDB deletion was blocked'))
+    })
+
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open('QuestPlatformDB', 8)
+      request.onupgradeneeded = () => {
+        const database = request.result
+        database.createObjectStore('quests', { keyPath: 'id' })
+        const pending = database.createObjectStore('pendingResults', {
+          keyPath: 'id',
+          autoIncrement: true,
+        })
+        pending.createIndex('by_quest_id', 'questId')
+        pending.createIndex('by_synced', 'synced')
+        pending.createIndex('by_local_attempt', 'localQuestAttemptId')
+        pending.createIndex('by_client_event_id', 'clientEventId', { unique: true })
+        pending.createIndex('by_user_id', 'userId')
+        const downloads = database.createObjectStore('downloadedQuests', { keyPath: 'questId' })
+        downloads.createIndex('by_downloaded_at', 'downloadedAt')
+        const attempts = database.createObjectStore('questAttempts', { keyPath: 'localId' })
+        attempts.createIndex('by_quest_user', ['questId', 'userId'])
+        attempts.createIndex('by_synced', 'synced')
+      }
+      request.onsuccess = () => {
+        const database = request.result
+        const transaction = database.transaction(
+          ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts'],
+          'readwrite'
+        )
+        transaction.objectStore('quests').put({ id: 'quest-before-upgrade', title: 'Saved quest' })
+        transaction.objectStore('downloadedQuests').put({
+          questId: 'quest-before-upgrade',
+          downloadedAt: '2026-09-09T06:00:00.000Z',
+        })
+        transaction.objectStore('questAttempts').put({
+          localId: 'attempt-before-upgrade',
+          questId: 'quest-before-upgrade',
+          userId: 'adult-1',
+          participantProfileId: 'child-1',
+          finished: false,
+          synced: false,
+        })
+        transaction.objectStore('pendingResults').put({
+          clientEventId: 'event-before-upgrade',
+          questId: 'quest-before-upgrade',
+          localQuestAttemptId: 'attempt-before-upgrade',
+          userId: 'adult-1',
+          participantProfileId: 'child-1',
+          synced: false,
+        })
+        transaction.oncomplete = () => {
+          database.close()
+          resolve()
+        }
+        transaction.onerror = () => reject(transaction.error)
+      }
+      request.onerror = () => reject(request.error)
+    })
+
+    const dbModule = await import('/src/services/db.js?indexeddb-upgrade=10')
+    const database = await dbModule.initDB()
+    const [quest, attempt, pending] = await Promise.all([
+      database.get('quests', 'quest-before-upgrade'),
+      database.get('questAttempts', 'attempt-before-upgrade'),
+      database.getFromIndex('pendingResults', 'by_client_event_id', 'event-before-upgrade'),
+    ])
+
+    const upgradedState = {
+      version: database.version,
+      hasPackageVersionIndex: database
+        .transaction('downloadedQuests')
+        .objectStore('downloadedQuests')
+        .indexNames
+        .contains('by_package_version'),
+      hasParticipantProfilesStore: database.objectStoreNames.contains('participantProfiles'),
+      quest,
+      attempt,
+      pending,
+    }
+    database.close()
+    return upgradedState
+  })
+
+  expect(result.version).toBe(10)
+  expect(result.hasPackageVersionIndex).toBe(true)
+  expect(result.hasParticipantProfilesStore).toBe(true)
+  expect(result.quest?.title).toBe('Saved quest')
+  expect(result.attempt).toMatchObject({
+    localId: 'attempt-before-upgrade',
+    participantProfileId: 'child-1',
+    synced: false,
+  })
+  expect(result.pending).toMatchObject({
+    clientEventId: 'event-before-upgrade',
+    participantProfileId: 'child-1',
+    synced: false,
+  })
+})
+
+test('restores and synchronizes a complete authorized offline attempt without duplicates', async ({ page }, testInfo) => {
+  test.skip(!process.env.RUN_LOCAL_SUPABASE_E2E, 'requires a running local Supabase stack')
+  testInfo.setTimeout(180_000)
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const email = `e2e-offline-${suffix}@example.test`
+  const password = 'Local-offline-e2e-password-42'
+
+  await page.goto('/login')
+  const setup = await page.evaluate(async ({ email: userEmail, password: userPassword }) => {
+    const { supabase } = await import('/src/supabaseClient.js')
+    const db = await import('/src/services/db.js')
+    const requireData = (result, operation) => {
+      if (result.error) throw new Error(`${operation}: ${result.error.message}`)
+      return result.data
+    }
+    const waitFor = async (load, predicate, operation) => {
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        const data = requireData(await load(), operation)
+        if (predicate(data)) return data
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+      throw new Error(`${operation}: timed out`)
+    }
+
+    await db.clearAllLocalData()
+    const auth = requireData(await supabase.auth.signUp({
+      email: userEmail,
+      password: userPassword,
+      options: { data: { username: `E2E offline ${userEmail}` } },
+    }), 'sign up')
+    if (!auth.user || !auth.session) throw new Error('offline user session was not created')
+
+    const memberships = await waitFor(
+      () => supabase
+        .from('organization_memberships')
+        .select('organization_id')
+        .eq('status', 'active'),
+      rows => Boolean(rows?.[0]?.organization_id),
+      'load organization'
+    )
+    const organizationId = memberships?.[0]?.organization_id
+    if (!organizationId) throw new Error('personal organization was not provisioned')
+
+    const quest = requireData(await supabase.from('quests').insert({
+      creator_id: auth.user.id,
+      organization_id: organizationId,
+      title: 'Authorized offline E2E',
+      is_public: true,
+      is_open: true,
+      max_attempts: 1,
+      verification_options: [],
+      location_options: [],
+    }).select('id').single(), 'create quest')
+    const task = requireData(await supabase.from('tasks').insert({
+      quest_id: quest.id,
+      title: 'Offline answer',
+      order_index: 0,
+    }).select('id').single(), 'create task')
+    const profiles = await waitFor(
+      () => supabase.rpc('get_my_participant_profiles'),
+      rows => rows.some(profile => profile.relationship === 'self'),
+      'load participant profile'
+    )
+    const participantProfileId = profiles.find(profile => (
+      profile.relationship === 'self'
+    ))?.participant_profile_id
+    if (!participantProfileId) throw new Error('self participant profile was not provisioned')
+
+    const localAttemptId = `offline-attempt-${crypto.randomUUID()}`
+    await db.saveQuestToDB({
+      id: quest.id,
+      title: 'Authorized offline E2E',
+      is_public: true,
+      is_open: true,
+      max_attempts: 1,
+      verification_options: [],
+    }, [{ id: task.id, title: 'Offline answer', requires_answer: false }], participantProfileId)
+    await db.saveQuestAttempt(
+      localAttemptId,
+      quest.id,
+      auth.user.id,
+      null,
+      false,
+      false,
+      participantProfileId
+    )
+    return {
+      userId: auth.user.id,
+      questId: quest.id,
+      participantProfileId,
+      localAttemptId,
+      taskId: task.id,
+      clientEventIds: [crypto.randomUUID(), crypto.randomUUID()],
+    }
+  }, { email, password })
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Квесты', exact: true })).toBeVisible()
+  await page.evaluate(() => import('/src/services/db.js').then(() => true))
+  await page.context().setOffline(true)
+
+  const recovered = await page.evaluate(async ({ setup: values }) => {
+    const db = await import('/src/services/db.js')
+    await db.enqueuePendingEvent(values.questId, values.taskId, values.localAttemptId, {
+      clientEventId: values.clientEventIds[0],
+      eventType: 'open',
+      clientElapsedSeconds: 1,
+    })
+    await db.enqueuePendingEvent(values.questId, values.taskId, values.localAttemptId, {
+      clientEventId: values.clientEventIds[1],
+      eventType: 'answer',
+      clientElapsedSeconds: 2,
+    })
+    const attempt = await db.getActiveLocalQuestAttempt(
+      values.questId,
+      values.userId,
+      values.participantProfileId
+    )
+    const pending = await db.getPendingResults()
+    return {
+      online: navigator.onLine,
+      attempt,
+      pending: pending.filter(record => record.localQuestAttemptId === values.localAttemptId),
+    }
+  }, { setup })
+
+  expect(recovered.online).toBe(false)
+  expect(recovered.attempt?.localId).toBe(setup.localAttemptId)
+  expect(recovered.pending).toHaveLength(2)
+  expect(recovered.pending.map(record => record.eventType)).toEqual(['open', 'answer'])
+
+  await page.context().setOffline(false)
+
+  await expect.poll(async () => page.evaluate(async ({ setup: values }) => {
+    const db = await import('/src/services/db.js')
+    const pending = await db.getPendingResults(values.userId)
+    return pending.filter(record => (
+      record.localQuestAttemptId === values.localAttemptId && !record.synced
+    )).length
+  }, { setup }), { timeout: 30_000 }).toBe(0)
+
+  const synchronized = await page.evaluate(async ({ setup: values }) => {
+    const { supabase } = await import('/src/supabaseClient.js')
+    const { syncPendingResults } = await import('/src/services/sync.js')
+    const db = await import('/src/services/db.js')
+    const retry = await syncPendingResults(null, { suppressErrorToast: true })
+    const receipts = await supabase.rpc('get_task_event_receipts', {
+      p_client_event_ids: values.clientEventIds,
+    })
+    if (receipts.error) throw new Error(receipts.error.message)
+    return {
+      retry,
+      receipts: receipts.data,
+      pending: await db.getPendingResults(),
+    }
+  }, { setup })
+
+  expect(synchronized.retry).toMatchObject({ syncedEvents: 0 })
+  expect(synchronized.receipts).toHaveLength(2)
+  expect(new Set(synchronized.receipts.map(receipt => receipt.client_event_id))).toEqual(
+    new Set(setup.clientEventIds)
+  )
+  expect(synchronized.pending).toEqual([])
+
+  await page.evaluate(async () => {
+    const { supabase } = await import('/src/supabaseClient.js')
+    supabase.auth.stopAutoRefresh()
+    await supabase.removeAllChannels()
+  })
+  await page.goto('about:blank')
+  await page.context().close()
+})
+
+test('completes an authorized quest through the participant UI', async ({ page }, testInfo) => {
+  test.skip(!process.env.RUN_LOCAL_SUPABASE_E2E, 'requires a running local Supabase stack')
+  testInfo.setTimeout(120_000)
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const email = `e2e-ui-${suffix}@example.test`
+  const password = 'Local-ui-e2e-password-42'
+
+  await page.goto('/login')
+  const setup = await page.evaluate(async ({ email: userEmail, password: userPassword }) => {
+    const { supabase } = await import('/src/supabaseClient.js')
+    const requireData = (result, operation) => {
+      if (result.error) throw new Error(`${operation}: ${result.error.message}`)
+      return result.data
+    }
+    const waitFor = async (load, predicate, operation) => {
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        const data = requireData(await load(), operation)
+        if (predicate(data)) return data
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+      throw new Error(`${operation}: timed out`)
+    }
+
+    const auth = requireData(await supabase.auth.signUp({
+      email: userEmail,
+      password: userPassword,
+      options: { data: { username: `UI E2E participant ${userEmail}` } },
+    }), 'sign up')
+    if (!auth.user || !auth.session) throw new Error('UI E2E user session was not created')
+
+    const memberships = await waitFor(
+      () => supabase
+        .from('organization_memberships')
+        .select('organization_id')
+        .eq('status', 'active'),
+      rows => Boolean(rows?.[0]?.organization_id),
+      'load organization'
+    )
+    const organizationId = memberships?.[0]?.organization_id
+    if (!organizationId) throw new Error('personal organization was not provisioned')
+
+    const quest = requireData(await supabase.from('quests').insert({
+      creator_id: auth.user.id,
+      organization_id: organizationId,
+      title: 'UI participant journey E2E',
+      is_public: true,
+      is_open: true,
+      max_attempts: 1,
+      verification_options: [],
+      location_options: [],
+      task_navigation_mode: 'sequential',
+    }).select('id').single(), 'create quest')
+    requireData(await supabase.from('tasks').insert({
+      quest_id: quest.id,
+      title: 'UI E2E task',
+      order_index: 0,
+    }), 'create task')
+    const profiles = await waitFor(
+      () => supabase.rpc('get_my_participant_profiles'),
+      rows => rows.some(profile => profile.relationship === 'self'),
+      'load participant profile'
+    )
+    const participantProfileId = profiles.find(profile => (
+      profile.relationship === 'self'
+    ))?.participant_profile_id
+    if (!participantProfileId) throw new Error('self participant profile was not provisioned')
+
+    requireData(await supabase.auth.signOut(), 'sign out after setup')
+    return { questId: quest.id, participantProfileId }
+  }, { email, password })
+
+  await page.reload()
+  await expectLoginPage(page)
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Пароль', { exact: true }).fill(password)
+  await page.getByRole('button', { name: 'Войти' }).click()
+  await expect(page).toHaveURL(/\/quests$/)
+  await expect(page.getByRole('heading', { name: 'Квесты', exact: true })).toBeVisible()
+
+  await page.goto(`/play/${setup.questId}`)
+  await expect(page).toHaveURL(new RegExp(`participant=${setup.participantProfileId}`))
+  await expect(page.getByRole('heading', { name: 'UI participant journey E2E' })).toBeVisible()
+  await page.getByRole('button', { name: 'Начать квест' }).click()
+  await expect(page.getByRole('heading', { name: 'Задания квеста' })).toBeVisible()
+  await page.getByRole('button', { name: 'Продолжить с задания 1' }).click()
+  await expect(page.getByRole('heading', { name: 'UI E2E task' })).toBeVisible()
+  await page.getByRole('button', { name: 'Завершить задание' }).click()
+
+  await expect(page.getByRole('heading', { name: '🏁 Квест завершён!' })).toBeVisible()
+  await expect(page.getByText('Завершено заданий: 1 из 1')).toBeVisible()
+  await expect(page.getByText('✅ Успешно: 1 | ❌ Неуспешно: 0')).toBeVisible()
+  await expect(page.getByText('✅ Результат сохранён и подтверждён сервером')).toBeVisible()
+
+  const serverResult = await page.evaluate(async questId => {
+    const { supabase } = await import('/src/supabaseClient.js')
+    const result = await supabase
+      .from('quest_attempts')
+      .select('completed_tasks, failed_tasks, finished_at')
+      .eq('quest_id', questId)
+      .single()
+    if (result.error) throw new Error(result.error.message)
+    return result.data
+  }, setup.questId)
+  expect(serverResult).toMatchObject({ completed_tasks: 1, failed_tasks: 0 })
+  expect(serverResult.finished_at).toBeTruthy()
+
+  await page.evaluate(async () => {
+    const { supabase } = await import('/src/supabaseClient.js')
+    supabase.auth.stopAutoRefresh()
+    await supabase.removeAllChannels()
+  })
+  await page.goto('about:blank')
+  await page.context().close()
+})
+
+test('manages a dependent profile and group membership through the UI', async ({ page }, testInfo) => {
+  test.skip(!process.env.RUN_LOCAL_SUPABASE_E2E, 'requires a running local Supabase stack')
+  testInfo.setTimeout(120_000)
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const email = `e2e-group-${suffix}@example.test`
+  const password = 'Local-group-e2e-password-42'
+  const groupName = `E2E group ${suffix}`
+  const initialProfileName = `E2E child ${suffix}`
+  const renamedProfileName = `E2E participant ${suffix}`
+
+  await page.goto('/login')
+  await page.evaluate(async ({ email: userEmail, password: userPassword }) => {
+    const { supabase } = await import('/src/supabaseClient.js')
+    const result = await supabase.auth.signUp({
+      email: userEmail,
+      password: userPassword,
+      options: { data: { username: `Group E2E owner ${userEmail}` } },
+    })
+    if (result.error) throw new Error(result.error.message)
+    if (!result.data.user || !result.data.session) {
+      throw new Error('group E2E user session was not created')
+    }
+    const signOut = await supabase.auth.signOut()
+    if (signOut.error) throw new Error(signOut.error.message)
+  }, { email, password })
+
+  await page.reload()
+  await expectLoginPage(page)
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Пароль', { exact: true }).fill(password)
+  await page.getByRole('button', { name: 'Войти' }).click()
+  await expect(page).toHaveURL(/\/quests$/)
+  await page.getByRole('link', { name: /Мои группы/ }).click()
+  await expect(page).toHaveURL(/\/participants\/group$/)
+  await expect(page.getByRole('heading', { name: 'Моя группа' })).toBeVisible()
+
+  const createGroupForm = page.getByRole('heading', { name: 'Создать группу' }).locator('..')
+  await createGroupForm.getByLabel('Название').fill(groupName)
+  await createGroupForm.getByRole('button', { name: 'Создать группу' }).click()
+  await expect(page.getByRole('heading', { name: groupName })).toBeVisible()
+
+  const createProfileForm = page.getByRole('heading', { name: 'Добавить участника' }).locator('..')
+  await createProfileForm.getByLabel('Имя для отображения').fill(initialProfileName)
+  await createProfileForm.getByLabel('Возрастная категория').selectOption('child')
+  await createProfileForm.getByLabel('Группа').selectOption({ label: groupName })
+  await createProfileForm.getByRole('button', { name: 'Добавить участника' }).click()
+
+  const initialProfileCard = page.locator('article').filter({
+    has: page.getByRole('heading', { name: initialProfileName, exact: true }),
+  })
+  await expect(initialProfileCard).toBeVisible()
+  await expect(initialProfileCard.getByText('Ребёнок', { exact: true })).toBeVisible()
+  await initialProfileCard.getByRole('button', { name: 'Изменить имя' }).click()
+  await initialProfileCard.getByLabel(`Новое имя профиля ${initialProfileName}`).fill(renamedProfileName)
+  await initialProfileCard.getByRole('button', { name: 'Сохранить' }).click()
+
+  const renamedProfileCard = page.locator('article').filter({
+    has: page.getByRole('heading', { name: renamedProfileName, exact: true }),
+  })
+  await expect(renamedProfileCard).toBeVisible()
+
+  const groupCard = page.locator('article').filter({
+    has: page.getByRole('heading', { name: groupName, exact: true }),
+  })
+  const participantRow = groupCard.locator('li').filter({ hasText: renamedProfileName })
+  await expect(participantRow.getByText('Участник группы', { exact: true })).toBeVisible()
+  await participantRow.getByRole('button', { name: 'Удалить' }).click()
+  await expect(participantRow).toHaveCount(0)
+
+  await groupCard.getByRole('button', { name: `Добавить: ${renamedProfileName}` }).click()
+  await expect(groupCard.locator('li').filter({ hasText: renamedProfileName })).toBeVisible()
+
+  const auditSection = page.getByRole('heading', { name: 'История управления профилями' }).locator('..')
+  await expect(auditSection.getByText('Участник добавлен в группу', { exact: true }).first()).toBeVisible()
+  await expect(auditSection.getByText('Участник удалён из группы', { exact: true })).toBeVisible()
+  await expect(auditSection.getByText(`Профиль: ${renamedProfileName}`, { exact: true }).first()).toBeVisible()
+
+  await page.evaluate(async () => {
+    const { supabase } = await import('/src/supabaseClient.js')
+    supabase.auth.stopAutoRefresh()
+    await supabase.removeAllChannels()
+  })
+  await page.goto('about:blank')
+  await page.context().close()
 })
 
 test('rechecks supervision during a real participant grant and retry flow', async ({ page }, testInfo) => {

@@ -1,6 +1,6 @@
 begin;
 
-select plan(15);
+select plan(21);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -72,6 +72,25 @@ insert into public.quest_attempts (
   1,
   now()
 );
+insert into public.quest_access_grants (quest_id, user_id, participant_profile_id)
+values (
+  '6f100000-0000-4000-8000-000000000001',
+  '6f000000-0000-4000-8000-000000000003',
+  '6f000000-0000-4000-8000-000000000003'
+);
+insert into public.quest_attempts (
+  id, quest_id, user_id, actor_user_id, participant_profile_id,
+  total_tasks, completed_tasks, finished_at
+) values (
+  '6f300000-0000-4000-8000-000000000002',
+  '6f100000-0000-4000-8000-000000000001',
+  '6f000000-0000-4000-8000-000000000003',
+  '6f000000-0000-4000-8000-000000000003',
+  '6f000000-0000-4000-8000-000000000003',
+  1,
+  0,
+  null
+);
 
 select set_config('request.jwt.claim.sub', '6f000000-0000-4000-8000-000000000004', true);
 set local role authenticated;
@@ -106,6 +125,23 @@ select is(
   'Участник',
   'intended account sees minimal claim context'
 );
+select throws_ok(
+  format($$select * from public.accept_participant_profile_invitation(%L)$$, current_setting('app.test_claim_token')),
+  '55000',
+  'self participant profile has active quest attempt',
+  'claim refuses to alter an active attempt on the automatically provisioned profile'
+);
+select is(
+  (select count(*) from public.get_participant_profile_invitation_preview(current_setting('app.test_claim_token'))),
+  1::bigint,
+  'failed merge leaves the invitation available for retry'
+);
+reset role;
+update public.quest_attempts
+set finished_at = now()
+where id = '6f300000-0000-4000-8000-000000000002';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '6f000000-0000-4000-8000-000000000003', true);
 select lives_ok(
   format($$select * from public.accept_participant_profile_invitation(%L)$$, current_setting('app.test_claim_token')),
   'intended account can claim the existing participant profile'
@@ -115,6 +151,12 @@ select is(
    where user_id = '6f000000-0000-4000-8000-000000000003' and relationship = 'self' and status = 'active'),
   current_setting('app.test_invited_profile_id')::uuid,
   'claim links the account to the existing stable participant profile'
+);
+select is(
+  (select display_name from public.participant_profiles
+   where id = current_setting('app.test_invited_profile_id')::uuid),
+  'New account',
+  'claimed profile keeps the personal name entered during account registration'
 );
 select is(
   (select count(*) from public.participant_group_members
@@ -135,16 +177,35 @@ select is(
   (select count(*) from public.get_participant_quest_history(
     current_setting('app.test_invited_profile_id')::uuid
   )),
-  1::bigint,
-  'claimed account can read the preserved participant history'
+  2::bigint,
+  'claimed account can read both preserved and merged participant history'
 );
 reset role;
 select is(
   (select count(*) from public.quest_attempts
    where participant_profile_id = current_setting('app.test_invited_profile_id')::uuid
      and finished_at is not null),
-  1::bigint,
-  'claim preserves participant quest attempts'
+  2::bigint,
+  'claim preserves and merges participant quest attempts'
+);
+select is(
+  (select count(*) from public.quest_attempts
+   where participant_profile_id = current_setting('app.test_invited_profile_id')::uuid
+     and finished_at is not null),
+  2::bigint,
+  'claim merges completed history from the automatically provisioned profile'
+);
+select is(
+  (select count(*) from public.quest_attempts
+   where participant_profile_id = '6f000000-0000-4000-8000-000000000003'),
+  0::bigint,
+  'archived profile keeps no detached quest attempts'
+);
+select is(
+  (select count(*) from public.quest_access_grants
+   where participant_profile_id = current_setting('app.test_invited_profile_id')::uuid),
+  2::bigint,
+  'claim merges quest grants and safely retains duplicate grant history'
 );
 select is(
   (select status from public.participant_profiles where id = '6f000000-0000-4000-8000-000000000003'),

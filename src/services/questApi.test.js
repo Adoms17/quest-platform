@@ -9,9 +9,11 @@ vi.mock('../supabaseClient', () => ({
 }))
 
 import {
+  listAccessiblePrivateQuests,
   loadTaskEventReceipts,
   loadParticipantTasks,
   loadParticipantQuest,
+  loadParticipantQuestSummary,
   loadQuestEntryStatus,
   startServerQuestAttempt,
   submitTaskEvent,
@@ -43,6 +45,12 @@ describe('questApi', () => {
     })
   })
 
+  it('lists private quests available to controlled profiles', async () => {
+    rpc.mockResolvedValue({ data: [{ quest_id: 'quest-1' }], error: null })
+    await expect(listAccessiblePrivateQuests()).resolves.toEqual([{ quest_id: 'quest-1' }])
+    expect(rpc).toHaveBeenCalledWith('get_my_accessible_private_quests')
+  })
+
   it('loads quest content and tasks for an explicitly selected participant', async () => {
     rpc.mockResolvedValueOnce({ data: { id: 'quest-1' }, error: null })
     rpc.mockResolvedValueOnce({ data: [{ id: 'task-1' }], error: null })
@@ -53,6 +61,32 @@ describe('questApi', () => {
     })
     expect(rpc).toHaveBeenNthCalledWith(2, 'get_participant_tasks_for_profile', {
       p_quest_id: 'quest-1', p_participant_profile_id: 'profile-1',
+    })
+  })
+
+  it('loads the safe quest projection for the current participant', async () => {
+    rpc.mockResolvedValueOnce({ data: { id: 'quest-1' }, error: null })
+
+    await expect(loadParticipantQuest('quest-1')).resolves.toEqual({ id: 'quest-1' })
+    expect(rpc).toHaveBeenCalledWith('get_participant_quest', {
+      p_quest_id: 'quest-1',
+    })
+  })
+
+  it('loads the server-authorized participant quest summary', async () => {
+    const summary = {
+      navigation_mode: 'sequential',
+      total_tasks: 3,
+      tasks: [{ id: 'task-1', status: 'available' }],
+    }
+    rpc.mockResolvedValueOnce({ data: summary, error: null })
+
+    await expect(
+      loadParticipantQuestSummary('quest-1', 'profile-1')
+    ).resolves.toEqual(summary)
+    expect(rpc).toHaveBeenCalledWith('get_participant_quest_summary', {
+      p_quest_id: 'quest-1',
+      p_participant_profile_id: 'profile-1',
     })
   })
 
