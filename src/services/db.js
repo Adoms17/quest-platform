@@ -115,6 +115,7 @@ export function sanitizeParticipantTask(task, quest = {}) {
   delete safeTask.correct_answer
   delete safeTask.gps_point
   delete safeTask.required_photo_hash
+  delete safeTask.media_url
 
   if (quest.verification_mode !== 'hybrid') {
     delete safeTask.answer_verifier
@@ -300,7 +301,15 @@ function applyOfflineAssetUrls(quest, assets) {
     return quest
   }
   const assetsById = new Map(assets.map(asset => [asset.id, asset]))
-  const hydrated = { ...quest, tasks: (quest.tasks || []).map(task => ({ ...task })) }
+  const hydrated = {
+    ...quest,
+    tasks: (quest.tasks || []).map(task => ({
+      ...task,
+      media: Array.isArray(task.media)
+        ? task.media.map(item => ({ ...item }))
+        : task.media,
+    })),
+  }
   for (const url of offlineObjectUrls.get(quest.id) || []) URL.revokeObjectURL(url)
   const createdUrls = []
 
@@ -312,8 +321,16 @@ function applyOfflineAssetUrls(quest, assets) {
     if (reference.taskId) {
       const task = hydrated.tasks.find(item => item.id === reference.taskId)
       if (task) {
-        task[reference.field] = localUrl
-        task[`${reference.field}_content_type`] = asset.contentType || null
+        if (reference.field === 'media' && Number.isInteger(reference.mediaIndex)) {
+          const media = task.media?.[reference.mediaIndex]
+          if (media) {
+            media.url = localUrl
+            media.content_type = asset.contentType || null
+          }
+        } else {
+          task[reference.field] = localUrl
+          task[`${reference.field}_content_type`] = asset.contentType || null
+        }
       }
     } else {
       hydrated[reference.field] = localUrl

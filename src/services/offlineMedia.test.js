@@ -12,11 +12,11 @@ describe('offline media manifest', () => {
       cover_image_url: 'https://media.test/cover.jpg',
     }, [{
       id: 'task-1',
-      media_url: 'https://media.test/audio.mp3',
       location_image_url: 'https://media.test/cover.jpg',
+      media: [{ url: 'https://media.test/video.mp4' }],
     }, {
       id: 'task-2',
-      media_url: 'javascript:alert(1)',
+      media: [{ url: 'javascript:alert(1)' }],
     }])).toEqual([
       {
         url: 'https://media.test/cover.jpg',
@@ -26,8 +26,8 @@ describe('offline media manifest', () => {
         ],
       },
       {
-        url: 'https://media.test/audio.mp3',
-        targets: [{ kind: 'task-media', field: 'media_url', taskId: 'task-1' }],
+        url: 'https://media.test/video.mp4',
+        targets: [{ kind: 'task-media', field: 'media', taskId: 'task-1', mediaIndex: 0 }],
       },
     ])
   })

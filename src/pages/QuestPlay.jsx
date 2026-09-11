@@ -36,6 +36,7 @@ import { isTransportError } from '../services/network'
 import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
 import { getUserErrorMessage } from '../services/userErrorMessage'
 import { measureOperation, recordOfflineMetric } from '../services/operationTiming'
+import TaskMedia from '../components/TaskMedia'
 import { requiresOnlineQuestStart } from '../services/questVerificationMode'
 import {
   evaluateOfflineAnswerAttempt,
@@ -207,6 +208,7 @@ export default function QuestPlay({ session }) {
 
   const [openingTask, setOpeningTask] = useState(false)
   const [submittingAnswer, setSubmittingAnswer] = useState(false)
+  const [landmarkOpen, setLandmarkOpen] = useState(true)
   // ----- Онлайн/офлайн -----
   useEffect(() => {
     const handleOnline = () => {
@@ -634,6 +636,7 @@ export default function QuestPlay({ session }) {
       setTaskFailed(false)
       setTaskAttemptsUsed(0)
       setIsLocationPhase(true)
+      setLandmarkOpen(true)
       setTaskStartTime(Date.now())
 
       if (existing) {
@@ -642,6 +645,7 @@ export default function QuestPlay({ session }) {
         setTaskFailed(existing.failed || false)
         if (existing.opened) {
           setIsLocationPhase(false)
+          setLandmarkOpen(false)
         }
         // Если задание уже завершено – переходим
         if (existing.completed || existing.failed) {
@@ -775,6 +779,7 @@ export default function QuestPlay({ session }) {
         setLocationVerified(requiresGps)
         setCodeVerified(requiresCode)
         setIsLocationPhase(false)
+        setLandmarkOpen(false)
 
         toast.success(
           '⏳ Проверка сохранена и будет подтверждена сервером'
@@ -806,6 +811,7 @@ export default function QuestPlay({ session }) {
         setLocationVerified(requiresGps)
         setCodeVerified(requiresCode)
         setIsLocationPhase(false)
+        setLandmarkOpen(false)
         toast.success('🔓 Задание открыто!')
       } else {
         toast.error('Проверка места или кода не пройдена')
@@ -1115,18 +1121,6 @@ export default function QuestPlay({ session }) {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
-  function getMediaType(url, contentType = '') {
-    if (!url) return null
-    if (contentType.startsWith('image/')) return 'image'
-    if (contentType.startsWith('video/')) return 'video'
-    if (contentType.startsWith('audio/')) return 'audio'
-    const ext = url.split('.').pop().toLowerCase()
-    if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return 'image'
-    if (['mp4','webm','ogg'].includes(ext)) return 'video'
-    if (['mp3','wav','aac'].includes(ext)) return 'audio'
-    return 'image'
-  }
-
   const handleExit = () => {
     sessionStorage.removeItem(`questAttempt_${id}_${participantProfileId || session?.user?.id}`)
     navigate('/quests')
@@ -1336,34 +1330,29 @@ export default function QuestPlay({ session }) {
       </div>
       <div className="bg-white shadow-sm rounded-sm p-6">
         <h2 className="text-xl font-semibold mb-2">{currentTask.title}</h2>
-        {(currentTask.location_text || currentTask.location_image_url) && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-sm">
-            <h4 className="font-semibold text-blue-700 mb-1">
-              📍 Место задания
-            </h4>
-
-            {currentTask.location_text && (
-              <p className="text-sm text-gray-700 mt-1">
-                {currentTask.location_text}
-              </p>
-            )}
-
-            {currentTask.location_image_url && (
-              <img
-                src={currentTask.location_image_url}
-                alt="Место"
-                className="mt-2 max-w-full h-auto rounded-sm max-h-40 object-cover"
-              />
-            )}
+        {(currentTask.location_text || currentTask.location_image_url || (
+          Number.isFinite(Number(currentTask.location_latitude)) &&
+          Number.isFinite(Number(currentTask.location_longitude))
+        )) && <details
+          open={landmarkOpen}
+          onToggle={event => setLandmarkOpen(event.currentTarget.open)}
+          className="mb-4 rounded-sm border border-blue-200 bg-blue-50"
+        >
+          <summary className="cursor-pointer p-3 font-semibold text-blue-700">
+            📍 Ориентир
+          </summary>
+          <div className="px-3 pb-3">
+            {currentTask.location_text && <p className="mb-3 text-sm text-gray-700">{currentTask.location_text}</p>}
+            {currentTask.location_image_url && <img src={currentTask.location_image_url} alt="Ориентир" className="mb-3 max-h-40 max-w-full rounded-sm object-cover" />}
+            <TaskLocationMap
+              latitude={currentTask.location_latitude}
+              longitude={currentTask.location_longitude}
+              isOnline={isOnline}
+              taskNumber={currentTaskIndex + 1}
+              verificationRadiusMeters={currentTask.requires_gps ? 50 : null}
+            />
           </div>
-        )}
-        <TaskLocationMap
-          latitude={currentTask.location_latitude}
-          longitude={currentTask.location_longitude}
-          isOnline={isOnline}
-          taskNumber={currentTaskIndex + 1}
-          verificationRadiusMeters={currentTask.requires_gps ? 50 : null}
-        />
+        </details>}
         {isLocationPhase && (
           <div className="border-t border-blue-200 pt-4 mt-4">
             <p className="text-gray-700 mb-3">Для доступа к заданию необходимо подтвердить нахождение на месте:</p>
@@ -1413,23 +1402,9 @@ export default function QuestPlay({ session }) {
         {!isLocationPhase && (
           <div className="border-t border-gray-200 pt-4 mt-4">
             {currentTask.description && <p className="text-gray-700 mb-2">{currentTask.description}</p>}
-            {currentTask.media_url && (
-              <div className="mb-3">
-                {getMediaType(currentTask.media_url, currentTask.media_url_content_type) === 'image' && (
-                  <img src={currentTask.media_url} alt="Медиа" className="max-w-full h-auto rounded-sm" />
-                )}
-                {getMediaType(currentTask.media_url, currentTask.media_url_content_type) === 'video' && (
-                  <video controls className="max-w-full h-auto rounded-sm">
-                    <source src={currentTask.media_url} type={currentTask.media_url_content_type || `video/${currentTask.media_url.split('.').pop()}`} />
-                  </video>
-                )}
-                {getMediaType(currentTask.media_url, currentTask.media_url_content_type) === 'audio' && (
-                  <audio controls className="w-full">
-                    <source src={currentTask.media_url} type={currentTask.media_url_content_type || `audio/${currentTask.media_url.split('.').pop()}`} />
-                  </audio>
-                )}
-              </div>
-            )}
+            <TaskMedia
+              media={currentTask.media}
+            />
             {currentTask.hint && (
               <details className="mb-3">
                 <summary className="text-blue-500 cursor-pointer">Подсказка</summary>
