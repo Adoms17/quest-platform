@@ -198,7 +198,6 @@ export default function QuestList({ session }) {
           static_code: task.static_code,
           correct_answer: task.correct_answer,
           options: task.options,
-          media_url: task.media_url,
           location_text: task.location_text,
           location_image_url: task.location_image_url,
           order_index: task.order_index,

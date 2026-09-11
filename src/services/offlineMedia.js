@@ -3,7 +3,6 @@ export const MIN_STORAGE_RESERVE_BYTES = 10 * 1024 * 1024
 
 const MEDIA_FIELDS = [
   ['cover', 'cover_image_url'],
-  ['task-media', 'media_url'],
   ['location-image', 'location_image_url'],
 ]
 
@@ -22,9 +21,10 @@ export function collectOfflineMediaManifest(quest, tasks = []) {
   const assets = []
   const byUrl = new Map()
 
-  const addAsset = (kind, field, url, taskId = null) => {
+  const addAsset = (kind, field, url, taskId = null, mediaIndex = null) => {
     if (!isRemoteMediaUrl(url)) return
     const target = { kind, field, taskId }
+    if (mediaIndex !== null) target.mediaIndex = mediaIndex
     const existing = byUrl.get(url)
     if (existing) {
       existing.targets.push(target)
@@ -39,6 +39,9 @@ export function collectOfflineMediaManifest(quest, tasks = []) {
   for (const task of tasks) {
     for (const [kind, field] of MEDIA_FIELDS.slice(1)) {
       addAsset(kind, field, task?.[field], task?.id || null)
+    }
+    for (const [mediaIndex, media] of (task?.media || []).entries()) {
+      addAsset('task-media', 'media', media?.url, task?.id || null, mediaIndex)
     }
   }
 

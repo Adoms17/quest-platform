@@ -138,7 +138,7 @@ export default function TaskManager() {
                 {task.options && Array.isArray(task.options) && task.options.length > 0 && (
                   <span className="text-xs text-indigo-500 ml-2">📋 варианты: {task.options.length}</span>
                 )}
-                {task.media_url && <span className="text-xs text-red-500 ml-2">🎬 медиа</span>}
+                {Array.isArray(task.media) && task.media.length > 0 && <span className="text-xs text-red-500 ml-2">🎬 медиа: {task.media.length}</span>}
               </div>
               <div className="flex gap-1 items-center">
                 <button

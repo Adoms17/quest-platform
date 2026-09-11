@@ -92,8 +92,6 @@ export default function TaskForm() {
       })
       if (data.media && Array.isArray(data.media)) {
         setMediaList(data.media.map((item, idx) => ({ ...item, id: idx })))
-      } else if (data.media_url) {
-        setMediaList([{ id: 0, url: data.media_url, title: '', description: '' }])
       } else {
         setMediaList([])
       }
