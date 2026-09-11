@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { redeemQuestAccessCode } from '../services/questAccessApi'
 import ParticipantProfileSelect from '../components/ParticipantProfileSelect'
+import PendingActionStatus from '../components/PendingActionStatus'
 import { formatQuestAccessCode, isCompleteQuestAccessCode } from '../services/questAccessCode'
 import { getUserErrorMessage, OFFLINE_ERROR_MESSAGE } from '../services/userErrorMessage'
+import { measureOperation } from '../services/operationTiming'
 
 export default function RedeemQuestCode() {
   const [searchParams] = useSearchParams()
@@ -16,7 +18,10 @@ export default function RedeemQuestCode() {
     event.preventDefault()
     setLoading(true)
     try {
-      setResult(await redeemQuestAccessCode(code, participantProfileId))
+      setResult(await measureOperation(
+        'redeem-quest-code',
+        () => redeemQuestAccessCode(code, participantProfileId),
+      ))
     } catch (error) {
       const message = getUserErrorMessage(error, 'Не удалось проверить код. Повторите позже.')
       setResult({
@@ -37,5 +42,5 @@ export default function RedeemQuestCode() {
         ? OFFLINE_ERROR_MESSAGE
         : result?.error_code === 'unavailable' ? 'Не удалось проверить код. Повторите позже.' : null
 
-  return <div className="mx-auto max-w-xl p-4 sm:p-8"><h1 className="text-2xl font-bold">Получить доступ по коду</h1><p className="mt-2 text-gray-600">Введите код, полученный от организатора.</p><form onSubmit={submit} className="mt-6 space-y-4 rounded-xl border bg-white p-5"><ParticipantProfileSelect value={participantProfileId} onChange={setParticipantProfileId} /><label htmlFor="quest-access-code" className="font-medium">Код доступа</label><input id="quest-access-code" value={code} onChange={event => setCode(formatQuestAccessCode(event.target.value))} placeholder="A1B2C3-D4E5F6" autoComplete="one-time-code" inputMode="text" className="block w-full rounded-lg border p-3 font-mono text-lg uppercase tracking-wider" /><button disabled={loading || !participantProfileId || !isCompleteQuestAccessCode(code)} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-white disabled:cursor-not-allowed disabled:opacity-50">{loading ? 'Проверяем…' : 'Активировать'}</button>{message && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-700">{message}</p>}</form></div>
+  return <div className="mx-auto max-w-xl p-4 sm:p-8"><h1 className="text-2xl font-bold">Получить доступ по коду</h1><p className="mt-2 text-gray-600">Введите код, полученный от организатора.</p><form onSubmit={submit} aria-busy={loading} className="mt-6 space-y-4 rounded-xl border bg-white p-5"><ParticipantProfileSelect value={participantProfileId} onChange={setParticipantProfileId} /><label htmlFor="quest-access-code" className="font-medium">Код доступа</label><input id="quest-access-code" value={code} onChange={event => setCode(formatQuestAccessCode(event.target.value))} disabled={loading} placeholder="A1B2C3-D4E5F6" autoComplete="one-time-code" inputMode="text" className="block w-full rounded-lg border p-3 font-mono text-lg uppercase tracking-wider" /><button disabled={loading || !participantProfileId || !isCompleteQuestAccessCode(code)} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-white disabled:cursor-not-allowed disabled:opacity-50">{loading ? 'Проверяем…' : 'Активировать'}</button><PendingActionStatus active={loading} text="Проверяем код и выдаём доступ…" />{message && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-700">{message}</p>}</form></div>
 }

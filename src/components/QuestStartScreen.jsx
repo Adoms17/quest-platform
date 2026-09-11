@@ -1,4 +1,5 @@
 import QuestConnectionStatus from './QuestConnectionStatus'
+import PendingActionStatus from './PendingActionStatus'
 
 const verificationLabels = {
   gps: 'GPS',
@@ -117,6 +118,11 @@ export default function QuestStartScreen({
           >
             {hasExistingAttempt ? 'Продолжить квест' : 'Начать квест'}
           </button>
+          <PendingActionStatus
+            active={offlinePackageStatus === 'loading'}
+            text="Проверяем и обновляем офлайн-пакет…"
+            delayedText="Подготовка офлайн-пакета занимает больше времени, чем обычно…"
+          />
           {startMessage && (
             <p role="alert" className="rounded-lg bg-amber-50 p-3 text-center text-amber-900">
               {startMessage}
