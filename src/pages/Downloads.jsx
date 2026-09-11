@@ -11,7 +11,10 @@ import {
   syncPendingResults, 
   SYNC_COMPLETE_EVENT} from '../services/sync'
 import Loader from '../components/Loader'
+import PendingActionStatus from '../components/PendingActionStatus'
 import toast from 'react-hot-toast'
+import { getUserErrorMessage } from '../services/userErrorMessage'
+import { measureOperation } from '../services/operationTiming'
 
 //const SYNC_COMPLETE_EVENT = 'quest-sync-complete'
 
@@ -55,7 +58,7 @@ export default function Downloads({ session }) {
       }))
       setQuests(questsWithStatus)
     } catch (err) {
-      toast.error('Ошибка загрузки списка: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось загрузить список квестов.'))
     } finally {
       setLoading(false)
     }
@@ -84,7 +87,7 @@ export default function Downloads({ session }) {
       setQuests(quests.filter(q => q.questId !== questId))
       toast.success('Квест удалён из загрузок')
     } catch (error) {
-      toast.error(error.message)
+      toast.error(getUserErrorMessage(error, 'Не удалось удалить загруженный квест.'))
     }
   }
 
@@ -93,7 +96,7 @@ export default function Downloads({ session }) {
     setSyncing(true)
     setSyncErrors({})
     try {
-      await syncPendingResults(session)
+      await measureOperation('sync-pending-results', () => syncPendingResults(session))
       // После успешной синхронизации loadDownloads вызывается через событие
       // но на всякий случай обновим и здесь
       await loadDownloads()
@@ -110,12 +113,13 @@ export default function Downloads({ session }) {
     setSyncing(true)
     setSyncErrors({})
     try {
-      await syncPendingResults(session)
+      await measureOperation('sync-pending-results', () => syncPendingResults(session))
       await loadDownloads()
       toast.success(`Результаты синхронизированы`)
     } catch (err) {
-      setSyncErrors(prev => ({ ...prev, [questId]: err.message }))
-      toast.error('Не удалось синхронизировать результаты')
+      const message = getUserErrorMessage(err, 'Не удалось синхронизировать результаты.')
+      setSyncErrors(prev => ({ ...prev, [questId]: message }))
+      toast.error(message)
     } finally {
       setSyncing(false)
     }
@@ -139,6 +143,12 @@ export default function Downloads({ session }) {
           {syncing ? 'Синхронизация...' : '🔄 Синхронизировать всё'}
         </button>
       </div>
+
+      <PendingActionStatus
+        active={syncing}
+        text="Синхронизируем результаты с сервером. Не закрывайте приложение…"
+        className="mb-4"
+      />
 
       {quests.length === 0 ? (
         <p className="text-gray-500">

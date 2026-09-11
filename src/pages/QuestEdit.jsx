@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
+import { getUserErrorMessage } from '../services/userErrorMessage'
+import { changeQuestVerificationMode } from '../services/questVerificationMode'
 
 export default function QuestEdit() {
   const { id } = useParams()
@@ -12,11 +14,14 @@ export default function QuestEdit() {
   const [editMode, setEditMode] = useState(false)
   const [questTitle, setQuestTitle] = useState('')
   const [questDescription, setQuestDescription] = useState('')
+  const [coverImageUrl, setCoverImageUrl] = useState('')
   const [verificationOptions, setVerificationOptions] = useState(['gps'])
   const [verificationMatchPolicy, setVerificationMatchPolicy] =
     useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
   const [maxQuestAttempts, setMaxQuestAttempts] = useState(0)
+  const [taskNavigationMode, setTaskNavigationMode] =
+    useState('sequential')
   const [isOpen, setIsOpen] = useState(true)
   const [isPublic, setIsPublic] = useState(false)
   const [startAt, setStartAt] = useState('')
@@ -38,8 +43,10 @@ export default function QuestEdit() {
       setQuest(questData)
       setMaxAttempts(questData.max_attempts || 0)
       setMaxQuestAttempts(questData.max_quest_attempts || 0)
+      setTaskNavigationMode(questData.task_navigation_mode || 'sequential')
       setQuestTitle(questData.title)
       setQuestDescription(questData.description || '')
+      setCoverImageUrl(questData.cover_image_url || '')
       setIsOpen(questData.is_open !== undefined ? questData.is_open : true)
       setIsPublic(Boolean(questData.is_public))
 
@@ -61,7 +68,7 @@ export default function QuestEdit() {
       setStartAt(questData.start_at ? new Date(questData.start_at).toISOString().slice(0, 16) : '')
       setEndAt(questData.end_at ? new Date(questData.end_at).toISOString().slice(0, 16) : '')
     } catch (err) {
-      toast.error(err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось загрузить квест.'))
       navigate('/quests')
     } finally {
       setLoading(false)
@@ -100,7 +107,7 @@ export default function QuestEdit() {
       setQuest(previous => ({ ...previous, ...updates }))
       toast.success('Настройки места обновлены')
     } catch (error) {
-      toast.error(`Ошибка обновления: ${error.message}`)
+      toast.error(getUserErrorMessage(error, 'Не удалось обновить настройки места.'))
     }
   }
 
@@ -114,7 +121,7 @@ export default function QuestEdit() {
       if (error) throw error
       toast.success('Настройки проверки обновлены')
     } catch (err) {
-      toast.error('Ошибка сохранения: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось сохранить настройки проверки.'))
     }
   }
 
@@ -149,12 +156,18 @@ export default function QuestEdit() {
 
   async function updateSecuritySetting(field, value) {
     try {
-      const { error } = await supabase
-        .from('quests')
-        .update({ [field]: value })
-        .eq('id', id)
-
-      if (error) throw error
+      if (field === 'verification_mode') {
+        toast.loading('Подготавливаем задания для нового режима…', {
+          id: 'verification-mode-update',
+        })
+        await changeQuestVerificationMode(id, value)
+      } else {
+        const { error } = await supabase
+          .from('quests')
+          .update({ [field]: value })
+          .eq('id', id)
+        if (error) throw error
+      }
 
       if (field === 'verification_mode') {
         setVerificationMode(value)
@@ -162,6 +175,8 @@ export default function QuestEdit() {
         setOfflineProgressPolicy(value)
       } else if (field === 'verification_match_policy') {
         setVerificationMatchPolicy(value)
+      } else if (field === 'task_navigation_mode') {
+        setTaskNavigationMode(value)
       }
 
       setQuest(previous => ({
@@ -169,9 +184,13 @@ export default function QuestEdit() {
         [field]: value,
       }))
 
-      toast.success('Настройки безопасности обновлены')
+      toast.success('Настройки безопасности обновлены', {
+        id: field === 'verification_mode' ? 'verification-mode-update' : undefined,
+      })
     } catch (err) {
-      toast.error('Ошибка обновления: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось обновить настройки безопасности.'), {
+        id: field === 'verification_mode' ? 'verification-mode-update' : undefined,
+      })
     }
   }
 
@@ -186,6 +205,7 @@ export default function QuestEdit() {
         .update({
           title: questTitle.trim(),
           description: questDescription.trim() || null,
+          cover_image_url: coverImageUrl.trim() || null,
         })
         .eq('id', id)
       if (error) throw error
@@ -193,11 +213,12 @@ export default function QuestEdit() {
         ...prev,
         title: questTitle.trim(),
         description: questDescription.trim() || null,
+        cover_image_url: coverImageUrl.trim() || null,
       }))
       setEditMode(false)
       toast.success('Квест обновлён')
     } catch (err) {
-      toast.error('Ошибка обновления: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось обновить квест.'))
     }
   }
 
@@ -212,7 +233,7 @@ export default function QuestEdit() {
       if (error) throw error
       toast.success('Лимит попыток обновлён')
     } catch (err) {
-      toast.error('Ошибка обновления: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось обновить лимит попыток.'))
     }
   }
 
@@ -228,7 +249,7 @@ export default function QuestEdit() {
       setQuest(previous => ({ ...previous, max_quest_attempts: num }))
       toast.success('Лимит прохождений обновлён')
     } catch (err) {
-      toast.error('Ошибка обновления: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось обновить лимит прохождений.'))
     }
   }
 
@@ -254,7 +275,7 @@ export default function QuestEdit() {
       setQuest(prev => ({ ...prev, [field]: finalValue }))
       toast.success('Настройки доступности обновлены')
     } catch (err) {
-      toast.error('Ошибка обновления: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось обновить доступность квеста.'))
     }
   }
 
@@ -280,6 +301,19 @@ export default function QuestEdit() {
               rows="2"
               placeholder="Описание квеста"
             />
+            <div>
+              <label className="block text-sm font-medium mb-1">Обложка квеста</label>
+              <input
+                type="url"
+                value={coverImageUrl}
+                onChange={(e) => setCoverImageUrl(e.target.value)}
+                className="w-full border p-2 rounded-sm"
+                placeholder="https://example.com/quest-cover.jpg"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Прямая HTTPS-ссылка на изображение стартовой страницы.
+              </p>
+            </div>
             <div className="mt-6 border-t pt-4">
               <h3 className="font-semibold mb-3">Доступность квеста</h3>
               <div className="space-y-3">
@@ -373,6 +407,7 @@ export default function QuestEdit() {
                   setEditMode(false)
                   setQuestTitle(quest.title)
                   setQuestDescription(quest.description || '')
+                  setCoverImageUrl(quest.cover_image_url || '')
                 }}
                 className="bg-gray-300 text-gray-700 px-4 py-1 rounded-sm hover:bg-gray-400"
               >
@@ -382,6 +417,13 @@ export default function QuestEdit() {
           </div>
         ) : (
           <div className="flex-1">
+            {quest.cover_image_url && (
+              <img
+                src={quest.cover_image_url}
+                alt={`Обложка квеста «${quest.title}»`}
+                className="mb-4 aspect-video w-full rounded-xl object-cover"
+              />
+            )}
             <h1 className="text-2xl font-bold">{quest.title}</h1>
             {quest.description && <p className="text-gray-600">{quest.description}</p>}
             <div className="mt-4 p-3 bg-gray-50 border rounded-sm">
@@ -392,6 +434,11 @@ export default function QuestEdit() {
                 {quest.start_at && <li>Начало: {new Date(quest.start_at).toLocaleString()}</li>}
                 {quest.end_at && <li>Окончание: {new Date(quest.end_at).toLocaleString()}</li>}
                 <li>Прохождений на участника: {quest.max_quest_attempts || 'без ограничений'}</li>
+                <li>
+                  Порядок заданий: {quest.task_navigation_mode === 'free'
+                    ? 'произвольный'
+                    : 'последовательный'}
+                </li>
               </ul>
             </div>
           </div>
@@ -403,6 +450,30 @@ export default function QuestEdit() {
         >
           ✏️
         </button>
+      </div>
+
+      <div className="bg-gray-50 p-4 rounded-sm mb-6 border">
+        <label className="block font-semibold mb-2">
+          Порядок прохождения заданий
+        </label>
+        <select
+          value={taskNavigationMode}
+          onChange={event => updateSecuritySetting(
+            'task_navigation_mode',
+            event.target.value
+          )}
+          className="w-full border p-2 rounded-sm"
+        >
+          <option value="sequential">
+            Последовательно — следующее задание открывается после текущего
+          </option>
+          <option value="free">
+            Произвольно — участник выбирает доступное задание
+          </option>
+        </select>
+        <p className="text-sm text-gray-500 mt-2">
+          В последовательном режиме будущие задания не будут показаны участнику до их открытия.
+        </p>
       </div>
 
       {/* Блок выбора опций места */}
@@ -543,9 +614,8 @@ export default function QuestEdit() {
           </div>
 
           <p className="text-sm text-gray-500">
-            Сервер остаётся источником истины. После переключения
-            существующего квеста на Hybrid повторно сохраните задания
-            с кодами или ответами, чтобы создать PBKDF2 verifier.
+            Сервер остаётся источником истины. При смене режима локальные
+            verifier заданий создаются или удаляются автоматически.
           </p>
         </div>
       </div>

@@ -55,7 +55,7 @@ reset role;
 select set_config('request.jwt.claim.sub', '2f000000-0000-4000-8000-000000000002', true);
 set local role authenticated;
 select is((select count(*) from public.participant_profiles), 2::bigint, 'second adult sees self and the same supervised child');
-select is((select count(*) from public.participant_groups), 1::bigint, 'second adult sees group through supervised child membership');
+select is((select count(*) from public.participant_groups), 0::bigint, 'second adult does not inherit groups through supervised child membership');
 
 reset role;
 select set_config('request.jwt.claim.sub', '2f000000-0000-4000-8000-000000000003', true);

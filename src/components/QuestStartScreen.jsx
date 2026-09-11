@@ -1,3 +1,6 @@
+import QuestConnectionStatus from './QuestConnectionStatus'
+import PendingActionStatus from './PendingActionStatus'
+
 const verificationLabels = {
   gps: 'GPS',
   code: 'код на месте',
@@ -8,11 +11,19 @@ function formatDate(value) {
   return value ? new Date(value).toLocaleString('ru-RU') : 'не ограничено'
 }
 
+function formatPackageSize(value) {
+  if (!Number.isFinite(value) || value <= 0) return 'не определён'
+  if (value < 1024) return `${value} Б`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} КБ`
+  return `${(value / (1024 * 1024)).toFixed(1)} МБ`
+}
+
 export default function QuestStartScreen({
   quest,
   taskCount,
   isOnline,
   offlinePackageStatus,
+  offlinePackageMetadata,
   hasExistingAttempt,
   startDisabled = false,
   startMessage = '',
@@ -31,6 +42,13 @@ export default function QuestStartScreen({
   return (
     <main className="mx-auto max-w-3xl p-4 sm:p-8">
       <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+        {quest.cover_image_url && (
+          <img
+            src={quest.cover_image_url}
+            alt={`Обложка квеста «${quest.title}»`}
+            className="aspect-video w-full object-cover"
+          />
+        )}
         <div className="bg-linear-to-br from-blue-700 to-indigo-500 p-6 text-white sm:p-8">
           <p className="text-sm font-medium uppercase tracking-wide text-blue-100">
             Квест готов к прохождению
@@ -53,13 +71,27 @@ export default function QuestStartScreen({
             </div>
             <div className="rounded-xl bg-gray-50 p-4">
               <dt className="text-sm text-gray-500">Подключение</dt>
-              <dd className="mt-1 text-lg font-semibold">
-                {isOnline ? 'Онлайн' : 'Нет сети'}
+              <dd className="mt-2">
+                <QuestConnectionStatus
+                  isOnline={isOnline}
+                  verificationMode={quest.verification_mode}
+                  offlineProgressPolicy={quest.offline_progress_policy}
+                />
               </dd>
             </div>
             <div className="rounded-xl bg-gray-50 p-4">
               <dt className="text-sm text-gray-500">Офлайн-пакет</dt>
               <dd className="mt-1 text-lg font-semibold">{offlineStatus}</dd>
+              {offlinePackageMetadata && (
+                <div className="mt-2 space-y-1 text-sm text-gray-600">
+                  <p>Версия: {offlinePackageMetadata.packageVersion || 'устаревший формат'}</p>
+                  <p>Размер: {formatPackageSize(offlinePackageMetadata.packageSizeBytes)}</p>
+                  <p>Проверен: {formatDate(offlinePackageMetadata.validatedAt)}</p>
+                  {offlinePackageMetadata.expiresAt && (
+                    <p>Действует до: {formatDate(offlinePackageMetadata.expiresAt)}</p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="rounded-xl bg-gray-50 p-4 sm:col-span-2">
               <dt className="text-sm text-gray-500">Прохождений на участника</dt>
@@ -82,10 +114,15 @@ export default function QuestStartScreen({
             type="button"
             onClick={onStart}
             disabled={startDisabled}
-            className="w-full rounded-xl bg-blue-600 px-5 py-3 text-lg font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+            className="w-full rounded-xl bg-blue-600 px-5 py-3 text-lg font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
           >
             {hasExistingAttempt ? 'Продолжить квест' : 'Начать квест'}
           </button>
+          <PendingActionStatus
+            active={offlinePackageStatus === 'loading'}
+            text="Проверяем и обновляем офлайн-пакет…"
+            delayedText="Подготовка офлайн-пакета занимает больше времени, чем обычно…"
+          />
           {startMessage && (
             <p role="alert" className="rounded-lg bg-amber-50 p-3 text-center text-amber-900">
               {startMessage}
