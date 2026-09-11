@@ -13,20 +13,26 @@ function formatSchedule(quest) {
   return `Доступен до ${new Date(quest.end_at).toLocaleString()}`
 }
 
-export default function AccessiblePrivateQuests({ quests, loading }) {
+export default function AccessiblePrivateQuests({ quests, loading, offline = false }) {
   return (
     <section className="mb-8" aria-labelledby="accessible-private-quests-title">
       <h2 id="accessible-private-quests-title" className="text-xl font-semibold mb-1">
         Доступные приватные квесты
       </h2>
       <p className="text-sm text-gray-500 mb-4">
-        Открытые квесты, доступные вашим профилям или участникам управляемых групп.
+        {offline
+          ? 'Показаны актуальные квесты, сохранённые на этом устройстве для офлайн-прохождения.'
+          : 'Открытые квесты, доступные вашим профилям или участникам управляемых групп.'}
       </p>
 
       {loading ? (
         <p className="text-gray-500">Обновляем список доступных квестов…</p>
       ) : quests.length === 0 ? (
-        <p className="text-gray-500">Сейчас нет доступных приватных квестов.</p>
+        <p className="text-gray-500">
+          {offline
+            ? 'На этом устройстве нет актуальных квестов для офлайн-прохождения.'
+            : 'Сейчас нет доступных приватных квестов.'}
+        </p>
       ) : (
         <div className="space-y-4">
           {quests.map(quest => {
@@ -38,6 +44,11 @@ export default function AccessiblePrivateQuests({ quests, loading }) {
                   <p className="text-sm text-gray-600 mt-1">{quest.description}</p>
                 )}
                 <p className="text-xs text-gray-500 mt-1">{formatSchedule(quest)}</p>
+                {offline && (
+                  <p className="text-xs font-medium text-amber-700 mt-1">
+                    Офлайн-копия
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2 mt-3">
                   {participants.map(profile => (
                     <Link

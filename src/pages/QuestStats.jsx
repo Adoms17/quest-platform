@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 const TIMING_CONFIDENCE_LABELS = {
   trusted: '✅ Серверное',
@@ -67,7 +68,7 @@ export default function QuestStats() {
           participant_display_name: labelByProfileId.get(attempt.participant_profile_id) || null,
         })))
       } catch (err) {
-        toast.error('Ошибка загрузки статистики: ' + err.message)
+        toast.error(getUserErrorMessage(err, 'Не удалось загрузить статистику.'))
         navigate('/quests')
       } finally {
         setLoading(false)
@@ -92,7 +93,7 @@ export default function QuestStats() {
       toast.success('Статистика очищена')
       setAttempts([]) // очищаем локальное состояние
     } catch (err) {
-      toast.error('Ошибка очистки: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось очистить статистику.'))
     } finally {
       setClearing(false)
     }

@@ -6,6 +6,7 @@ import {
 } from '../services/participantGroupApi'
 import { adoptParticipantOfflineData } from '../services/db'
 import { getParticipantGroupErrorMessage } from '../services/participantGroupErrors'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function AcceptParticipantInvitation({ session }) {
   const [searchParams] = useSearchParams()
@@ -27,10 +28,10 @@ export default function AcceptParticipantInvitation({ session }) {
       setPreview(result)
       setStatus('ready')
       setMessage('')
-    }).catch(() => {
+    }).catch(error => {
       if (active) {
         setStatus('error')
-        setMessage('Не удалось проверить приглашение.')
+        setMessage(getUserErrorMessage(error, 'Не удалось проверить приглашение.'))
       }
     })
     return () => { active = false }

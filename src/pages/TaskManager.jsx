@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function TaskManager() {
   const { id } = useParams()
@@ -27,7 +28,7 @@ export default function TaskManager() {
       .eq('quest_id', id)
       .order('order_index', { ascending: true })
     if (error) {
-      toast.error('Ошибка загрузки заданий: ' + error.message)
+      toast.error(getUserErrorMessage(error, 'Не удалось загрузить задания.'))
     } else {
       setTasks(data || [])
     }
@@ -46,7 +47,7 @@ export default function TaskManager() {
     if (!confirm('Удалить задание?')) return
     const { error } = await supabase.from('tasks').delete().eq('id', taskId)
     if (error) {
-      toast.error('Ошибка удаления: ' + error.message)
+      toast.error(getUserErrorMessage(error, 'Не удалось удалить задание.'))
     } else {
       toast.success('Задание удалено')
       setTasks(tasks.filter(t => t.id !== taskId))
@@ -77,7 +78,7 @@ export default function TaskManager() {
       })))
       toast.success('Порядок обновлён')
     } catch (err) {
-      toast.error('Ошибка перемещения: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось изменить порядок заданий.'))
       await fetchTasks()
     } finally {
       setMoving(false)

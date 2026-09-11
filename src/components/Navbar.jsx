@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
 import { useOrganization } from '../contexts/useOrganization'
 import { hasOrganizationPermission } from '../services/organizationPermissions'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function Navbar({ session }) {
   const navigate = useNavigate()
@@ -51,7 +52,7 @@ export default function Navbar({ session }) {
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
     if (error) {
-      toast.error('Ошибка выхода: ' + error.message)
+      toast.error(getUserErrorMessage(error, 'Не удалось выйти из аккаунта.'))
     } else {
       toast.success('Вы вышли')
       navigate('/login')

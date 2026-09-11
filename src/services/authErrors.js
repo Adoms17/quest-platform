@@ -1,3 +1,5 @@
+import { isTransportError } from './network'
+
 const ERROR_MESSAGES_BY_CODE = {
   over_email_send_rate_limit:
     'Временно исчерпан лимит отправки писем. Попробуйте позже или обратитесь к администратору.',
@@ -31,6 +33,13 @@ const MESSAGE_MATCHERS = [
 ]
 
 export function getAuthErrorMessage(error) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return 'Нет соединения с сервером. Проверьте интернет и попробуйте снова.'
+  }
+  if (isTransportError(error)) {
+    return 'Нет соединения с сервером. Проверьте интернет и попробуйте снова.'
+  }
+
   const code = String(error?.code || '').toLowerCase()
   if (ERROR_MESSAGES_BY_CODE[code]) return ERROR_MESSAGES_BY_CODE[code]
 

@@ -16,9 +16,9 @@ export function buildQuestTaskSummary({
     const attempt = taskAttemptsMap[task.id]
     let status = serverTasks.get(task.id)?.status || 'available'
 
-    if (attempt?.pending) status = 'pending'
-    else if (attempt?.completed) status = 'completed'
+    if (attempt?.completed) status = 'completed'
     else if (attempt?.failed) status = 'failed'
+    else if (attempt?.pending) status = 'pending'
     else if (attempt?.opened) status = 'in_progress'
 
     if (navigationMode === 'sequential') {

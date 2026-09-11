@@ -1,3 +1,5 @@
+import { getUserErrorMessage } from './userErrorMessage'
+
 const participantGroupErrorMessages = {
   'last participant supervisor cannot be revoked': 'Нельзя отозвать доступ последнего контролирующего взрослого, пока у ребёнка нет собственного аккаунта.',
   'participant profile is not orphaned': 'Восстановление не требуется: у профиля уже есть аккаунт или контролирующий взрослый.',
@@ -25,5 +27,5 @@ export function getParticipantGroupErrorMessage(error, fallback = 'Не удал
   const match = Object.entries(participantGroupErrorMessages).find(([message]) =>
     technicalMessage.includes(message)
   )
-  return match?.[1] || fallback
+  return match?.[1] || getUserErrorMessage(error, fallback)
 }

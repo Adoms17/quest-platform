@@ -3,11 +3,15 @@ import { supabase } from '../supabaseClient'
 import { Link, useNavigate } from 'react-router-dom'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
-import { saveQuestToDB } from '../services/db'
+import {
+  getOfflineAccessiblePrivateQuests,
+  saveQuestToDB,
+} from '../services/db'
 import { useOrganization } from '../contexts/useOrganization'
 import QuickQuestAccessCode from '../components/QuickQuestAccessCode'
 import AccessiblePrivateQuests from '../components/AccessiblePrivateQuests'
 import { listAccessiblePrivateQuests } from '../services/questApi'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function QuestList({ session }) {
   const navigate = useNavigate()
@@ -15,6 +19,7 @@ export default function QuestList({ session }) {
   const [loading, setLoading] = useState(true)
   const [accessibleQuests, setAccessibleQuests] = useState([])
   const [accessibleQuestsLoading, setAccessibleQuestsLoading] = useState(true)
+  const [usingOfflineAccessibleQuests, setUsingOfflineAccessibleQuests] = useState(false)
   const [copying, setCopying] = useState(null) // id квеста, который копируется
   const {
     currentOrganization,
@@ -44,7 +49,7 @@ export default function QuestList({ session }) {
 
     if (error) {
       console.error('Ошибка загрузки квестов:', error)
-      toast.error('Не удалось загрузить квесты')
+      toast.error(getUserErrorMessage(error, 'Не удалось загрузить квесты.'))
     } else {
       setQuests(data || [])
     }
@@ -53,16 +58,38 @@ export default function QuestList({ session }) {
 
   const fetchAccessibleQuests = useCallback(async () => {
     setAccessibleQuestsLoading(true)
+    const loadOfflineQuests = async () => {
+      try {
+        return await getOfflineAccessiblePrivateQuests(userId)
+      } catch {
+        return []
+      }
+    }
+
     try {
+      if (!navigator.onLine) {
+        setAccessibleQuests(await loadOfflineQuests())
+        setUsingOfflineAccessibleQuests(true)
+        return
+      }
+
       setAccessibleQuests(await listAccessiblePrivateQuests())
+      setUsingOfflineAccessibleQuests(false)
     } catch (error) {
       console.error('Ошибка загрузки доступных приватных квестов:', error)
-      setAccessibleQuests([])
-      toast.error('Не удалось загрузить доступные приватные квесты')
+      const offlineQuests = await loadOfflineQuests()
+      setAccessibleQuests(offlineQuests)
+      setUsingOfflineAccessibleQuests(true)
+      if (navigator.onLine && offlineQuests.length === 0) {
+        toast.error(getUserErrorMessage(
+          error,
+          'Не удалось загрузить доступные приватные квесты.',
+        ))
+      }
     } finally {
       setAccessibleQuestsLoading(false)
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     if (!userId || loadingOrganizations) return
@@ -79,10 +106,14 @@ export default function QuestList({ session }) {
     }
     const timeout = setTimeout(refresh, 0)
     window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
+    window.addEventListener('offline', refresh)
     document.addEventListener('visibilitychange', refreshWhenVisible)
     return () => {
       clearTimeout(timeout)
       window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refresh)
+      window.removeEventListener('offline', refresh)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
   }, [userId, fetchAccessibleQuests])
@@ -90,7 +121,7 @@ export default function QuestList({ session }) {
   async function handleDelete(id) {
     if (!confirm('Удалить квест?')) return
     const { error } = await supabase.from('quests').delete().eq('id', id)
-    if (error) toast.error('Ошибка удаления')
+    if (error) toast.error(getUserErrorMessage(error, 'Не удалось удалить квест.'))
     else {
       toast.success('Квест удалён')
       fetchQuests()
@@ -162,23 +193,38 @@ export default function QuestList({ session }) {
       toast.success('Квест скопирован!')
       fetchQuests() // обновляем список
     } catch (err) {
-      toast.error('Ошибка копирования: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось скопировать квест.'))
     } finally {
       setCopying(null)
     }
   }
 
-  if (loading || loadingOrganizations) return <Loader text="Загрузка списка квестов..." />
+  if ((loading || loadingOrganizations) && accessibleQuestsLoading) {
+    return <Loader text="Загрузка списка квестов..." />
+  }
 
   if (!currentOrganization) {
+    const organizationMessage = organizationError
+      ? usingOfflineAccessibleQuests
+        ? 'Создание и управление квестами будут доступны после подключения к интернету.'
+        : getUserErrorMessage(organizationError, 'Не удалось загрузить организации.')
+      : 'Нет доступной организации. Обратитесь к администратору.'
+
     return (
       <div className="p-8 max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold mb-4">Квесты</h1>
-        <p className="text-gray-600">
-          {organizationError
-            ? `Не удалось загрузить организации: ${organizationError.message}`
-            : 'Нет доступной организации. Обновите страницу или обратитесь к администратору.'}
-        </p>
+        <QuickQuestAccessCode
+          onContinue={code => navigate(`/access/code?code=${encodeURIComponent(code)}`)}
+        />
+        <AccessiblePrivateQuests
+          quests={accessibleQuests}
+          loading={accessibleQuestsLoading}
+          offline={usingOfflineAccessibleQuests}
+        />
+        <section className="rounded-sm border border-gray-200 bg-gray-50 p-4">
+          <h2 className="font-semibold">Управление квестами</h2>
+          <p className="mt-1 text-sm text-gray-600">{organizationMessage}</p>
+        </section>
       </div>
     )
   }
@@ -205,6 +251,7 @@ export default function QuestList({ session }) {
       <AccessiblePrivateQuests
         quests={accessibleQuests}
         loading={accessibleQuestsLoading}
+        offline={usingOfflineAccessibleQuests}
       />
 
       {quests.length === 0 ? (
@@ -286,7 +333,10 @@ export default function QuestList({ session }) {
                       await saveQuestToDB(qData, tData)
                       toast.success('Квест скачан для офлайн-прохождения!')
                     } catch (err) {
-                      toast.error('Ошибка скачивания: ' + err.message)
+                      toast.error(getUserErrorMessage(
+                        err,
+                        'Не удалось скачать квест для офлайн-прохождения.',
+                      ))
                     }
                   }}
                   className="bg-blue-500 text-white px-3 py-1 rounded-sm text-sm hover:bg-blue-600 text-center flex items-center justify-center"

@@ -12,6 +12,7 @@ import {
   SYNC_COMPLETE_EVENT} from '../services/sync'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 //const SYNC_COMPLETE_EVENT = 'quest-sync-complete'
 
@@ -55,7 +56,7 @@ export default function Downloads({ session }) {
       }))
       setQuests(questsWithStatus)
     } catch (err) {
-      toast.error('Ошибка загрузки списка: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось загрузить список квестов.'))
     } finally {
       setLoading(false)
     }
@@ -84,7 +85,7 @@ export default function Downloads({ session }) {
       setQuests(quests.filter(q => q.questId !== questId))
       toast.success('Квест удалён из загрузок')
     } catch (error) {
-      toast.error(error.message)
+      toast.error(getUserErrorMessage(error, 'Не удалось удалить загруженный квест.'))
     }
   }
 
@@ -114,8 +115,9 @@ export default function Downloads({ session }) {
       await loadDownloads()
       toast.success(`Результаты синхронизированы`)
     } catch (err) {
-      setSyncErrors(prev => ({ ...prev, [questId]: err.message }))
-      toast.error('Не удалось синхронизировать результаты')
+      const message = getUserErrorMessage(err, 'Не удалось синхронизировать результаты.')
+      setSyncErrors(prev => ({ ...prev, [questId]: message }))
+      toast.error(message)
     } finally {
       setSyncing(false)
     }

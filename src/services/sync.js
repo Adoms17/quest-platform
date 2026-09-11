@@ -17,6 +17,7 @@ import {
 import { reconcilePendingReceipts } from './syncReceipts'
 import toast from 'react-hot-toast'
 import { isTransportError } from './network'
+import { getUserErrorMessage } from './userErrorMessage'
 
 export const SYNC_COMPLETE_EVENT = 'quest-sync-complete'
 
@@ -304,7 +305,7 @@ export async function syncPendingResults(
           duration: 5000,
         })
       } else {
-        toast.error(`Ошибка синхронизации: ${error.message}`)
+        toast.error(getUserErrorMessage(error, 'Не удалось синхронизировать результаты.'))
       }
     }
 

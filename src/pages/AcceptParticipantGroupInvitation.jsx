@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { acceptParticipantGroupInvitation, previewParticipantGroupInvitation } from '../services/participantGroupApi'
 import { getParticipantGroupErrorMessage } from '../services/participantGroupErrors'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function AcceptParticipantGroupInvitation() {
   const [searchParams] = useSearchParams()
@@ -15,7 +16,13 @@ export default function AcceptParticipantGroupInvitation() {
     void previewParticipantGroupInvitation(token).then(result => {
       if (!result) throw new Error('not found')
       setPreview(result); setStatus('ready'); setMessage('')
-    }).catch(() => { setStatus('error'); setMessage('Приглашение не найдено, истекло или предназначено другому аккаунту.') })
+    }).catch(error => {
+      setStatus('error')
+      setMessage(getUserErrorMessage(
+        error,
+        'Приглашение не найдено, истекло или предназначено другому аккаунту.',
+      ))
+    })
   }, [token])
 
   const accept = async () => {

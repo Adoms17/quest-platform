@@ -152,7 +152,7 @@ src/test        общая настройка Vitest
 e2e             Playwright smoke tests
 public          статические PWA-ресурсы
 .github         CI и Dependabot
-docs            архитектура и развёртывание
+docs            архитектура проекта
 ```
 
 ## Рабочий процесс
@@ -162,12 +162,9 @@ docs            архитектура и развёртывание
 ## Документация
 
 - [Архитектура](docs/ARCHITECTURE.md)
-- [Развёртывание](docs/DEPLOYMENT.md)
-- [Модель доступа к квестам](docs/access/QUEST_ACCESS_GRANTS_DESIGN.md)
-- [Проверка и публикация доступа к квестам](docs/access/QUEST_ACCESS_GRANTS_ROLLOUT.md)
-- [План интерфейса участника квеста](docs/access/PARTICIPANT_QUEST_UX_PLAN.md)
+- [Подробная документация в Notion](https://app.notion.com/p/3bc511103a9a811996feff01bcc586d6)
 - [Правила работы агента](AGENTS.md)
 
 ## Статус
 
-Стабильный развиваемый MVP с миграциями Supabase, RLS/pgTAP-тестами и раздельными frontend-окружениями. До полноценной production-ready стадии остаются расширенные авторизованные E2E, device/offline recovery-тесты и безопасная миграция IndexedDB перед следующим изменением её схемы.
+Стабильный развиваемый MVP с миграциями Supabase, RLS/pgTAP-тестами и раздельными frontend-окружениями. Фазы доступа 1–4 закрыты, фаза 5 находится на завершающей мобильной приёмке. Авторизованные participant, offline/recovery и group-management E2E реализованы; до production-ready стадии остаются полный Gate E на реальных Android/iOS устройствах и stage/production rollout текущей версии. Актуальный план и статусы ведутся в [Notion](https://app.notion.com/p/3d7511103a9a8109b25fc84f9611ee79).

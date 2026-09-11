@@ -1,3 +1,5 @@
+import QuestConnectionStatus from './QuestConnectionStatus'
+
 const statusLabels = {
   available: 'Доступно',
   in_progress: 'Выполняется',
@@ -54,6 +56,14 @@ export default function QuestTaskSummary({
         >
           Выйти
         </button>
+      </div>
+
+      <div className="mb-6">
+        <QuestConnectionStatus
+          isOnline={isOnline}
+          verificationMode={quest.verification_mode}
+          offlineProgressPolicy={quest.offline_progress_policy}
+        />
       </div>
 
       <section className="mb-6 rounded-2xl border bg-white p-5 shadow-sm">

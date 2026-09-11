@@ -53,4 +53,39 @@ describe('AccessiblePrivateQuests', () => {
 
     expect(screen.getByText('Сейчас нет доступных приватных квестов.')).toBeInTheDocument()
   })
+
+  it('marks quests loaded from the offline package', () => {
+    render(
+      <MemoryRouter>
+        <AccessiblePrivateQuests
+          loading={false}
+          offline
+          quests={[{
+            quest_id: 'quest-offline',
+            title: 'Офлайн-маршрут',
+            participants: [{
+              participant_profile_id: 'self-1',
+              display_name: 'Я',
+              relationship: 'self',
+            }],
+          }]}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Офлайн-копия')).toBeInTheDocument()
+    expect(screen.getByText(/сохранённые на этом устройстве/)).toBeInTheDocument()
+  })
+
+  it('explains an empty offline list without showing a server error', () => {
+    render(
+      <MemoryRouter>
+        <AccessiblePrivateQuests loading={false} offline quests={[]} />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText(
+      'На этом устройстве нет актуальных квестов для офлайн-прохождения.',
+    )).toBeInTheDocument()
+  })
 })
