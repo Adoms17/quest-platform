@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
+import PendingActionStatus from '../components/PendingActionStatus'
 import QuestStartScreen from '../components/QuestStartScreen'
 import QuestTaskSummary from '../components/QuestTaskSummary'
 import TaskLocationMap from '../components/TaskLocationMap'
@@ -34,6 +35,7 @@ import {
 import { isTransportError } from '../services/network'
 import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
 import { getUserErrorMessage } from '../services/userErrorMessage'
+import { measureOperation } from '../services/operationTiming'
 import { requiresOnlineQuestStart } from '../services/questVerificationMode'
 import {
   evaluateOfflineAnswerAttempt,
@@ -204,6 +206,7 @@ export default function QuestPlay({ session }) {
   }
 
   const [openingTask, setOpeningTask] = useState(false)
+  const [submittingAnswer, setSubmittingAnswer] = useState(false)
   // ----- Онлайн/офлайн -----
   useEffect(() => {
     const handleOnline = () => {
@@ -755,7 +758,7 @@ export default function QuestPlay({ session }) {
         return
       }
 
-      const serverState = await submitTaskEvent({
+      const serverState = await measureOperation('open-quest-task', () => submitTaskEvent({
         questAttemptId,
         taskId: currentTask.id,
         clientEventId: createClientEventId(),
@@ -763,7 +766,7 @@ export default function QuestPlay({ session }) {
         submittedValue: submittedCode,
         latitude,
         longitude,
-      })
+      }))
 
       setTaskAttemptsMap(prev => ({
         ...prev,
@@ -859,7 +862,7 @@ export default function QuestPlay({ session }) {
   ])
 
   // ----- Завершение задания -----
-  async function completeTask() {
+  async function performCompleteTask() {
     if (taskCompleted || taskFailed) return
 
     const hasAnswer = Boolean(currentTask.requires_answer)
@@ -902,13 +905,13 @@ export default function QuestPlay({ session }) {
 
     if (isOnlineRef.current) {
       try {
-        const serverState = await submitTaskEvent({
+        const serverState = await measureOperation('submit-task-answer', () => submitTaskEvent({
           questAttemptId,
           taskId: currentTask.id,
           clientEventId: createClientEventId(),
           eventType: 'answer',
           submittedValue,
-        })
+        }))
 
         const attemptsUsed = serverState.attempts_used || 0
         setTaskAttemptsUsed(attemptsUsed)
@@ -1066,6 +1069,17 @@ export default function QuestPlay({ session }) {
       setFinished(true)
     } else {
       setCurrentTaskIndex(nextIndex)
+    }
+  }
+
+  async function completeTask() {
+    if (submittingAnswer || taskCompleted || taskFailed) return
+
+    setSubmittingAnswer(true)
+    try {
+      await performCompleteTask()
+    } finally {
+      setSubmittingAnswer(false)
     }
   }
 
@@ -1362,6 +1376,11 @@ export default function QuestPlay({ session }) {
                 </button>
               </div>
             )}
+            <PendingActionStatus
+              active={openingTask}
+              text="Проверяем место или код и открываем задание…"
+              className="mt-3"
+            />
           </div>
         )}
         {!isLocationPhase && (
@@ -1400,6 +1419,7 @@ export default function QuestPlay({ session }) {
                         key={idx}
                         type="button"
                         onClick={() => setSelectedOption(opt)}
+                        disabled={submittingAnswer}
                         aria-pressed={selectedOption === opt}
                         className={`block w-full text-left p-2 border rounded-sm transition ${
                           selectedOption === opt ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'
@@ -1433,17 +1453,23 @@ export default function QuestPlay({ session }) {
             <button
               type="button"
               onClick={completeTask}
-              disabled={taskCompleted || taskFailed}
+              disabled={taskCompleted || taskFailed || submittingAnswer}
               className={`w-full py-3 rounded-sm text-white ${
                 taskCompleted ? 'bg-green-500' :
                 taskFailed ? 'bg-red-500' :
                 'bg-green-500 hover:bg-green-600'
               }`}
             >
-              {taskCompleted ? '✅ Задание выполнено' :
+              {submittingAnswer ? 'Проверяем ответ…' :
+               taskCompleted ? '✅ Задание выполнено' :
                taskFailed ? '❌ Попытки исчерпаны' :
                'Завершить задание'}
             </button>
+            <PendingActionStatus
+              active={submittingAnswer}
+              text={isOnline ? 'Отправляем ответ и ожидаем решение сервера…' : 'Проверяем и сохраняем ответ на устройстве…'}
+              className="mt-3"
+            />
           </div>
         )}
       </div>
