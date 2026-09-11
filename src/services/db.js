@@ -1,9 +1,14 @@
 import { openDB } from 'idb'
 import { notifyPendingResultEnqueued } from './syncSignals'
+import {
+  collectOfflineMediaManifest,
+  downloadOfflineMediaAssets,
+  estimateOfflineStorage,
+} from './offlineMedia'
 
 const DB_NAME = 'QuestPlatformDB'
-const DB_VERSION = 10
-export const OFFLINE_PACKAGE_VERSION = 1
+const DB_VERSION = 11
+export const OFFLINE_PACKAGE_VERSION = 2
 export const PARTICIPANT_PACKAGE_ACCESS_TTL_MS = 24 * 60 * 60 * 1000
 
 export const UNSYNCED_QUEST_RESULTS_ERROR =
@@ -172,6 +177,13 @@ export async function initDB() {
         db.createObjectStore('participantProfiles', { keyPath: 'userId' })
       }
 
+      const offlineAssetStore = db.objectStoreNames.contains('offlineAssets')
+        ? transaction.objectStore('offlineAssets')
+        : db.createObjectStore('offlineAssets', { keyPath: 'id' })
+      if (!offlineAssetStore.indexNames.contains('by_quest_id')) {
+        offlineAssetStore.createIndex('by_quest_id', 'questId')
+      }
+
       if (oldVersion < 8) {
         let cursor = await pendingStore.openCursor()
 
@@ -228,16 +240,36 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
   const participantAccess = { ...(existingQuest?.participantAccess || {}) }
   if (participantProfileId) participantAccess[participantProfileId] = new Date().toISOString()
   const safeTasks = tasks.map(task => sanitizeParticipantTask(task, questData))
+  const mediaManifest = collectOfflineMediaManifest(questData, safeTasks)
+  const storageEstimate = await estimateOfflineStorage()
+  const { assets, assetBytes } = await downloadOfflineMediaAssets(
+    mediaManifest,
+    { storageEstimate },
+  )
+  const packageRevision = createClientEventId()
+  const offlineAssetRefs = []
+  const assetRecords = assets.map((asset, index) => {
+    const id = `${questData.id}:${packageRevision}:${index}`
+    for (const target of asset.targets) offlineAssetRefs.push({ ...target, assetId: id })
+    return {
+      id,
+      questId: questData.id,
+      packageRevision,
+      blob: asset.blob,
+      sizeBytes: asset.sizeBytes,
+      contentType: asset.contentType,
+    }
+  })
   const questWithTasks = {
     ...questData,
     tasks: safeTasks,
     downloadedAt: new Date().toISOString(),
     participantAccess,
+    offlineAssetRefs,
   }
   const serializedPackage = JSON.stringify(questWithTasks)
-  const packageSizeBytes = new TextEncoder().encode(serializedPackage).byteLength
+  const packageSizeBytes = new TextEncoder().encode(serializedPackage).byteLength + assetBytes
   const downloadedAt = new Date().toISOString()
-  await db.put('quests', questWithTasks)
   const existing = await db.get('downloadedQuests', questData.id)
   const packageMetadata = {
     questId: questData.id,
@@ -246,8 +278,50 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
     downloadedAt,
     lastSyncDate: existing?.lastSyncDate || null,
   }
-  await db.put('downloadedQuests', packageMetadata)
+  const oldAssets = await db.getAllFromIndex('offlineAssets', 'by_quest_id', questData.id)
+  const transaction = db.transaction(
+    ['quests', 'downloadedQuests', 'offlineAssets'],
+    'readwrite',
+  )
+  await Promise.all([
+    transaction.objectStore('quests').put(questWithTasks),
+    transaction.objectStore('downloadedQuests').put(packageMetadata),
+    ...assetRecords.map(asset => transaction.objectStore('offlineAssets').put(asset)),
+    ...oldAssets.map(asset => transaction.objectStore('offlineAssets').delete(asset.id)),
+  ])
+  await transaction.done
   return packageMetadata
+}
+
+const offlineObjectUrls = new Map()
+
+function applyOfflineAssetUrls(quest, assets) {
+  if (!Array.isArray(quest.offlineAssetRefs) || quest.offlineAssetRefs.length === 0) {
+    return quest
+  }
+  const assetsById = new Map(assets.map(asset => [asset.id, asset]))
+  const hydrated = { ...quest, tasks: (quest.tasks || []).map(task => ({ ...task })) }
+  for (const url of offlineObjectUrls.get(quest.id) || []) URL.revokeObjectURL(url)
+  const createdUrls = []
+
+  for (const reference of quest.offlineAssetRefs) {
+    const asset = assetsById.get(reference.assetId)
+    if (!asset?.blob) continue
+    const localUrl = URL.createObjectURL(asset.blob)
+    createdUrls.push(localUrl)
+    if (reference.taskId) {
+      const task = hydrated.tasks.find(item => item.id === reference.taskId)
+      if (task) {
+        task[reference.field] = localUrl
+        task[`${reference.field}_content_type`] = asset.contentType || null
+      }
+    } else {
+      hydrated[reference.field] = localUrl
+      hydrated[`${reference.field}_content_type`] = asset.contentType || null
+    }
+  }
+  offlineObjectUrls.set(quest.id, createdUrls)
+  return hydrated
 }
 
 export async function getQuestPackageMetadata(questId, participantProfileId = null) {
@@ -287,7 +361,8 @@ export async function getQuestFromDB(questId, participantProfileId = null) {
 
   // Очищает от секретов также квесты, сохранённые старой версией приложения.
   await db.put('quests', sanitizedQuest)
-  return sanitizedQuest
+  const assets = await db.getAllFromIndex('offlineAssets', 'by_quest_id', questId)
+  return applyOfflineAssetUrls(sanitizedQuest, assets)
 }
 
 export async function getDownloadedQuests() {
@@ -426,6 +501,10 @@ export async function removeQuestFromDB(questId) {
 
   await db.delete('quests', questId)
   await db.delete('downloadedQuests', questId)
+  const assets = await db.getAllFromIndex('offlineAssets', 'by_quest_id', questId)
+  const transaction = db.transaction('offlineAssets', 'readwrite')
+  await Promise.all(assets.map(asset => transaction.store.delete(asset.id)))
+  await transaction.done
 }
 
 // ---------- Локальные результаты заданий (pendingResults) ----------
@@ -687,7 +766,7 @@ export async function finishQuestAttemptAliases(localId, serverId = null) {
 
 export async function clearAllLocalData() {
   const db = await initDB()
-  const stores = ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts', 'participantProfiles']
+  const stores = ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts', 'participantProfiles', 'offlineAssets']
   const tx = db.transaction(stores, 'readwrite')
   for (const store of stores) {
     await tx.objectStore(store).clear()

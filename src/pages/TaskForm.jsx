@@ -6,6 +6,7 @@ import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 import { createHybridVerifier } from '../services/hybridVerification'
 import { getUserErrorMessage } from '../services/userErrorMessage'
+import { isAbortError, withAbortSignal } from '../services/requestCancellation'
 
 export default function TaskForm() {
   const { id, taskId } = useParams()
@@ -17,11 +18,13 @@ export default function TaskForm() {
 
   useEffect(() => {
     async function fetchQuestOptions() {
-      const { data, error } = await supabase
+      const query = supabase
         .from('quests')
         .select('location_options, verification_mode')
         .eq('id', id)
         .single()
+      const { data, error } = await withAbortSignal(query, controller.signal)
+      if (controller.signal.aborted) return
       if (!error && data?.location_options) {
         setLocationOptions(data.location_options)
         if (!error && data?.verification_mode) {
@@ -29,7 +32,11 @@ export default function TaskForm() {
         }
       }
     }
-    fetchQuestOptions()
+    const controller = new AbortController()
+    void fetchQuestOptions().catch(error => {
+      if (!isAbortError(error, controller.signal)) throw error
+    })
+    return () => controller.abort()
   }, [id])
 
   const [taskForm, setTaskForm] = useState({
@@ -51,12 +58,14 @@ export default function TaskForm() {
 
   const isEdit = !!taskId
 
-  const fetchTask = useCallback(async () => {
-    const { data, error } = await supabase
+  const fetchTask = useCallback(async (signal) => {
+    const query = supabase
       .from('tasks')
       .select('*')
       .eq('id', taskId)
       .single()
+    const { data, error } = await withAbortSignal(query, signal)
+    if (signal.aborted) return
     if (error) {
       toast.error(getUserErrorMessage(error, 'Не удалось загрузить задание.'))
       navigate(`/quests/${id}/tasks`)
@@ -94,8 +103,16 @@ export default function TaskForm() {
 
   useEffect(() => {
     if (isEdit) {
-      const timeout = setTimeout(() => fetchTask(), 0)
-      return () => clearTimeout(timeout)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => {
+        void fetchTask(controller.signal).catch(error => {
+          if (!isAbortError(error, controller.signal)) throw error
+        })
+      }, 0)
+      return () => {
+        clearTimeout(timeout)
+        controller.abort()
+      }
     }
   }, [isEdit, fetchTask])
 

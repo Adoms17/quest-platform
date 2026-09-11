@@ -157,8 +157,13 @@ test('restores a participant attempt and unsynced event after reload', async ({ 
   })
 })
 
-test('upgrades IndexedDB without losing offline or pending data', async ({ page }) => {
-  await page.goto('/login')
+test('upgrades IndexedDB without losing offline or pending data', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'IndexedDB migration is browser-engine independent')
+  await page.route('**/__indexeddb_upgrade_test__', route => route.fulfill({
+    contentType: 'text/html',
+    body: '<!doctype html><title>IndexedDB upgrade test</title>',
+  }))
+  await page.goto('/__indexeddb_upgrade_test__')
 
   const result = await page.evaluate(async () => {
     await new Promise((resolve, reject) => {
@@ -169,7 +174,7 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
     })
 
     await new Promise((resolve, reject) => {
-      const request = indexedDB.open('QuestPlatformDB', 8)
+      const request = indexedDB.open('QuestPlatformDB', 10)
       request.onupgradeneeded = () => {
         const database = request.result
         database.createObjectStore('quests', { keyPath: 'id' })
@@ -184,9 +189,11 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
         pending.createIndex('by_user_id', 'userId')
         const downloads = database.createObjectStore('downloadedQuests', { keyPath: 'questId' })
         downloads.createIndex('by_downloaded_at', 'downloadedAt')
+        downloads.createIndex('by_package_version', 'packageVersion')
         const attempts = database.createObjectStore('questAttempts', { keyPath: 'localId' })
         attempts.createIndex('by_quest_user', ['questId', 'userId'])
         attempts.createIndex('by_synced', 'synced')
+        database.createObjectStore('participantProfiles', { keyPath: 'userId' })
       }
       request.onsuccess = () => {
         const database = request.result
@@ -224,7 +231,7 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
       request.onerror = () => reject(request.error)
     })
 
-    const dbModule = await import('/src/services/db.js?indexeddb-upgrade=10')
+    const dbModule = await import('/src/services/db.js?indexeddb-upgrade=11')
     const database = await dbModule.initDB()
     const [quest, attempt, pending] = await Promise.all([
       database.get('quests', 'quest-before-upgrade'),
@@ -240,6 +247,7 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
         .indexNames
         .contains('by_package_version'),
       hasParticipantProfilesStore: database.objectStoreNames.contains('participantProfiles'),
+      hasOfflineAssetsStore: database.objectStoreNames.contains('offlineAssets'),
       quest,
       attempt,
       pending,
@@ -248,9 +256,10 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
     return upgradedState
   })
 
-  expect(result.version).toBe(10)
+  expect(result.version).toBe(11)
   expect(result.hasPackageVersionIndex).toBe(true)
   expect(result.hasParticipantProfilesStore).toBe(true)
+  expect(result.hasOfflineAssetsStore).toBe(true)
   expect(result.quest?.title).toBe('Saved quest')
   expect(result.attempt).toMatchObject({
     localId: 'attempt-before-upgrade',

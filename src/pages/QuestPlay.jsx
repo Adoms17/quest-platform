@@ -35,7 +35,7 @@ import {
 import { isTransportError } from '../services/network'
 import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
 import { getUserErrorMessage } from '../services/userErrorMessage'
-import { measureOperation } from '../services/operationTiming'
+import { measureOperation, recordOfflineMetric } from '../services/operationTiming'
 import { requiresOnlineQuestStart } from '../services/questVerificationMode'
 import {
   evaluateOfflineAnswerAttempt,
@@ -210,10 +210,12 @@ export default function QuestPlay({ session }) {
   // ----- Онлайн/офлайн -----
   useEffect(() => {
     const handleOnline = () => {
+      recordOfflineMetric('connection-state', 'online')
       setIsOnline(true)
       isOnlineRef.current = true
     }
     const handleOffline = () => {
+      recordOfflineMetric('connection-state', 'offline')
       setIsOnline(false)
       isOnlineRef.current = false
     }
@@ -231,6 +233,8 @@ export default function QuestPlay({ session }) {
 
     if (questLoadKeyRef.current === loadKey) return
     questLoadKeyRef.current = loadKey
+    const abortController = new AbortController()
+    const { signal } = abortController
 
     async function loadQuest() {
       setLoading(true)
@@ -251,7 +255,10 @@ export default function QuestPlay({ session }) {
         let tasksData
 
         async function loadCachedQuest() {
-          const localQuest = await getQuestFromDB(id, participantProfileId)
+          const localQuest = await measureOperation(
+            'load-offline-package',
+            () => getQuestFromDB(id, participantProfileId),
+          )
 
           if (!localQuest) {
             throw new Error('Квест не загружен для работы без интернета')
@@ -269,7 +276,8 @@ export default function QuestPlay({ session }) {
 
         if (isOnlineRef.current) {
           try {
-            const entryStatus = await loadQuestEntryStatus(id)
+            const entryStatus = await loadQuestEntryStatus(id, signal)
+            if (signal.aborted) return
             const entryAvailability = getQuestAvailability(entryStatus)
 
             if (!entryAvailability.isAvailable) {
@@ -282,27 +290,34 @@ export default function QuestPlay({ session }) {
             }
 
             if (participantProfileId) {
-              questData = await loadParticipantQuest(id, participantProfileId)
-              tasksData = await loadParticipantTasks(id, participantProfileId)
+              questData = await loadParticipantQuest(id, participantProfileId, signal)
+              tasksData = await loadParticipantTasks(id, participantProfileId, signal)
             } else {
-              questData = await loadParticipantQuest(id)
-              tasksData = await loadParticipantTasks(id)
+              questData = await loadParticipantQuest(id, undefined, signal)
+              tasksData = await loadParticipantTasks(id, null, signal)
             }
+            if (signal.aborted) return
 
             const effectiveParticipantProfileId = participantProfileId || session?.user?.id
             if (effectiveParticipantProfileId) {
               setQuestSummary(await loadParticipantQuestSummary(
                 id,
-                effectiveParticipantProfileId
+                effectiveParticipantProfileId,
+                signal,
               ))
+              if (signal.aborted) return
             }
 
             try {
-              const packageMetadata = await saveQuestToDB(
-                questData,
-                tasksData,
-                participantProfileId
+              const packageMetadata = await measureOperation(
+                'prepare-offline-package',
+                () => saveQuestToDB(
+                  questData,
+                  tasksData,
+                  participantProfileId
+                ),
               )
+              recordOfflineMetric('package-source', 'network')
               setOfflinePackageMetadata(await getQuestPackageMetadata(
                 id,
                 participantProfileId
@@ -319,12 +334,16 @@ export default function QuestPlay({ session }) {
             setIsOnline(false)
 
             const cached = await loadCachedQuest()
+            if (signal.aborted) return
+            recordOfflineMetric('package-source', 'cache-fallback')
             questData = cached.questData
             tasksData = cached.tasksData
             setOfflinePackageStatus('ready')
           }
         } else {
           const cached = await loadCachedQuest()
+          if (signal.aborted) return
+          recordOfflineMetric('package-source', 'cache')
           questData = cached.questData
           tasksData = cached.tasksData
           setOfflinePackageStatus('ready')
@@ -345,6 +364,7 @@ export default function QuestPlay({ session }) {
           setHasExistingAttempt(Boolean(localAttempt))
         }
       } catch (err) {
+        if (signal.aborted) return
         setError(err.message)
         const accessErrorMessage = getQuestAccessErrorMessage(err.message)
         toast.error(
@@ -353,11 +373,15 @@ export default function QuestPlay({ session }) {
             : 'Не удалось загрузить квест. Попробуйте ещё раз.'
         )
       } finally {
-        setLoading(false)
+        if (!signal.aborted) setLoading(false)
       }
     }
 
-    loadQuest()
+    void loadQuest()
+    return () => {
+      abortController.abort()
+      if (questLoadKeyRef.current === loadKey) questLoadKeyRef.current = null
+    }
   }, [id, session, participantProfileId])
 
   // ----- Доступность -----
@@ -1091,8 +1115,11 @@ export default function QuestPlay({ session }) {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
-  function getMediaType(url) {
+  function getMediaType(url, contentType = '') {
     if (!url) return null
+    if (contentType.startsWith('image/')) return 'image'
+    if (contentType.startsWith('video/')) return 'video'
+    if (contentType.startsWith('audio/')) return 'audio'
     const ext = url.split('.').pop().toLowerCase()
     if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return 'image'
     if (['mp4','webm','ogg'].includes(ext)) return 'video'
@@ -1388,17 +1415,17 @@ export default function QuestPlay({ session }) {
             {currentTask.description && <p className="text-gray-700 mb-2">{currentTask.description}</p>}
             {currentTask.media_url && (
               <div className="mb-3">
-                {getMediaType(currentTask.media_url) === 'image' && (
+                {getMediaType(currentTask.media_url, currentTask.media_url_content_type) === 'image' && (
                   <img src={currentTask.media_url} alt="Медиа" className="max-w-full h-auto rounded-sm" />
                 )}
-                {getMediaType(currentTask.media_url) === 'video' && (
+                {getMediaType(currentTask.media_url, currentTask.media_url_content_type) === 'video' && (
                   <video controls className="max-w-full h-auto rounded-sm">
-                    <source src={currentTask.media_url} type={`video/${currentTask.media_url.split('.').pop()}`} />
+                    <source src={currentTask.media_url} type={currentTask.media_url_content_type || `video/${currentTask.media_url.split('.').pop()}`} />
                   </video>
                 )}
-                {getMediaType(currentTask.media_url) === 'audio' && (
+                {getMediaType(currentTask.media_url, currentTask.media_url_content_type) === 'audio' && (
                   <audio controls className="w-full">
-                    <source src={currentTask.media_url} type={`audio/${currentTask.media_url.split('.').pop()}`} />
+                    <source src={currentTask.media_url} type={currentTask.media_url_content_type || `audio/${currentTask.media_url.split('.').pop()}`} />
                   </audio>
                 )}
               </div>

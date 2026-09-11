@@ -34,6 +34,20 @@ describe('questApi', () => {
     })
   })
 
+  it('passes route cancellation to participant-loading requests', async () => {
+    const controller = new AbortController()
+    const abortSignal = vi.fn().mockResolvedValue({ data: [], error: null })
+    rpc.mockReturnValue({ abortSignal })
+
+    await expect(loadParticipantTasks(
+      'quest-1',
+      null,
+      controller.signal,
+    )).resolves.toEqual([])
+
+    expect(abortSignal).toHaveBeenCalledWith(controller.signal)
+  })
+
   it('loads minimal availability before participant access', async () => {
     const status = { id: 'quest-1', title: 'Quest', is_open: false }
     const single = vi.fn().mockResolvedValue({ data: status, error: null })

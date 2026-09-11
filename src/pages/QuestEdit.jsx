@@ -5,6 +5,7 @@ import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 import { getUserErrorMessage } from '../services/userErrorMessage'
 import { changeQuestVerificationMode } from '../services/questVerificationMode'
+import { isAbortError, withAbortSignal } from '../services/requestCancellation'
 
 export default function QuestEdit() {
   const { id } = useParams()
@@ -32,13 +33,15 @@ export default function QuestEdit() {
   const [offlineProgressPolicy, setOfflineProgressPolicy] =
     useState('allow_pending')
 
-  const fetchQuest = useCallback(async () => {
+  const fetchQuest = useCallback(async (signal) => {
     try {
-      const { data: questData, error: questError } = await supabase
+      const query = supabase
         .from('quests')
         .select('*')
         .eq('id', id)
         .single()
+      const { data: questData, error: questError } = await withAbortSignal(query, signal)
+      if (signal.aborted) return
       if (questError) throw new Error('Квест не найден')
       setQuest(questData)
       setMaxAttempts(questData.max_attempts || 0)
@@ -68,17 +71,22 @@ export default function QuestEdit() {
       setStartAt(questData.start_at ? new Date(questData.start_at).toISOString().slice(0, 16) : '')
       setEndAt(questData.end_at ? new Date(questData.end_at).toISOString().slice(0, 16) : '')
     } catch (err) {
+      if (isAbortError(err, signal)) return
       toast.error(getUserErrorMessage(err, 'Не удалось загрузить квест.'))
       navigate('/quests')
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
   }, [id, navigate])
 
   useEffect(() => {
     if (!id) return
-    const timeout = setTimeout(() => fetchQuest(), 0)
-    return () => clearTimeout(timeout)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => fetchQuest(controller.signal), 0)
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
   }, [id, fetchQuest])
 
   async function updateLocationOptions(newOptions) {
