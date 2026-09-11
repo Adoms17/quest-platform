@@ -71,11 +71,31 @@ describe('TaskLocationMap', () => {
   })
 
   it('сохраняет координаты видимыми без загрузки подложки офлайн', () => {
-    render(<TaskLocationMap latitude={44.6} longitude={33.5} isOnline={false} />)
+    render(<TaskLocationMap latitude={44.6} longitude={33.5} isOnline={false} taskNumber={2} />)
 
     expect(screen.getByText(/44\.600000, 33\.500000/)).toBeInTheDocument()
-    expect(screen.getByText(/картографическая подложка появится/)).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Офлайн-схема места задания 2' })).toBeInTheDocument()
+    expect(screen.getByText(/Схема работает без картографической подложки/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Открыть в картах' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Скопировать координаты' })).toBeInTheDocument()
     expect(screen.queryByTestId('map')).not.toBeInTheDocument()
+  })
+
+  it('показывает расстояние и направление на офлайн-схеме', async () => {
+    render(
+      <TaskLocationMap
+        latitude={44.6}
+        longitude={33.5}
+        isOnline={false}
+        taskNumber={1}
+        verificationRadiusMeters={50}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Показать мою геопозицию' }))
+
+    expect(await screen.findByText(/Направление:/)).toBeInTheDocument()
+    expect(screen.getByText(/До зоны проверки примерно/)).toBeInTheDocument()
   })
 
   it('показывает текущую геопозицию отдельной точкой', async () => {
@@ -90,10 +110,14 @@ describe('TaskLocationMap', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Показать мою геопозицию' }))
 
-    expect(await screen.findByText(/Вы здесь: 44\.610000, 33\.510000/)).toBeInTheDocument()
-    expect(screen.getByText(/Расстояние до места: примерно/)).toBeInTheDocument()
-    expect(screen.getByText('Точность геопозиции: около 12 м')).toBeInTheDocument()
-    expect(screen.getByText('Радиус GPS-проверки: 50 м')).toBeInTheDocument()
+    expect((await screen.findByText('Вы здесь:')).parentElement)
+      .toHaveTextContent('Вы здесь: 44.610000, 33.510000')
+    expect(screen.getByText('Расстояние до места:').parentElement)
+      .toHaveTextContent('Расстояние до места: примерно')
+    expect(screen.getByText('Точность геопозиции:').parentElement)
+      .toHaveTextContent('Точность геопозиции: около 12 м')
+    expect(screen.getByText('Радиус GPS-проверки:').parentElement)
+      .toHaveTextContent('Радиус GPS-проверки: 50 м')
     expect(screen.getByTestId('verification-radius')).toHaveTextContent('50')
     expect(screen.getByTestId('participant-marker')).toBeInTheDocument()
     await waitFor(() => expect(map.fitBounds).toHaveBeenCalled())

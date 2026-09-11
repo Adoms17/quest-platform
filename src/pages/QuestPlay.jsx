@@ -33,6 +33,13 @@ import {
 } from '../services/verificationPolicy'
 import { isTransportError } from '../services/network'
 import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
+import { getUserErrorMessage } from '../services/userErrorMessage'
+import { requiresOnlineQuestStart } from '../services/questVerificationMode'
+import {
+  evaluateOfflineAnswerAttempt,
+  restorePendingAnswerAttempt,
+} from '../services/offlineAnswerAttempt'
+import QuestConnectionStatus from '../components/QuestConnectionStatus'
 import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
 import { getQuestAvailability } from '../services/questAvailability'
 import { getAnswerResultMessage } from '../services/questResultPresentation'
@@ -168,6 +175,13 @@ export default function QuestPlay({ session }) {
   }, [])
 
   const handleStart = async () => {
+    if (!isOnlineRef.current && requiresOnlineQuestStart(
+      quest?.verification_mode,
+      quest?.offline_progress_policy,
+    )) {
+      toast.error('Для запуска этого квеста необходимо подключение к интернету.')
+      return
+    }
     if (selectedParticipantProfile?.relationship !== 'self' && !participantModeIsActive) {
       if (!isValidParticipantModePin(participantModePin)) {
         setParticipantModeError('Укажите PIN взрослого из 4–6 цифр.')
@@ -408,11 +422,7 @@ export default function QuestPlay({ session }) {
           pendingOpen: true,
         }
       } else if (attempt.eventType === 'answer') {
-        map[taskId] = {
-          ...current,
-          opened: true,
-          pending: true,
-        }
+        map[taskId] = restorePendingAnswerAttempt(current, attempt)
       } else {
         // Совместимость со старыми локальными записями.
         map[taskId] = {
@@ -429,7 +439,7 @@ export default function QuestPlay({ session }) {
     }
 
     setHasPendingConfirmation(
-      Object.values(map).some(attempt => attempt.pending)
+      attempts.some(attempt => attempt.eventType === 'answer')
     )
 
     setTaskAttemptsMap(map)
@@ -561,7 +571,7 @@ export default function QuestPlay({ session }) {
             toast.error('Лимит прохождений этого квеста исчерпан')
           } else {
             setHasStarted(false)
-            toast.error(`Не удалось открыть квест: ${err.message}`)
+            toast.error(getUserErrorMessage(err, 'Не удалось открыть квест.'))
           }
         })
       }, 0)
@@ -774,7 +784,7 @@ export default function QuestPlay({ session }) {
         toast.error('Проверка места или кода не пройдена')
       }
     } catch (err) {
-      toast.error(`Ошибка открытия задания: ${err.message}`)
+      toast.error(getUserErrorMessage(err, 'Не удалось открыть задание.'))
     } finally {
       setOpeningTask(false)
     }
@@ -870,23 +880,18 @@ export default function QuestPlay({ session }) {
       }
     }
 
+    let locallyMatches = null
+
     if (
       quest.verification_mode === 'hybrid' &&
       hasAnswer &&
       currentTask.answer_verifier
     ) {
       try {
-        const locallyMatches = await verifyHybridCandidate(
+        locallyMatches = await verifyHybridCandidate(
           submittedValue,
           currentTask.answer_verifier
         )
-
-        if (!locallyMatches && !isOnlineRef.current) {
-          toast.error(
-            '❌ Ответ не прошёл предварительную проверку'
-          )
-          return
-        }
       } catch {
         // Не доверяем повреждённому verifier и не подменяем сервер.
         toast.error(
@@ -967,13 +972,13 @@ export default function QuestPlay({ session }) {
 
         return
       } catch (err) {
-        toast.error(`Ошибка проверки ответа: ${err.message}`)
+        toast.error(getUserErrorMessage(err, 'Не удалось проверить ответ.'))
         return
       }
     }
 
-    // Offline-событие остаётся pending. Локальная PBKDF2-проверка
-    // не создаёт доверенный результат и не изменяет серверный лимит.
+    // Каждая offline-попытка сохраняется отдельным событием. После
+    // синхронизации сервер повторит их по порядку и подтвердит результат.
     if (quest.offline_progress_policy === 'block') {
       toast.error(
         'Этот квест нельзя продолжать без подключения к интернету'
@@ -986,6 +991,13 @@ export default function QuestPlay({ session }) {
       Math.floor((Date.now() - taskStartTime) / 1000)
     )
 
+    const offlineAttempt = evaluateOfflineAnswerAttempt({
+      attemptsUsed: taskAttemptsUsed,
+      maxAttempts,
+      locallyMatches,
+    })
+    const localTerminal = offlineAttempt.shouldAdvance
+
     await enqueuePendingEvent(
       quest.id,
       currentTask.id,
@@ -994,6 +1006,8 @@ export default function QuestPlay({ session }) {
         eventType: 'answer',
         submittedValue,
         clientElapsedSeconds,
+        localOutcome: offlineAttempt.localOutcome,
+        localTerminal,
       }
     )
 
@@ -1002,18 +1016,49 @@ export default function QuestPlay({ session }) {
       [currentTask.id]: {
         ...taskAttemptsMap[currentTask.id],
         opened: true,
-        completed: false,
-        failed: false,
-        pending: true,
+        completed: offlineAttempt.localOutcome === 'accepted',
+        failed: offlineAttempt.exhausted,
+        pending: localTerminal,
+        attemptsUsed: offlineAttempt.attemptsUsed,
       },
     }
 
     setTaskAttemptsMap(newMap)
+    setTaskAttemptsUsed(offlineAttempt.attemptsUsed)
+    setTotalAttempts(previous => previous + 1)
     setHasPendingConfirmation(true)
 
-    toast.success(
-      '⏳ Ответ сохранён и ожидает серверной проверки'
-    )
+    if (!offlineAttempt.shouldAdvance) {
+      const attemptsLeft = maxAttempts > 0
+        ? maxAttempts - offlineAttempt.attemptsUsed
+        : null
+      toast.error(
+        attemptsLeft === null
+          ? '❌ Ответ неверный. Попробуйте ещё раз.'
+          : `❌ Ответ неверный. Осталось попыток: ${attemptsLeft}`
+      )
+      setSelectedOption('')
+      setAnswerInput('')
+      return
+    }
+
+    if (offlineAttempt.exhausted) {
+      setTaskFailed(true)
+      setFailedTasks(previous => previous + 1)
+      toast('Ответ неверный. Попытки закончились — задание не пройдено.', {
+        icon: '⚠️',
+      })
+    } else if (offlineAttempt.localOutcome === 'accepted') {
+      setTaskCompleted(true)
+      setCompletedTasks(previous => previous + 1)
+      toast.success(
+        '✅ Ответ прошёл локальную проверку и ожидает подтверждения сервером'
+      )
+    } else {
+      toast.success(
+        '⏳ Ответ сохранён и ожидает серверной проверки'
+      )
+    }
 
     const nextIndex = findNextTaskIndex(newMap)
 
@@ -1116,6 +1161,11 @@ export default function QuestPlay({ session }) {
     return <div className="p-8">В этом квесте пока нет заданий</div>
   }
   if (!hasStarted) {
+    const connectionRequired = !isOnline &&
+      requiresOnlineQuestStart(
+        quest.verification_mode,
+        quest.offline_progress_policy,
+      )
     return (
       <>
         {participantSelector}
@@ -1126,10 +1176,12 @@ export default function QuestPlay({ session }) {
           offlinePackageStatus={offlinePackageStatus}
           offlinePackageMetadata={offlinePackageMetadata}
           hasExistingAttempt={hasExistingAttempt}
-          startDisabled={attemptLimitReached}
+          startDisabled={attemptLimitReached || connectionRequired}
           startMessage={attemptLimitReached
             ? 'Вы использовали все доступные прохождения этого квеста.'
-            : ''}
+            : connectionRequired
+              ? 'Для запуска этого квеста необходимо подключение к интернету.'
+              : ''}
           onStart={() => void handleStart()}
         />
       </>
@@ -1142,6 +1194,13 @@ export default function QuestPlay({ session }) {
     const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-green-50 p-8">
+        <div className="mb-6 w-full max-w-lg">
+          <QuestConnectionStatus
+            isOnline={isOnline}
+            verificationMode={quest.verification_mode}
+            offlineProgressPolicy={quest.offline_progress_policy}
+          />
+        </div>
         {hasPendingConfirmation && (
           <div className="mb-6 max-w-lg rounded-sm border border-yellow-300 bg-yellow-50 p-4 text-center text-yellow-900">
             ⏳ Результаты сохранены локально и ожидают подтверждения
@@ -1207,6 +1266,13 @@ export default function QuestPlay({ session }) {
             ✕ Выйти из квеста
           </button>
         </div>
+      </div>
+      <div className="mb-4">
+        <QuestConnectionStatus
+          isOnline={isOnline}
+          verificationMode={quest.verification_mode}
+          offlineProgressPolicy={quest.offline_progress_policy}
+        />
       </div>
       <div className="flex justify-between items-center mb-2 text-sm text-gray-600">
         <span>Прогресс</span>

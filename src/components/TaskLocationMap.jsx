@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Circle, CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import { getGeolocationErrorMessage } from '../services/verificationPolicy'
+import {
+  calculateBearingDegrees,
+  calculateDistanceMeters,
+  createExternalMapUrl,
+  formatCompassDirection,
+} from '../services/geoNavigation'
+import OfflineLocationGuide from './OfflineLocationGuide'
 import 'leaflet/dist/leaflet.css'
 
 function MapViewport({ taskLatitude, taskLongitude, participantPosition }) {
@@ -18,20 +25,6 @@ function MapViewport({ taskLatitude, taskLongitude, participantPosition }) {
   return null
 }
 
-function calculateDistanceMeters([firstLat, firstLng], [secondLat, secondLng]) {
-  const earthRadiusMeters = 6371000
-  const toRadians = value => value * Math.PI / 180
-  const latitudeDelta = toRadians(secondLat - firstLat)
-  const longitudeDelta = toRadians(secondLng - firstLng)
-  const firstLatitude = toRadians(firstLat)
-  const secondLatitude = toRadians(secondLat)
-  const haversine = Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(firstLatitude) * Math.cos(secondLatitude) *
-    Math.sin(longitudeDelta / 2) ** 2
-
-  return 2 * earthRadiusMeters * Math.asin(Math.sqrt(haversine))
-}
-
 export default function TaskLocationMap({
   latitude,
   longitude,
@@ -43,6 +36,7 @@ export default function TaskLocationMap({
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [trackingLocation, setTrackingLocation] = useState(false)
+  const [locationActionMessage, setLocationActionMessage] = useState('')
   const locationWatchIdRef = useRef(null)
 
   useEffect(() => () => {
@@ -106,6 +100,48 @@ export default function TaskLocationMap({
       [lat, lng]
     ))
     : null
+  const bearingDegrees = participantPosition
+    ? calculateBearingDegrees(
+      participantPosition.coordinates,
+      [lat, lng]
+    )
+    : null
+  const hasVerificationRadius = Number.isFinite(verificationRadiusMeters) &&
+    verificationRadiusMeters > 0
+  const isInsideVerificationZone = distanceMeters !== null &&
+    hasVerificationRadius &&
+    distanceMeters <= verificationRadiusMeters
+  const taskLabel = `Место задания${taskNumber ? ` №${taskNumber}` : ''}`
+  const coordinatesText = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+  const externalMapUrl = createExternalMapUrl({
+    latitude: lat,
+    longitude: lng,
+    label: taskLabel,
+    userAgent: navigator.userAgent,
+  })
+
+  async function copyCoordinates() {
+    try {
+      await navigator.clipboard.writeText(coordinatesText)
+      setLocationActionMessage('Координаты скопированы')
+    } catch {
+      setLocationActionMessage('Не удалось скопировать координаты')
+    }
+  }
+
+  async function shareLocation() {
+    try {
+      await navigator.share({
+        title: taskLabel,
+        text: `${taskLabel}: ${coordinatesText}`,
+      })
+      setLocationActionMessage('Точка передана')
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        setLocationActionMessage('Не удалось передать точку')
+      }
+    }
+  }
 
   function stopParticipantLocationTracking() {
     if (locationWatchIdRef.current !== null) {
@@ -120,23 +156,36 @@ export default function TaskLocationMap({
     <section className="mb-4 overflow-hidden rounded-sm border border-blue-200 bg-blue-50">
       <div className="p-3">
         <h4 className="font-semibold text-blue-700">🗺️ Ориентир на карте</h4>
-        <p className="mt-1 text-xs text-gray-600">
-          Место задания: {lat.toFixed(6)}, {lng.toFixed(6)}
-        </p>
-        {participantPosition && (
-          <div className="mt-1 space-y-1 text-xs text-green-700" aria-live="polite">
-            <p>Вы здесь: {participantPosition.coordinates[0].toFixed(6)}, {participantPosition.coordinates[1].toFixed(6)}</p>
-            <p>Расстояние до места: примерно {distanceMeters} м</p>
+        <div className="mt-2 space-y-1 rounded-lg bg-white p-3 text-sm text-gray-700" aria-live="polite">
+          <p><strong>Место задания:</strong> {lat.toFixed(6)}, {lng.toFixed(6)}</p>
+          {participantPosition && (
+            <>
+            <p><strong>Вы здесь:</strong> {participantPosition.coordinates[0].toFixed(6)}, {participantPosition.coordinates[1].toFixed(6)}</p>
+            <p><strong>Расстояние до места:</strong> примерно {distanceMeters} м</p>
             {participantPosition.accuracy !== null && (
-              <p>Точность геопозиции: около {participantPosition.accuracy} м</p>
+              <p><strong>Точность геопозиции:</strong> около {participantPosition.accuracy} м</p>
             )}
-          </div>
-        )}
-        {Number.isFinite(verificationRadiusMeters) && verificationRadiusMeters > 0 && (
-          <p className="mt-1 text-xs text-blue-700">
-            Радиус GPS-проверки: {verificationRadiusMeters} м
-          </p>
-        )}
+            </>
+          )}
+          {hasVerificationRadius && (
+            <p><strong>Радиус GPS-проверки:</strong> {verificationRadiusMeters} м</p>
+          )}
+          {participantPosition && (
+            <>
+            <p>
+              <strong>Направление:</strong>{' '}
+              {formatCompassDirection(bearingDegrees)} · {Math.round(bearingDegrees)}°
+            </p>
+            {hasVerificationRadius && (
+              <p className={isInsideVerificationZone ? 'font-medium text-green-700' : ''}>
+                {isInsideVerificationZone
+                  ? 'Вы находитесь внутри радиуса проверки.'
+                  : `До зоны проверки примерно ${Math.max(0, distanceMeters - verificationRadiusMeters)} м.`}
+              </p>
+            )}
+            </>
+          )}
+        </div>
         <button
           type="button"
           onClick={trackingLocation
@@ -153,6 +202,27 @@ export default function TaskLocationMap({
               ? 'Возобновить обновление геопозиции'
               : 'Показать мою геопозицию'}
         </button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            href={externalMapUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-sm bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Открыть в картах
+          </a>
+          <button type="button" onClick={copyCoordinates} className="rounded-sm border border-blue-600 px-3 py-2 text-sm text-blue-700 hover:bg-blue-100">
+            Скопировать координаты
+          </button>
+          {typeof navigator.share === 'function' && (
+            <button type="button" onClick={shareLocation} className="rounded-sm border border-blue-600 px-3 py-2 text-sm text-blue-700 hover:bg-blue-100">
+              Поделиться точкой
+            </button>
+          )}
+        </div>
+        {locationActionMessage && (
+          <p className="mt-2 text-sm text-gray-700" aria-live="polite">{locationActionMessage}</p>
+        )}
         {locationError && (
           <p role="alert" className="mt-2 text-sm text-red-600">{locationError}</p>
         )}
@@ -216,9 +286,12 @@ export default function TaskLocationMap({
           </MapContainer>
         </div>
       ) : (
-        <p className="border-t border-blue-200 p-3 text-sm text-gray-600">
-          Нет подключения к интернету. Координаты сохранены, картографическая подложка появится после подключения.
-        </p>
+        <OfflineLocationGuide
+          taskPosition={[lat, lng]}
+          participantPosition={participantPosition}
+          taskNumber={taskNumber}
+          verificationRadiusMeters={verificationRadiusMeters}
+        />
       )}
     </section>
   )

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
 import { useOrganization } from '../contexts/useOrganization'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function QuestCreate({ session }) {
   const navigate = useNavigate()
@@ -94,7 +95,7 @@ export default function QuestCreate({ session }) {
       .select()
 
     if (error) {
-      toast.error('Ошибка создания: ' + error.message)
+      toast.error(getUserErrorMessage(error, 'Не удалось создать квест.'))
     } else {
       toast.success('Квест создан!')
       navigate(`/quests/${data[0].id}/edit`)

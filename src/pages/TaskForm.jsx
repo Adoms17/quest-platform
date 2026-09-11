@@ -5,6 +5,7 @@ import MapPicker from '../components/MapPicker'
 import Loader from '../components/Loader'
 import toast from 'react-hot-toast'
 import { createHybridVerifier } from '../services/hybridVerification'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function TaskForm() {
   const { id, taskId } = useParams()
@@ -57,7 +58,7 @@ export default function TaskForm() {
       .eq('id', taskId)
       .single()
     if (error) {
-      toast.error('Ошибка загрузки задания: ' + error.message)
+      toast.error(getUserErrorMessage(error, 'Не удалось загрузить задание.'))
       navigate(`/quests/${id}/tasks`)
     } else if (data) {
       let lat = '', lng = ''
@@ -206,9 +207,10 @@ export default function TaskForm() {
             : null,
         ])
       } catch (err) {
-        toast.error(
-          'Не удалось создать hybrid verifier: ' + err.message
-        )
+        toast.error(getUserErrorMessage(
+          err,
+          'Не удалось подготовить проверку ответа.',
+        ))
         setSaving(false)
         return
       }
@@ -253,7 +255,7 @@ export default function TaskForm() {
       toast.success(isEdit ? 'Задание обновлено' : 'Задание добавлено')
       navigate(`/quests/${id}/tasks`)
     } catch (err) {
-      toast.error('Ошибка сохранения: ' + err.message)
+      toast.error(getUserErrorMessage(err, 'Не удалось сохранить задание.'))
     } finally {
       setSaving(false)
     }

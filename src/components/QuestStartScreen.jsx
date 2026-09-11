@@ -1,3 +1,5 @@
+import QuestConnectionStatus from './QuestConnectionStatus'
+
 const verificationLabels = {
   gps: 'GPS',
   code: 'код на месте',
@@ -68,8 +70,12 @@ export default function QuestStartScreen({
             </div>
             <div className="rounded-xl bg-gray-50 p-4">
               <dt className="text-sm text-gray-500">Подключение</dt>
-              <dd className="mt-1 text-lg font-semibold">
-                {isOnline ? 'Онлайн' : 'Нет сети'}
+              <dd className="mt-2">
+                <QuestConnectionStatus
+                  isOnline={isOnline}
+                  verificationMode={quest.verification_mode}
+                  offlineProgressPolicy={quest.offline_progress_policy}
+                />
               </dd>
             </div>
             <div className="rounded-xl bg-gray-50 p-4">

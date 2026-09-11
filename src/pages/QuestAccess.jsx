@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { createQuestAccessCredential, listQuestAccess, revokeQuestAccessCredential, revokeQuestAccessGrant } from '../services/questAccessApi'
 import { loadLocalSecretLinks, removeLocalSecretLink, saveLocalSecretLink } from '../services/localSecretLinks'
 import { getCredentialCardLabel, getCredentialEmail } from '../services/questAccessPresentation'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 const labels = { invitation: 'Приглашение', code: 'Код', link: 'Ссылка' }
 const statusLabels = { active: 'Активен', revoked: 'Отозван', expired: 'Истёк' }
@@ -25,7 +26,7 @@ export default function QuestAccess() {
 
   const load = useCallback(async () => {
     try { setData(await listQuestAccess(id)) }
-    catch (error) { toast.error(error.message || 'Не удалось загрузить доступы') }
+    catch (error) { toast.error(getUserErrorMessage(error, 'Не удалось загрузить доступы.')) }
     finally { setLoading(false) }
   }, [id])
   useEffect(() => {
@@ -50,7 +51,7 @@ export default function QuestAccess() {
       setCredentialLinks(await saveLocalSecretLink(linkScope, result.credential_id, secret))
       toast.success('Доступ создан')
       await load()
-    } catch (error) { toast.error(error.message || 'Не удалось создать доступ') }
+    } catch (error) { toast.error(getUserErrorMessage(error, 'Не удалось создать доступ.')) }
   }
 
   return <div className="mx-auto max-w-5xl space-y-8 p-4 sm:p-6">

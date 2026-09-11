@@ -13,6 +13,7 @@ import {
 } from '../services/teamApi'
 import { loadLocalSecretLinks, removeLocalSecretLink, saveLocalSecretLink } from '../services/localSecretLinks'
 import { hasOrganizationPermission } from '../services/organizationPermissions'
+import { getUserErrorMessage } from '../services/userErrorMessage'
 
 function roleNames(roles) {
   return roles?.map(role => role.name).join(', ') || 'Без роли'
@@ -132,7 +133,7 @@ export default function OrganizationTeam() {
       toast.success('Приглашение создано')
       await loadTeam()
     } catch (nextError) {
-      toast.error(nextError?.message || 'Не удалось создать приглашение')
+      toast.error(getUserErrorMessage(nextError, 'Не удалось создать приглашение.'))
     } finally {
       setSubmitting(false)
     }
@@ -150,7 +151,7 @@ export default function OrganizationTeam() {
       toast.success('Приглашение отозвано')
       await loadTeam()
     } catch (nextError) {
-      toast.error(nextError?.message || 'Не удалось отозвать приглашение')
+      toast.error(getUserErrorMessage(nextError, 'Не удалось отозвать приглашение.'))
     }
   }
 
@@ -161,7 +162,7 @@ export default function OrganizationTeam() {
       toast.success('Доступ отозван')
       await loadTeam()
     } catch (nextError) {
-      toast.error(nextError?.message || 'Не удалось отозвать доступ')
+      toast.error(getUserErrorMessage(nextError, 'Не удалось отозвать доступ.'))
     }
   }
 
@@ -185,7 +186,7 @@ export default function OrganizationTeam() {
       setEditingMemberId(null)
       await loadTeam()
     } catch (nextError) {
-      toast.error(nextError?.message || 'Не удалось изменить роли')
+      toast.error(getUserErrorMessage(nextError, 'Не удалось изменить роли.'))
     } finally {
       setSavingMemberId(null)
     }

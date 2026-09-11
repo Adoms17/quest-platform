@@ -341,6 +341,64 @@ export async function getDownloadedQuestPackages(now = Date.now()) {
   return packages
 }
 
+export function buildOfflineAccessibleQuestRecord(quest, profiles, now = Date.now()) {
+  if (!quest || quest.is_public !== false || quest.is_open !== true) return null
+
+  const startAt = quest.start_at ? new Date(quest.start_at).getTime() : null
+  const endAt = quest.end_at ? new Date(quest.end_at).getTime() : null
+  if (Number.isFinite(startAt) && startAt > now) return null
+  if (Number.isFinite(endAt) && endAt < now) return null
+
+  const profilesById = new Map((profiles || []).map(profile => [
+    profile.participant_profile_id,
+    profile,
+  ]))
+  const participants = Object.keys(quest.participantAccess || {})
+    .filter(participantProfileId => (
+      profilesById.has(participantProfileId) &&
+      hasFreshParticipantPackageAccess(quest, participantProfileId, now)
+    ))
+    .map(participantProfileId => profilesById.get(participantProfileId))
+
+  if (participants.length === 0) return null
+
+  return {
+    quest_id: quest.id,
+    title: quest.title || 'Без названия',
+    description: quest.description || null,
+    start_at: quest.start_at || null,
+    end_at: quest.end_at || null,
+    participants,
+    offline_package: true,
+  }
+}
+
+export async function getOfflineAccessiblePrivateQuests(
+  userId,
+  now = Date.now()
+) {
+  if (!userId) return []
+
+  const db = await initDB()
+  const [downloads, profiles] = await Promise.all([
+    db.getAll('downloadedQuests'),
+    getParticipantProfiles(userId),
+  ])
+  const result = []
+
+  for (const download of downloads) {
+    const quest = await db.get('quests', download.questId)
+    const record = buildOfflineAccessibleQuestRecord(quest, profiles, now)
+    if (record) result.push(record)
+  }
+
+  return result.sort((left, right) => left.title.localeCompare(
+    right.title,
+    'ru',
+    { sensitivity: 'base' },
+  ))
+}
+
 export async function updateQuestSyncDate(questId, syncDate) {
   const db = await initDB()
   const record = await db.get('downloadedQuests', questId)
