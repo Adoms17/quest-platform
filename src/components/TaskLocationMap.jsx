@@ -31,6 +31,8 @@ export default function TaskLocationMap({
   isOnline,
   taskNumber,
   verificationRadiusMeters = null,
+  offlineMapImageUrl = null,
+  offlineMapBounds = null,
 }) {
   const [participantPosition, setParticipantPosition] = useState(null)
   const [locationLoading, setLocationLoading] = useState(false)
@@ -291,6 +293,8 @@ export default function TaskLocationMap({
           participantPosition={participantPosition}
           taskNumber={taskNumber}
           verificationRadiusMeters={verificationRadiusMeters}
+          imageUrl={offlineMapImageUrl}
+          imageBounds={offlineMapBounds}
         />
       )}
     </section>

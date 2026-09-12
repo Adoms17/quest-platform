@@ -330,6 +330,9 @@ function applyOfflineAssetUrls(quest, assets) {
         } else {
           task[reference.field] = localUrl
           task[`${reference.field}_content_type`] = asset.contentType || null
+          if (reference.field === 'offline_map_image_url' && reference.bounds) {
+            task.offline_map_bounds = reference.bounds
+          }
         }
       }
     } else {

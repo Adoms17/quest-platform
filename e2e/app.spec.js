@@ -25,6 +25,21 @@ test('opens the login page directly', async ({ page }) => {
   expect(pageErrors).toEqual([])
 })
 
+test('keeps the entry screen usable with large text in landscape orientation', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.goto('/login')
+  await page.locator('html').evaluate(element => {
+    element.style.fontSize = '200%'
+  })
+
+  await expectLoginPage(page)
+  const overflow = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    content: document.documentElement.scrollWidth,
+  }))
+  expect(overflow.content).toBeLessThanOrEqual(overflow.viewport + 1)
+})
+
 test('redirects a protected route to login without a session', async ({ page }) => {
   const pageErrors = collectPageErrors(page)
 

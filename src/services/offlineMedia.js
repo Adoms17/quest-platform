@@ -1,3 +1,5 @@
+import { createGeoapifyStaticMapAsset } from './staticOfflineMap'
+
 export const MAX_OFFLINE_MEDIA_BYTES = 50 * 1024 * 1024
 export const MIN_STORAGE_RESERVE_BYTES = 10 * 1024 * 1024
 
@@ -17,31 +19,51 @@ function isRemoteMediaUrl(value) {
   }
 }
 
-export function collectOfflineMediaManifest(quest, tasks = []) {
+export function collectOfflineMediaManifest(quest, tasks = [], options = {}) {
   const assets = []
   const byUrl = new Map()
 
-  const addAsset = (kind, field, url, taskId = null, mediaIndex = null) => {
+  const addAsset = (
+    kind,
+    field,
+    url,
+    taskId = null,
+    mediaIndex = null,
+    metadata = {},
+    assetMetadata = {},
+  ) => {
     if (!isRemoteMediaUrl(url)) return
-    const target = { kind, field, taskId }
+    const target = { kind, field, taskId, ...metadata }
     if (mediaIndex !== null) target.mediaIndex = mediaIndex
     const existing = byUrl.get(url)
     if (existing) {
       existing.targets.push(target)
       return
     }
-    const asset = { url, targets: [target] }
+    const asset = { url, targets: [target], ...assetMetadata }
     byUrl.set(url, asset)
     assets.push(asset)
   }
 
   addAsset('cover', 'cover_image_url', quest?.cover_image_url)
-  for (const task of tasks) {
+  for (const [taskIndex, task] of tasks.entries()) {
     for (const [kind, field] of MEDIA_FIELDS.slice(1)) {
       addAsset(kind, field, task?.[field], task?.id || null)
     }
     for (const [mediaIndex, media] of (task?.media || []).entries()) {
       addAsset('task-media', 'media', media?.url, task?.id || null, mediaIndex)
+    }
+    const staticMap = createGeoapifyStaticMapAsset(task, taskIndex + 1, options.staticMap)
+    if (staticMap) {
+      addAsset(
+        'offline-map',
+        'offline_map_image_url',
+        staticMap.url,
+        task?.id || null,
+        null,
+        { bounds: staticMap.bounds },
+        { optional: true },
+      )
     }
   }
 
@@ -56,8 +78,18 @@ export async function downloadOfflineMediaAssets(
   let assetBytes = 0
 
   for (const item of manifest) {
-    const response = await fetchImpl(item.url)
+    let response
+    try {
+      response = await fetchImpl(item.url)
+    } catch (cause) {
+      if (item.optional) continue
+      const error = new Error('Не удалось скачать медиаресурсы квеста для офлайн-режима')
+      error.code = 'OFFLINE_MEDIA_DOWNLOAD_FAILED'
+      error.cause = cause
+      throw error
+    }
     if (!response.ok) {
+      if (item.optional) continue
       const error = new Error('Не удалось скачать медиаресурсы квеста для офлайн-режима')
       error.code = 'OFFLINE_MEDIA_DOWNLOAD_FAILED'
       throw error
