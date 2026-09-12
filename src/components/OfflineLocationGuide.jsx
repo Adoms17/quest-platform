@@ -8,6 +8,8 @@ export default function OfflineLocationGuide({
   participantPosition,
   taskNumber,
   verificationRadiusMeters,
+  imageUrl = null,
+  imageBounds = null,
 }) {
   const distance = participantPosition
     ? calculateDistanceMeters(participantPosition.coordinates, taskPosition)
@@ -27,13 +29,43 @@ export default function OfflineLocationGuide({
   const angle = bearing === null ? 0 : bearing * Math.PI / 180
   const participantX = 160 - Math.sin(angle) * participantDistance
   const participantY = 105 + Math.cos(angle) * participantDistance
+  const participantLatitude = participantPosition?.coordinates?.[0]
+  const participantLongitude = participantPosition?.coordinates?.[1]
+  const participantInsideImage = imageBounds &&
+    Number.isFinite(participantLatitude) &&
+    Number.isFinite(participantLongitude) &&
+    participantLatitude >= imageBounds.south && participantLatitude <= imageBounds.north &&
+    participantLongitude >= imageBounds.west && participantLongitude <= imageBounds.east
+  const participantImagePosition = participantInsideImage
+    ? {
+      left: `${(participantLongitude - imageBounds.west) /
+        (imageBounds.east - imageBounds.west) * 100}%`,
+      top: `${(imageBounds.north - participantLatitude) /
+        (imageBounds.north - imageBounds.south) * 100}%`,
+    }
+    : null
   return (
     <div className="border-t border-blue-200 bg-slate-50 p-3">
-      <div
-        role="img"
-        aria-label={`Офлайн-схема места задания ${taskNumber || ''}`.trim()}
-        className="overflow-hidden rounded-lg border border-slate-300 bg-white"
-      >
+      {imageUrl ? (
+        <div className="relative overflow-hidden rounded-lg border border-slate-300 bg-white">
+          <img
+            src={imageUrl}
+            alt={`Сохранённая офлайн-карта места задания ${taskNumber || ''}`.trim()}
+            className="h-auto w-full"
+          />
+          {participantImagePosition && (
+            <span
+              aria-label="Ваша текущая позиция на сохранённой карте"
+              className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-green-800 bg-green-500 shadow"
+              style={participantImagePosition}
+            />
+          )}
+        </div>
+      ) : <div
+          role="img"
+          aria-label={`Офлайн-схема места задания ${taskNumber || ''}`.trim()}
+          className="overflow-hidden rounded-lg border border-slate-300 bg-white"
+        >
         <svg viewBox="0 0 320 210" className="h-52 w-full" aria-hidden="true">
           <defs>
             <pattern id="offline-map-grid" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -58,9 +90,11 @@ export default function OfflineLocationGuide({
             </>
           )}
         </svg>
-      </div>
+        </div>}
       <p className="mt-2 text-xs text-gray-600">
-        Схема работает без картографической подложки и не заменяет карту улиц.
+        {imageUrl
+          ? 'Сохранённая карта доступна без подключения к интернету.'
+          : 'Схема работает без картографической подложки и не заменяет карту улиц.'}
       </p>
     </div>
   )

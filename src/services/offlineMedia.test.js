@@ -48,6 +48,38 @@ describe('offline media manifest', () => {
     expect(result.assets[0]).toMatchObject({ sizeBytes: 5, contentType: 'image/jpeg' })
   })
 
+  it('adds an optional static map with bounds when Geoapify is configured', () => {
+    const manifest = collectOfflineMediaManifest({}, [{
+      id: 'task-1',
+      location_latitude: 44.6,
+      location_longitude: 33.5,
+    }], { staticMap: { apiKey: 'public-test-key' } })
+
+    expect(manifest).toHaveLength(1)
+    expect(manifest[0]).toMatchObject({
+      optional: true,
+      targets: [{
+        kind: 'offline-map',
+        field: 'offline_map_image_url',
+        taskId: 'task-1',
+        bounds: expect.objectContaining({ north: expect.any(Number), west: expect.any(Number) }),
+      }],
+    })
+  })
+
+  it('keeps preparing the package when an optional static map is unavailable', async () => {
+    const result = await downloadOfflineMediaAssets([{
+      url: 'https://maps.geoapify.com/v1/staticmap',
+      optional: true,
+      targets: [],
+    }], {
+      fetchImpl: async () => ({ ok: false }),
+      storageEstimate: null,
+    })
+
+    expect(result).toEqual({ assets: [], assetBytes: 0 })
+  })
+
   it('rejects a package larger than the application limit', () => {
     expect(assessOfflineMediaBudget({
       assetBytes: MAX_OFFLINE_MEDIA_BYTES + 1,

@@ -1350,6 +1350,8 @@ export default function QuestPlay({ session }) {
               isOnline={isOnline}
               taskNumber={currentTaskIndex + 1}
               verificationRadiusMeters={currentTask.requires_gps ? 50 : null}
+              offlineMapImageUrl={currentTask.offline_map_image_url}
+              offlineMapBounds={currentTask.offline_map_bounds}
             />
           </div>
         </details>}
