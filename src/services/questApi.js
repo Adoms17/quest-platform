@@ -5,6 +5,12 @@ function throwIfError(error) {
   if (error) throw error
 }
 
+export async function loadQuestAttemptClock(attemptId) {
+  const { data, error } = await supabase.rpc('get_quest_attempt_clock', { p_attempt_id: attemptId })
+  throwIfError(error)
+  return data
+}
+
 export async function loadParticipantTasks(questId, participantProfileId = null, signal = null) {
   const query = participantProfileId
     ? supabase.rpc('get_participant_tasks_for_profile', {
@@ -90,8 +96,15 @@ export async function submitTaskEvent({
   latitude = null,
   longitude = null,
   clientElapsedSeconds = null,
+  offlineRecordedAt = null,
 }) {
-  const { data, error } = await supabase.rpc('submit_task_event', {
+  if (eventType === 'finish') {
+    const { data, error } = await supabase.rpc('finish_quest_early', { p_quest_attempt_id: questAttemptId, p_task_id: taskId, p_client_event_id: clientEventId })
+    throwIfError(error)
+    return data
+  }
+  const { data, error } = await supabase.rpc(offlineRecordedAt ? 'submit_offline_task_event' : 'submit_task_event', {
+    ...(offlineRecordedAt ? { p_recorded_at: offlineRecordedAt } : {}),
     p_quest_attempt_id: questAttemptId,
     p_task_id: taskId,
     p_client_event_id: clientEventId,

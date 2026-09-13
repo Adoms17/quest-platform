@@ -21,7 +21,7 @@ import { getUserErrorMessage } from './userErrorMessage'
 
 export const SYNC_COMPLETE_EVENT = 'quest-sync-complete'
 
-const SUPPORTED_EVENT_TYPES = new Set(['open', 'answer'])
+const SUPPORTED_EVENT_TYPES = new Set(['open', 'answer', 'finish'])
 
 function getEventValue(record, field) {
   return record.payload?.[field] ?? record[field] ?? null
@@ -221,6 +221,7 @@ export async function syncPendingResults(
         }
 
         const serverState = await submitTaskEvent({
+          offlineRecordedAt: record.recordedOffline ? record.createdAt : null,
           questAttemptId: serverAttemptId,
           taskId: record.taskId,
           clientEventId: record.clientEventId,

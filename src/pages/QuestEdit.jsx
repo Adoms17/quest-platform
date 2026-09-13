@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import Loader from '../components/Loader'
+import OfflinePackageCheck from '../components/OfflinePackageCheck'
 import toast from 'react-hot-toast'
 import { getUserErrorMessage } from '../services/userErrorMessage'
 import { changeQuestVerificationMode } from '../services/questVerificationMode'
@@ -21,6 +22,8 @@ export default function QuestEdit() {
     useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
   const [maxQuestAttempts, setMaxQuestAttempts] = useState(0)
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState(0)
+  const [allowLateOfflineAnswers, setAllowLateOfflineAnswers] = useState(false)
   const [taskNavigationMode, setTaskNavigationMode] =
     useState('sequential')
   const [isOpen, setIsOpen] = useState(true)
@@ -46,6 +49,8 @@ export default function QuestEdit() {
       setQuest(questData)
       setMaxAttempts(questData.max_attempts || 0)
       setMaxQuestAttempts(questData.max_quest_attempts || 0)
+      setTimeLimitMinutes(questData.time_limit_minutes || 0)
+      setAllowLateOfflineAnswers(Boolean(questData.allow_late_offline_answers))
       setTaskNavigationMode(questData.task_navigation_mode || 'sequential')
       setQuestTitle(questData.title)
       setQuestDescription(questData.description || '')
@@ -212,6 +217,8 @@ export default function QuestEdit() {
         .from('quests')
         .update({
           title: questTitle.trim(),
+          time_limit_minutes: Number(timeLimitMinutes) || 0,
+          allow_late_offline_answers: allowLateOfflineAnswers,
           description: questDescription.trim() || null,
           cover_image_url: coverImageUrl.trim() || null,
         })
@@ -220,6 +227,8 @@ export default function QuestEdit() {
       setQuest((prev) => ({
         ...prev,
         title: questTitle.trim(),
+        time_limit_minutes: Number(timeLimitMinutes) || 0,
+        allow_late_offline_answers: allowLateOfflineAnswers,
         description: questDescription.trim() || null,
         cover_image_url: coverImageUrl.trim() || null,
       }))
@@ -292,6 +301,7 @@ export default function QuestEdit() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
+      <OfflinePackageCheck quest={{ ...quest, cover_image_url: coverImageUrl }} />
       <div className="flex items-start gap-2 mb-6">
         {editMode ? (
           <div className="flex-1 space-y-2">
@@ -392,6 +402,9 @@ export default function QuestEdit() {
             </div>
             <div>
               <label className="block font-medium mb-1">Лимит прохождений квеста участником</label>
+              <label className="block font-medium">Время прохождения, минут (0 — без ограничения)<input type="number" min="0" max="10080" step="1" value={timeLimitMinutes} onChange={e => setTimeLimitMinutes(e.target.value)} className="w-full border p-2" /></label>
+              <label className="mt-3 flex items-start gap-2"><input type="checkbox" checked={allowLateOfflineAnswers} onChange={e => setAllowLateOfflineAnswers(e.target.checked)} />Принимать офлайн-ответы после истечения времени</label>
+              <p className="text-sm text-gray-500">Разрешает позднюю доставку ответов, введённых до окончания таймера по времени устройства. Применяется к новым попыткам; требует доверия к времени устройства.</p>
               <input
                 type="number"
                 min="0"

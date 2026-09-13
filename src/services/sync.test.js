@@ -96,7 +96,7 @@ describe('syncPendingResults', () => {
     mocks.reconcilePendingReceipts.mockImplementation(async pending => ({
       unresolvedEvents: pending.filter(record => (
         !record.synced &&
-        (record.eventType === 'open' || record.eventType === 'answer')
+        ['open', 'answer', 'finish'].includes(record.eventType)
       )),
       contexts: new Map(),
       syncedEvents: 0,
@@ -125,6 +125,11 @@ describe('syncPendingResults', () => {
       expect.objectContaining({ clientEventId: 'event-2', eventType: 'answer' })
     )
     expect(mocks.markResultsSynced.mock.calls).toEqual([[[1]], [[2]]])
+  })
+  it('sends early finish only after preceding answers', async () => {
+    mocks.getPendingResults.mockResolvedValue([event({ id: 2, eventType: 'finish' }), event({ id: 1, eventType: 'answer' })])
+    await syncPendingResults(session)
+    expect(mocks.submitTaskEvent.mock.calls.map(([payload]) => payload.eventType)).toEqual(['answer', 'finish'])
   })
 
   it('does not replay an event acknowledged before a later network failure', async () => {

@@ -42,13 +42,14 @@ export default function QuestStartScreen({
   return (
     <main className="mx-auto max-w-3xl p-4 sm:p-8">
       <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-        {quest.cover_image_url && (
+        {quest.cover_image_url && !(!isOnline && quest.cover_image_offline_unavailable) && (
           <img
             src={quest.cover_image_url}
             alt={`Обложка квеста «${quest.title}»`}
             className="aspect-video w-full object-cover"
           />
         )}
+        {!isOnline && quest.cover_image_offline_unavailable && <p className="p-4 text-amber-800">Обложка недоступна офлайн.</p>}
         <div className="bg-linear-to-br from-blue-700 to-indigo-500 p-6 text-white sm:p-8">
           <p className="text-sm font-medium uppercase tracking-wide text-blue-100">
             Квест готов к прохождению
@@ -64,6 +65,20 @@ export default function QuestStartScreen({
             <div className="rounded-xl bg-gray-50 p-4">
               <dt className="text-sm text-gray-500">Заданий</dt>
               <dd className="mt-1 text-lg font-semibold">{taskCount}</dd>
+            </div>
+            <div className="rounded-xl bg-gray-50 p-4">
+              <dt className="text-sm text-gray-500">Лимит времени</dt>
+              <dd className="mt-1 text-lg font-semibold">
+                {quest.time_limit_minutes ? `${quest.time_limit_minutes} мин` : 'Без ограничения'}
+              </dd>
+            </div>
+            <div className="rounded-xl bg-gray-50 p-4">
+              <dt className="text-sm text-gray-500">Прохождений на участника</dt>
+              <dd className="mt-1 text-lg font-semibold">
+                {quest.max_quest_attempts > 0
+                  ? `Не более ${quest.max_quest_attempts}`
+                  : 'Без ограничений'}
+              </dd>
             </div>
             <div className="rounded-xl bg-gray-50 p-4">
               <dt className="text-sm text-gray-500">Проверка</dt>
@@ -82,6 +97,7 @@ export default function QuestStartScreen({
             <div className="rounded-xl bg-gray-50 p-4">
               <dt className="text-sm text-gray-500">Офлайн-пакет</dt>
               <dd className="mt-1 text-lg font-semibold">{offlineStatus}</dd>
+              {offlinePackageMetadata?.offlineMediaFailures?.length > 0 && <p role="status" className="mt-2 text-sm text-amber-800">Пакет неполный: некоторые материалы не скачаны и будут недоступны офлайн. Обновите пакет при восстановлении доступа к материалам.</p>}
               {offlinePackageMetadata && (
                 <div className="mt-2 space-y-1 text-sm text-gray-600">
                   <p>Версия: {offlinePackageMetadata.packageVersion || 'устаревший формат'}</p>
@@ -92,14 +108,6 @@ export default function QuestStartScreen({
                   )}
                 </div>
               )}
-            </div>
-            <div className="rounded-xl bg-gray-50 p-4 sm:col-span-2">
-              <dt className="text-sm text-gray-500">Прохождений на участника</dt>
-              <dd className="mt-1 text-lg font-semibold">
-                {quest.max_quest_attempts > 0
-                  ? `Не более ${quest.max_quest_attempts}`
-                  : 'Без ограничений'}
-              </dd>
             </div>
           </dl>
 

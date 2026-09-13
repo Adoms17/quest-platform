@@ -2,6 +2,7 @@ import {
   calculateBearingDegrees,
   calculateDistanceMeters,
 } from '../services/geoNavigation'
+import StaticMapOverlay from './StaticMapOverlay'
 
 export default function OfflineLocationGuide({
   taskPosition,
@@ -46,7 +47,7 @@ export default function OfflineLocationGuide({
     : null
   return (
     <div className="border-t border-blue-200 bg-slate-50 p-3">
-      {imageUrl ? (
+      {imageUrl && imageBounds ? <StaticMapOverlay imageUrl={imageUrl} bounds={imageBounds} points={[{ id: 'task', latitude: taskPosition[0], longitude: taskPosition[1], number: taskNumber }]} participant={participantPosition?.coordinates} radius={radius} /> : imageUrl ? (
         <div className="relative overflow-hidden rounded-lg border border-slate-300 bg-white">
           <img
             src={imageUrl}
