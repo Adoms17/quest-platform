@@ -14,7 +14,7 @@ describe('static offline map', () => {
     expect(url.searchParams.has('geometry')).toBe(false)
     expect(url.searchParams.get('attribution')).toBe('default')
     expect(url.searchParams.get('apiKey')).toBe('public-test-key')
-    expect(asset.bounds).toEqual(fitMapBounds(getStaticOfflineMapBounds(44.6, 33.5, 200)))
+    expect(asset.bounds).toEqual(fitMapBounds(getStaticOfflineMapBounds(44.6, 33.5, 150)))
     const center = projectMapPoint(44.6, 33.5, asset.bounds)
     expect(center.x).toBeCloseTo(400, 0)
     expect(center.y).toBeCloseTo(300, 0)
