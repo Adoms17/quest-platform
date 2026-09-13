@@ -26,6 +26,8 @@ export default function QuestTaskSummary({
   onSelectTask,
   onExit,
   isOnline,
+  onFinish,
+  finishing = false,
 }) {
   const navigationMode = quest.task_navigation_mode || 'sequential'
   const summaryTasks = buildQuestTaskSummary({
@@ -88,6 +90,8 @@ export default function QuestTaskSummary({
       </section>
 
       <QuestOverviewMap
+        imageUrl={quest.offline_overview_image_url}
+        imageBounds={quest.offline_overview_image_url_bounds}
         tasks={summaryTasks}
         isOnline={isOnline}
         onSelectTask={onSelectTask}
@@ -114,6 +118,7 @@ export default function QuestTaskSummary({
           </li>
         ))}
       </ol>
+      {onFinish && <button type="button" disabled={finishing} onClick={onFinish} className="mt-4 rounded border border-red-500 px-4 py-2 text-red-700 disabled:opacity-50">Завершить квест</button>}
 
       {nextTask && (
         <button

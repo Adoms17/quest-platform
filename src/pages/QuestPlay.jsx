@@ -5,6 +5,8 @@ import Loader from '../components/Loader'
 import PendingActionStatus from '../components/PendingActionStatus'
 import QuestStartScreen from '../components/QuestStartScreen'
 import QuestTaskSummary from '../components/QuestTaskSummary'
+import QuestCountdown from '../components/QuestCountdown'
+import { makeQuestDeadline, remainingQuestSeconds } from '../services/questTimeLimit'
 import TaskLocationMap from '../components/TaskLocationMap'
 import ParticipantProfileSelect from '../components/ParticipantProfileSelect'
 import toast from 'react-hot-toast'
@@ -25,6 +27,7 @@ import {
   loadParticipantQuestSummary,
   loadQuestEntryStatus,
   startServerQuestAttempt,
+  loadQuestAttemptClock,
   submitTaskEvent,
 } from '../services/questApi'
 import { verifyHybridCandidate } from '../services/hybridVerification'
@@ -44,6 +47,7 @@ import {
 } from '../services/offlineAnswerAttempt'
 import QuestConnectionStatus from '../components/QuestConnectionStatus'
 import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
+import { syncPendingResults } from '../services/sync'
 import { getQuestAvailability } from '../services/questAvailability'
 import { getAnswerResultMessage } from '../services/questResultPresentation'
 import {
@@ -92,6 +96,26 @@ export default function QuestPlay({ session }) {
   const [startTime, setStartTime] = useState(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [finished, setFinished] = useState(false)
+  const [finishingEarly, setFinishingEarly] = useState(false)
+  const [deadline, setDeadline] = useState(null)
+
+  async function finishEarly(automatic = false) {
+    if (finishingEarly || submittingAnswer || !questAttemptId) return
+    if (automatic !== true && !window.confirm('Завершить квест сейчас? Полученные результаты сохранятся. Остальные задания останутся непройденными.')) return
+    setFinishingEarly(true)
+    try {
+      await enqueuePendingEvent(id, currentTask.id, questAttemptId, { eventType: 'finish' })
+      setHasPendingConfirmation(true)
+      setFinished(true)
+      if (isOnlineRef.current) {
+        await syncPendingResults(session)
+        const pending = await getPendingResults(session.user.id)
+        if (!pending.some(record => !record.synced && record.localQuestAttemptId === questAttemptId)) setHasPendingConfirmation(false)
+      }
+    } catch {
+      toast.error('Не удалось подтвердить завершение. Если оно сохранено локально, приложение повторит синхронизацию.')
+    } finally { setFinishingEarly(false) }
+  }
   const [hasPendingConfirmation, setHasPendingConfirmation] =
   useState(false)
   const [initAttemptDone, setInitAttemptDone] = useState(false)
@@ -320,6 +344,12 @@ export default function QuestPlay({ session }) {
                 ),
               )
               recordOfflineMetric('package-source', 'network')
+              const preparedQuest = await getQuestFromDB(id, participantProfileId)
+              if (signal.aborted) return
+              if (preparedQuest) {
+                questData = { ...questData, cover_image_url: preparedQuest.cover_image_url, cover_image_offline_unavailable: preparedQuest.cover_image_offline_unavailable, offline_overview_image_url: preparedQuest.offline_overview_image_url, offline_overview_image_url_bounds: preparedQuest.offline_overview_image_url_bounds }
+                tasksData = preparedQuest.tasks || tasksData
+              }
               setOfflinePackageMetadata(await getQuestPackageMetadata(
                 id,
                 participantProfileId
@@ -432,6 +462,7 @@ export default function QuestPlay({ session }) {
     const map = {}
 
     for (const attempt of attempts) {
+      if (attempt.eventType === 'finish') continue
       const taskId = attempt.task_id || attempt.taskId
       const current = map[taskId] || {
         id: null,
@@ -468,7 +499,7 @@ export default function QuestPlay({ session }) {
     }
 
     setHasPendingConfirmation(
-      attempts.some(attempt => attempt.eventType === 'answer')
+      attempts.some(attempt => attempt.eventType === 'answer' || attempt.eventType === 'finish')
     )
 
     setTaskAttemptsMap(map)
@@ -480,7 +511,7 @@ export default function QuestPlay({ session }) {
     setFailedTasks(failed)
 
     const nextIndex = findNextTaskIndex(map)
-    if (nextIndex === -1) {
+    if (nextIndex === -1 || attempts.some(attempt => attempt.eventType === 'finish')) {
       setFinished(true)
     } else {
       setCurrentTaskIndex(nextIndex)
@@ -512,6 +543,7 @@ export default function QuestPlay({ session }) {
           const serverAttempt = await startServerQuestAttempt(id, participantProfileId)
 
           attemptId = serverAttempt.id
+          const clock = await loadQuestAttemptClock(attemptId)
 
           setCompletedTasks(serverAttempt.completed_tasks || 0)
           setFailedTasks(serverAttempt.failed_tasks || 0)
@@ -527,7 +559,8 @@ export default function QuestPlay({ session }) {
             attemptId,
             true,
             Boolean(serverAttempt.finished_at),
-            effectiveParticipantProfileId
+            effectiveParticipantProfileId,
+            { startedAt: clock.started_at, deadlineAt: clock.deadline_at }
           )
 
           sessionStorage.setItem(`questAttempt_${id}_${effectiveParticipantProfileId}`, attemptId)
@@ -565,7 +598,8 @@ export default function QuestPlay({ session }) {
         localAttempt = await getActiveLocalQuestAttempt(id, userId, effectiveParticipantProfileId)
         if (!localAttempt || localAttempt.finished) {
           const localId = `local-${Date.now()}`
-          await saveQuestAttempt(localId, id, userId, null, false, false, effectiveParticipantProfileId)
+          const startedAt = new Date().toISOString()
+          await saveQuestAttempt(localId, id, userId, null, false, false, effectiveParticipantProfileId, { startedAt, deadlineAt: makeQuestDeadline(startedAt, quest.time_limit_minutes) })
           localAttempt = await getActiveLocalQuestAttempt(id, userId, effectiveParticipantProfileId)
         }
         attemptId = localAttempt.localId
@@ -583,7 +617,9 @@ export default function QuestPlay({ session }) {
     setQuestAttemptId(attemptId)
     setHasExistingAttempt(true)
     await loadTaskAttempts(attemptId)
-    setStartTime(Date.now())
+    const savedClock = await getQuestAttempt(attemptId)
+    setStartTime(savedClock?.startedAt ? new Date(savedClock.startedAt).getTime() : Date.now())
+    setDeadline(savedClock?.deadlineAt || null)
     setInitAttemptDone(true)
     toast.success('🔓 Квест открыт!')
   }, [hasStarted, isAvailable, quest, tasks, id, session, initAttemptDone, loadTaskAttempts, participantProfileId])
@@ -1103,6 +1139,7 @@ export default function QuestPlay({ session }) {
   }
 
   async function completeTask() {
+    if (remainingQuestSeconds(deadline) === 0) { await finishEarly(true); return }
     if (submittingAnswer || taskCompleted || taskFailed) return
 
     setSubmittingAnswer(true)
@@ -1249,6 +1286,7 @@ export default function QuestPlay({ session }) {
             : '🏁 Квест завершён!'}
         </h1>
         <p className="text-xl mt-4">Завершено заданий: {completedTasks + failedTasks} из {totalTasks}</p>
+        {completedTasks + failedTasks < totalTasks && <p className="text-lg">Не пройдено: {totalTasks - completedTasks - failedTasks}</p>}
         <p className="text-lg mt-2">✅ Успешно: {completedTasks} | ❌ Неуспешно: {failedTasks}</p>
         <p className="text-lg">⏱️ Время: {elapsedSeconds} секунд</p>
         <p className="text-lg">🎯 Процент успеха: {percent}%</p>
@@ -1266,7 +1304,11 @@ export default function QuestPlay({ session }) {
 
   if (showTaskSummary) {
     return (
+      <>
+      <QuestCountdown deadline={deadline} onExpire={() => void finishEarly(true)} />
       <QuestTaskSummary
+        onFinish={finishEarly}
+        finishing={finishingEarly || submittingAnswer}
         quest={quest}
         tasks={tasks}
         taskAttemptsMap={taskAttemptsMap}
@@ -1278,14 +1320,17 @@ export default function QuestPlay({ session }) {
         }}
         onExit={handleExit}
       />
+      </>
     )
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto px-2 py-4 sm:p-6">
+      <QuestCountdown deadline={deadline} onExpire={() => void finishEarly(true)} />
       <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
         <h1 className="text-2xl font-bold">{quest.title}</h1>
         <div className="flex gap-2">
+          <button type="button" disabled={finishingEarly || submittingAnswer} onClick={finishEarly} className="rounded border border-red-500 px-3 py-1 text-sm text-red-700 disabled:opacity-50">Завершить квест</button>
           <button
             type="button"
             onClick={() => setShowTaskSummary(true)}
@@ -1328,7 +1373,7 @@ export default function QuestPlay({ session }) {
           style={{ width: `${progressTaskCount > 0 ? openedTaskCount / progressTaskCount * 100 : 0}%` }}
         />
       </div>
-      <div className="bg-white shadow-sm rounded-sm p-6">
+      <div className="bg-white shadow-sm rounded-sm px-2 py-4 sm:p-6">
         <h2 className="text-xl font-semibold mb-2">{currentTask.title}</h2>
         {(currentTask.location_text || currentTask.location_image_url || (
           Number.isFinite(Number(currentTask.location_latitude)) &&
@@ -1338,12 +1383,12 @@ export default function QuestPlay({ session }) {
           onToggle={event => setLandmarkOpen(event.currentTarget.open)}
           className="mb-4 rounded-sm border border-blue-200 bg-blue-50"
         >
-          <summary className="cursor-pointer p-3 font-semibold text-blue-700">
+          <summary className="cursor-pointer px-2 py-3 sm:px-3 font-semibold text-blue-700">
             📍 Ориентир
           </summary>
-          <div className="px-3 pb-3">
+          <div className="px-2 pb-3 sm:px-3">
             {currentTask.location_text && <p className="mb-3 text-sm text-gray-700">{currentTask.location_text}</p>}
-            {currentTask.location_image_url && <img src={currentTask.location_image_url} alt="Ориентир" className="mb-3 max-h-40 max-w-full rounded-sm object-cover" />}
+            {!isOnline && currentTask.location_image_offline_unavailable ? <p className="mb-3 text-amber-800">Изображение ориентира недоступно офлайн.</p> : currentTask.location_image_url && <img src={currentTask.location_image_url} alt="Ориентир" className="mb-3 max-h-40 max-w-full rounded-sm object-cover" />}
             <TaskLocationMap
               latitude={currentTask.location_latitude}
               longitude={currentTask.location_longitude}
@@ -1405,6 +1450,7 @@ export default function QuestPlay({ session }) {
           <div className="border-t border-gray-200 pt-4 mt-4">
             {currentTask.description && <p className="text-gray-700 mb-2">{currentTask.description}</p>}
             <TaskMedia
+              isOnline={isOnline}
               media={currentTask.media}
             />
             {currentTask.hint && (

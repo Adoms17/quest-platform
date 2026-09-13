@@ -243,7 +243,7 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
   const safeTasks = tasks.map(task => sanitizeParticipantTask(task, questData))
   const mediaManifest = collectOfflineMediaManifest(questData, safeTasks)
   const storageEstimate = await estimateOfflineStorage()
-  const { assets, assetBytes } = await downloadOfflineMediaAssets(
+  const { assets, assetBytes, failures } = await downloadOfflineMediaAssets(
     mediaManifest,
     { storageEstimate },
   )
@@ -267,6 +267,7 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
     downloadedAt: new Date().toISOString(),
     participantAccess,
     offlineAssetRefs,
+    offlineMediaFailures: failures,
   }
   const serializedPackage = JSON.stringify(questWithTasks)
   const packageSizeBytes = new TextEncoder().encode(serializedPackage).byteLength + assetBytes
@@ -276,6 +277,7 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
     questId: questData.id,
     packageVersion: OFFLINE_PACKAGE_VERSION,
     packageSizeBytes,
+    offlineMediaFailures: failures,
     downloadedAt,
     lastSyncDate: existing?.lastSyncDate || null,
   }
@@ -337,6 +339,7 @@ function applyOfflineAssetUrls(quest, assets) {
       }
     } else {
       hydrated[reference.field] = localUrl
+      if (reference.bounds) hydrated[`${reference.field}_bounds`] = reference.bounds
       hydrated[`${reference.field}_content_type`] = asset.contentType || null
     }
   }
@@ -382,7 +385,18 @@ export async function getQuestFromDB(questId, participantProfileId = null) {
   // Очищает от секретов также квесты, сохранённые старой версией приложения.
   await db.put('quests', sanitizedQuest)
   const assets = await db.getAllFromIndex('offlineAssets', 'by_quest_id', questId)
-  return applyOfflineAssetUrls(sanitizedQuest, assets)
+  const hydrated = applyOfflineAssetUrls(sanitizedQuest, assets)
+  for (const failure of quest.offlineMediaFailures || []) {
+    for (const target of failure.targets || []) {
+      const task = hydrated.tasks.find(item => item.id === target.taskId)
+      if (!target.taskId && target.field === 'cover_image_url') hydrated.cover_image_offline_unavailable = true
+      if (task && target.field === 'location_image_url') task.location_image_offline_unavailable = true
+      if (task && target.field === 'media' && task.media?.[target.mediaIndex]) {
+        task.media[target.mediaIndex] = { ...task.media[target.mediaIndex], offline_unavailable: true }
+      }
+    }
+  }
+  return hydrated
 }
 
 export async function getDownloadedQuests() {
@@ -590,6 +604,7 @@ export async function enqueuePendingEvent(
   const now = new Date().toISOString()
   const record = {
     ...data,
+    recordedOffline: data.eventType === 'open' || data.eventType === 'answer',
     questId,
     taskId,
     localQuestAttemptId,
@@ -690,9 +705,13 @@ export async function clearSyncedResults(userId = null) {
 }
 
 // ---------- Локальные попытки прохождения (questAttempts) ----------
-export async function saveQuestAttempt(localId, questId, userId, serverId = null, synced = false, finished = false, participantProfileId = userId) {
+export async function saveQuestAttempt(localId, questId, userId, serverId = null, synced = false, finished = false, participantProfileId = userId, clock = {}) {
   const db = await initDB()
+  const existing = await db.get('questAttempts', localId)
   await db.put('questAttempts', {
+    ...existing,
+    startedAt: existing?.startedAt || new Date().toISOString(),
+    ...clock,
     localId,
     questId,
     userId,

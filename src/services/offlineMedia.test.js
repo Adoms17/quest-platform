@@ -7,6 +7,18 @@ import {
 } from './offlineMedia'
 
 describe('offline media manifest', () => {
+  it('continues after an inaccessible required file and preserves its target for placeholders', async () => {
+    const targets = [{ field: 'media', taskId: 'one', mediaIndex: 0 }]
+    const result = await downloadOfflineMediaAssets([{ url: 'https://media.test/blocked', targets }, { url: 'https://media.test/ok', targets: [] }], {
+      fetchImpl: async url => {
+        if (url.endsWith('blocked')) throw new TypeError('Failed to fetch')
+        return { ok: true, blob: async () => new Blob(['image'], { type: 'image/jpeg' }) }
+      },
+    })
+    expect(result.assets).toHaveLength(1)
+    expect(result.failures).toEqual([{ targets, reason: 'network' }])
+    expect(JSON.stringify(result.failures)).not.toContain('https:')
+  })
   it('collects and deduplicates only remote participant media', () => {
     expect(collectOfflineMediaManifest({
       cover_image_url: 'https://media.test/cover.jpg',
@@ -55,7 +67,7 @@ describe('offline media manifest', () => {
       location_longitude: 33.5,
     }], { staticMap: { apiKey: 'public-test-key' } })
 
-    expect(manifest).toHaveLength(1)
+    expect(manifest).toHaveLength(2)
     expect(manifest[0]).toMatchObject({
       optional: true,
       targets: [{
@@ -77,7 +89,7 @@ describe('offline media manifest', () => {
       storageEstimate: null,
     })
 
-    expect(result).toEqual({ assets: [], assetBytes: 0 })
+    expect(result).toMatchObject({ assets: [], assetBytes: 0, failures: [{ targets: [], reason: 'http' }] })
   })
 
   it('rejects a package larger than the application limit', () => {

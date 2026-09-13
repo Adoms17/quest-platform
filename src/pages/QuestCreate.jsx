@@ -18,6 +18,8 @@ export default function QuestCreate({ session }) {
     useState('all')
   const [maxAttempts, setMaxAttempts] = useState(0)
   const [maxQuestAttempts, setMaxQuestAttempts] = useState(0)
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState(0)
+  const [allowLateOfflineAnswers, setAllowLateOfflineAnswers] = useState(false)
   const [taskNavigationMode, setTaskNavigationMode] =
     useState('sequential')
   const [verificationMode, setVerificationMode] =
@@ -90,6 +92,8 @@ export default function QuestCreate({ session }) {
         location_options: locationOptions,
         max_attempts: parseInt(maxAttempts, 10) || 0,
         max_quest_attempts: parseInt(maxQuestAttempts, 10) || 0,
+        time_limit_minutes: Number(timeLimitMinutes) || 0,
+        allow_late_offline_answers: allowLateOfflineAnswers,
         task_navigation_mode: taskNavigationMode,
       })
       .select()
@@ -306,6 +310,9 @@ export default function QuestCreate({ session }) {
           />
           <p className="text-sm text-gray-500 mt-1">0 — неограниченно. Если указано число, то при исчерпании попыток задание засчитывается как невыполненное.</p>
           <label className="block font-medium mb-1 mt-4">Лимит прохождений квеста участником</label>
+          <label className="block font-medium mt-4">Время прохождения, минут (0 — без ограничения)<input type="number" min="0" max="10080" step="1" value={timeLimitMinutes} onChange={e => setTimeLimitMinutes(e.target.value)} className="w-full border p-2" /></label>
+          <label className="mt-3 flex items-start gap-2"><input type="checkbox" checked={allowLateOfflineAnswers} onChange={e => setAllowLateOfflineAnswers(e.target.checked)} />Принимать офлайн-ответы после истечения времени</label>
+          <p className="text-sm text-gray-500">Разрешает позднюю доставку ответов, введённых до окончания таймера по времени устройства. Применяется к новым попыткам; требует доверия к времени устройства.</p>
           <input
             type="number"
             min="0"

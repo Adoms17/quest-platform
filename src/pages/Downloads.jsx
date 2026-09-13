@@ -169,6 +169,7 @@ export default function Downloads({ session }) {
                     <div className="text-sm text-gray-500 space-y-1">
                       <div>Участник: {q.participantName}</div>
                       <div>Скачан: {new Date(q.downloadedAt).toLocaleString()}</div>
+                      {q.offlineMediaFailures?.length > 0 && <div className="text-amber-800">Пакет неполный: некоторые материалы недоступны офлайн.</div>}
                       {q.expiresAt && (
                         <div>Офлайн-доступ до: {new Date(q.expiresAt).toLocaleString()}</div>
                       )}

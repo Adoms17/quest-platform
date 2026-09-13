@@ -1,4 +1,4 @@
-import { createGeoapifyStaticMapAsset } from './staticOfflineMap'
+import { createGeoapifyStaticMapAsset, createOverviewMapAsset } from './staticOfflineMap'
 
 export const MAX_OFFLINE_MEDIA_BYTES = 50 * 1024 * 1024
 export const MIN_STORAGE_RESERVE_BYTES = 10 * 1024 * 1024
@@ -67,6 +67,8 @@ export function collectOfflineMediaManifest(quest, tasks = [], options = {}) {
     }
   }
 
+  const overview = createOverviewMapAsset(tasks, options.staticMap)
+  if (overview) addAsset('offline-overview', 'offline_overview_image_url', overview.url, null, null, { bounds: overview.bounds }, { optional: true })
   return assets
 }
 
@@ -75,26 +77,28 @@ export async function downloadOfflineMediaAssets(
   { fetchImpl = fetch, storageEstimate = null } = {},
 ) {
   const downloaded = []
+  const failures = []
   let assetBytes = 0
 
   for (const item of manifest) {
     let response
     try {
       response = await fetchImpl(item.url)
-    } catch (cause) {
-      if (item.optional) continue
-      const error = new Error('Не удалось скачать медиаресурсы квеста для офлайн-режима')
-      error.code = 'OFFLINE_MEDIA_DOWNLOAD_FAILED'
-      error.cause = cause
-      throw error
+    } catch {
+      failures.push({ targets: item.targets, reason: 'network' })
+      continue
     }
     if (!response.ok) {
-      if (item.optional) continue
-      const error = new Error('Не удалось скачать медиаресурсы квеста для офлайн-режима')
-      error.code = 'OFFLINE_MEDIA_DOWNLOAD_FAILED'
-      throw error
+      failures.push({ targets: item.targets, reason: 'http', status: response.status })
+      continue
     }
-    const blob = await response.blob()
+    let blob
+    try {
+      blob = await response.blob()
+    } catch {
+      failures.push({ targets: item.targets, reason: 'network' })
+      continue
+    }
     assetBytes += blob.size
     const budget = assessOfflineMediaBudget({ assetBytes, storageEstimate })
     if (!budget.allowed) {
@@ -109,7 +113,7 @@ export async function downloadOfflineMediaAssets(
     downloaded.push({ blob, sizeBytes: blob.size, contentType: blob.type, targets: item.targets })
   }
 
-  return { assets: downloaded, assetBytes }
+  return { assets: downloaded, assetBytes, failures }
 }
 
 export function assessOfflineMediaBudget({

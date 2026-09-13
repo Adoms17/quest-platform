@@ -4,6 +4,13 @@ import TaskMedia from './TaskMedia'
 import { getTaskMediaKind } from '../services/taskMedia'
 
 describe('TaskMedia', () => {
+  it('keeps the unavailable material title and description without requesting its file offline', () => {
+    const { container } = render(<TaskMedia isOnline={false} media={[{ url: 'https://media.test/file.jpg', title: 'Фото', description: 'Описание', offline_unavailable: true }]} />)
+    expect(screen.getByText('Фото')).toBeInTheDocument()
+    expect(screen.getByText('Описание')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Материал недоступен офлайн')
+    expect(container.querySelector('img')).toBeNull()
+  })
   it('renders every media item with its title and description', () => {
     render(<TaskMedia media={[
       { url: 'https://media.test/photo.jpg', title: 'Ориентир', description: 'Дом слева' },
