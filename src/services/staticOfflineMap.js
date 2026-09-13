@@ -1,4 +1,4 @@
-const DEFAULT_MAP_RADIUS_METERS = 200
+const DEFAULT_MAP_RADIUS_METERS = 150
 
 function normalizeCoordinate(value, min, max) {
   const number = Number(value)
