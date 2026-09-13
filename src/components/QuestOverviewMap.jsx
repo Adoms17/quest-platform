@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import StaticMapOverlay from './StaticMapOverlay'
+import { fitMapBounds, getStaticOfflineMapBounds } from '../services/staticOfflineMap'
 
 const markerStyles = {
   completed: { color: '#15803d', fillColor: '#22c55e', tone: 'completed' },
@@ -43,17 +45,20 @@ function getMappedTasks(tasks) {
   }))
 }
 
-export default function QuestOverviewMap({ tasks, isOnline, onSelectTask }) {
+export default function QuestOverviewMap({ tasks, isOnline, onSelectTask, imageUrl, imageBounds }) {
   const mappedTasks = getMappedTasks(tasks)
 
   if (mappedTasks.length === 0) return null
 
   if (!isOnline) {
+    const boxes = mappedTasks.map(task => getStaticOfflineMapBounds(task.latitude, task.longitude, 100))
+    const bounds = imageBounds || fitMapBounds({ west: Math.min(...boxes.map(b => b.west)), east: Math.max(...boxes.map(b => b.east)), north: Math.max(...boxes.map(b => b.north)), south: Math.min(...boxes.map(b => b.south)) })
     return (
       <section className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4">
         <h2 className="font-semibold text-blue-900">🗺️ Карта заданий</h2>
+        <StaticMapOverlay imageUrl={imageUrl} bounds={bounds} points={mappedTasks.map(task => ({ ...task, number: task.index + 1, color: (markerStyles[task.status] || markerStyles.available).fillColor }))} onSelect={onSelectTask} />
         <p className="mt-1 text-sm text-gray-600">
-          Места заданий сохранены. Картографическая подложка появится после подключения к интернету.
+          {imageUrl ? 'Сохранённая карта доступна без интернета.' : 'Места заданий сохранены. Картографическая подложка появится после подключения к интернету.'}
         </p>
       </section>
     )

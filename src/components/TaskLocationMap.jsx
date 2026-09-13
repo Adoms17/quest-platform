@@ -31,6 +31,8 @@ export default function TaskLocationMap({
   isOnline,
   taskNumber,
   verificationRadiusMeters = null,
+  offlineMapImageUrl = null,
+  offlineMapBounds = null,
 }) {
   const [participantPosition, setParticipantPosition] = useState(null)
   const [locationLoading, setLocationLoading] = useState(false)
@@ -154,9 +156,9 @@ export default function TaskLocationMap({
 
   return (
     <section className="mb-4 overflow-hidden rounded-sm border border-blue-200 bg-blue-50">
-      <div className="p-3">
+      <div className="px-2 py-3 sm:px-3">
         <h4 className="font-semibold text-blue-700">🗺️ Ориентир на карте</h4>
-        <div className="mt-2 space-y-1 rounded-lg bg-white p-3 text-sm text-gray-700" aria-live="polite">
+        <div className="mt-2 space-y-1 rounded-lg bg-white px-2 py-3 sm:px-3 text-sm text-gray-700" aria-live="polite">
           <p><strong>Место задания:</strong> {lat.toFixed(6)}, {lng.toFixed(6)}</p>
           {participantPosition && (
             <>
@@ -291,6 +293,8 @@ export default function TaskLocationMap({
           participantPosition={participantPosition}
           taskNumber={taskNumber}
           verificationRadiusMeters={verificationRadiusMeters}
+          imageUrl={offlineMapImageUrl}
+          imageBounds={offlineMapBounds}
         />
       )}
     </section>

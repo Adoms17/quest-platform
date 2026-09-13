@@ -5,6 +5,8 @@ import Loader from '../components/Loader'
 import PendingActionStatus from '../components/PendingActionStatus'
 import QuestStartScreen from '../components/QuestStartScreen'
 import QuestTaskSummary from '../components/QuestTaskSummary'
+import QuestCountdown from '../components/QuestCountdown'
+import { makeQuestDeadline, remainingQuestSeconds } from '../services/questTimeLimit'
 import TaskLocationMap from '../components/TaskLocationMap'
 import ParticipantProfileSelect from '../components/ParticipantProfileSelect'
 import toast from 'react-hot-toast'
@@ -25,6 +27,7 @@ import {
   loadParticipantQuestSummary,
   loadQuestEntryStatus,
   startServerQuestAttempt,
+  loadQuestAttemptClock,
   submitTaskEvent,
 } from '../services/questApi'
 import { verifyHybridCandidate } from '../services/hybridVerification'
@@ -35,7 +38,8 @@ import {
 import { isTransportError } from '../services/network'
 import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
 import { getUserErrorMessage } from '../services/userErrorMessage'
-import { measureOperation } from '../services/operationTiming'
+import { measureOperation, recordOfflineMetric } from '../services/operationTiming'
+import TaskMedia from '../components/TaskMedia'
 import { requiresOnlineQuestStart } from '../services/questVerificationMode'
 import {
   evaluateOfflineAnswerAttempt,
@@ -43,6 +47,7 @@ import {
 } from '../services/offlineAnswerAttempt'
 import QuestConnectionStatus from '../components/QuestConnectionStatus'
 import { finalizeTrustedQuestAttempt } from '../services/questAttemptLifecycle'
+import { syncPendingResults } from '../services/sync'
 import { getQuestAvailability } from '../services/questAvailability'
 import { getAnswerResultMessage } from '../services/questResultPresentation'
 import {
@@ -91,6 +96,26 @@ export default function QuestPlay({ session }) {
   const [startTime, setStartTime] = useState(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [finished, setFinished] = useState(false)
+  const [finishingEarly, setFinishingEarly] = useState(false)
+  const [deadline, setDeadline] = useState(null)
+
+  async function finishEarly(automatic = false) {
+    if (finishingEarly || submittingAnswer || !questAttemptId) return
+    if (automatic !== true && !window.confirm('Завершить квест сейчас? Полученные результаты сохранятся. Остальные задания останутся непройденными.')) return
+    setFinishingEarly(true)
+    try {
+      await enqueuePendingEvent(id, currentTask.id, questAttemptId, { eventType: 'finish' })
+      setHasPendingConfirmation(true)
+      setFinished(true)
+      if (isOnlineRef.current) {
+        await syncPendingResults(session)
+        const pending = await getPendingResults(session.user.id)
+        if (!pending.some(record => !record.synced && record.localQuestAttemptId === questAttemptId)) setHasPendingConfirmation(false)
+      }
+    } catch {
+      toast.error('Не удалось подтвердить завершение. Если оно сохранено локально, приложение повторит синхронизацию.')
+    } finally { setFinishingEarly(false) }
+  }
   const [hasPendingConfirmation, setHasPendingConfirmation] =
   useState(false)
   const [initAttemptDone, setInitAttemptDone] = useState(false)
@@ -207,13 +232,16 @@ export default function QuestPlay({ session }) {
 
   const [openingTask, setOpeningTask] = useState(false)
   const [submittingAnswer, setSubmittingAnswer] = useState(false)
+  const [landmarkOpen, setLandmarkOpen] = useState(true)
   // ----- Онлайн/офлайн -----
   useEffect(() => {
     const handleOnline = () => {
+      recordOfflineMetric('connection-state', 'online')
       setIsOnline(true)
       isOnlineRef.current = true
     }
     const handleOffline = () => {
+      recordOfflineMetric('connection-state', 'offline')
       setIsOnline(false)
       isOnlineRef.current = false
     }
@@ -231,6 +259,8 @@ export default function QuestPlay({ session }) {
 
     if (questLoadKeyRef.current === loadKey) return
     questLoadKeyRef.current = loadKey
+    const abortController = new AbortController()
+    const { signal } = abortController
 
     async function loadQuest() {
       setLoading(true)
@@ -251,7 +281,10 @@ export default function QuestPlay({ session }) {
         let tasksData
 
         async function loadCachedQuest() {
-          const localQuest = await getQuestFromDB(id, participantProfileId)
+          const localQuest = await measureOperation(
+            'load-offline-package',
+            () => getQuestFromDB(id, participantProfileId),
+          )
 
           if (!localQuest) {
             throw new Error('Квест не загружен для работы без интернета')
@@ -269,7 +302,8 @@ export default function QuestPlay({ session }) {
 
         if (isOnlineRef.current) {
           try {
-            const entryStatus = await loadQuestEntryStatus(id)
+            const entryStatus = await loadQuestEntryStatus(id, signal)
+            if (signal.aborted) return
             const entryAvailability = getQuestAvailability(entryStatus)
 
             if (!entryAvailability.isAvailable) {
@@ -282,27 +316,40 @@ export default function QuestPlay({ session }) {
             }
 
             if (participantProfileId) {
-              questData = await loadParticipantQuest(id, participantProfileId)
-              tasksData = await loadParticipantTasks(id, participantProfileId)
+              questData = await loadParticipantQuest(id, participantProfileId, signal)
+              tasksData = await loadParticipantTasks(id, participantProfileId, signal)
             } else {
-              questData = await loadParticipantQuest(id)
-              tasksData = await loadParticipantTasks(id)
+              questData = await loadParticipantQuest(id, undefined, signal)
+              tasksData = await loadParticipantTasks(id, null, signal)
             }
+            if (signal.aborted) return
 
             const effectiveParticipantProfileId = participantProfileId || session?.user?.id
             if (effectiveParticipantProfileId) {
               setQuestSummary(await loadParticipantQuestSummary(
                 id,
-                effectiveParticipantProfileId
+                effectiveParticipantProfileId,
+                signal,
               ))
+              if (signal.aborted) return
             }
 
             try {
-              const packageMetadata = await saveQuestToDB(
-                questData,
-                tasksData,
-                participantProfileId
+              const packageMetadata = await measureOperation(
+                'prepare-offline-package',
+                () => saveQuestToDB(
+                  questData,
+                  tasksData,
+                  participantProfileId
+                ),
               )
+              recordOfflineMetric('package-source', 'network')
+              const preparedQuest = await getQuestFromDB(id, participantProfileId)
+              if (signal.aborted) return
+              if (preparedQuest) {
+                questData = { ...questData, cover_image_url: preparedQuest.cover_image_url, cover_image_offline_unavailable: preparedQuest.cover_image_offline_unavailable, offline_overview_image_url: preparedQuest.offline_overview_image_url, offline_overview_image_url_bounds: preparedQuest.offline_overview_image_url_bounds }
+                tasksData = preparedQuest.tasks || tasksData
+              }
               setOfflinePackageMetadata(await getQuestPackageMetadata(
                 id,
                 participantProfileId
@@ -319,12 +366,16 @@ export default function QuestPlay({ session }) {
             setIsOnline(false)
 
             const cached = await loadCachedQuest()
+            if (signal.aborted) return
+            recordOfflineMetric('package-source', 'cache-fallback')
             questData = cached.questData
             tasksData = cached.tasksData
             setOfflinePackageStatus('ready')
           }
         } else {
           const cached = await loadCachedQuest()
+          if (signal.aborted) return
+          recordOfflineMetric('package-source', 'cache')
           questData = cached.questData
           tasksData = cached.tasksData
           setOfflinePackageStatus('ready')
@@ -345,6 +396,7 @@ export default function QuestPlay({ session }) {
           setHasExistingAttempt(Boolean(localAttempt))
         }
       } catch (err) {
+        if (signal.aborted) return
         setError(err.message)
         const accessErrorMessage = getQuestAccessErrorMessage(err.message)
         toast.error(
@@ -353,11 +405,15 @@ export default function QuestPlay({ session }) {
             : 'Не удалось загрузить квест. Попробуйте ещё раз.'
         )
       } finally {
-        setLoading(false)
+        if (!signal.aborted) setLoading(false)
       }
     }
 
-    loadQuest()
+    void loadQuest()
+    return () => {
+      abortController.abort()
+      if (questLoadKeyRef.current === loadKey) questLoadKeyRef.current = null
+    }
   }, [id, session, participantProfileId])
 
   // ----- Доступность -----
@@ -406,6 +462,7 @@ export default function QuestPlay({ session }) {
     const map = {}
 
     for (const attempt of attempts) {
+      if (attempt.eventType === 'finish') continue
       const taskId = attempt.task_id || attempt.taskId
       const current = map[taskId] || {
         id: null,
@@ -442,7 +499,7 @@ export default function QuestPlay({ session }) {
     }
 
     setHasPendingConfirmation(
-      attempts.some(attempt => attempt.eventType === 'answer')
+      attempts.some(attempt => attempt.eventType === 'answer' || attempt.eventType === 'finish')
     )
 
     setTaskAttemptsMap(map)
@@ -454,7 +511,7 @@ export default function QuestPlay({ session }) {
     setFailedTasks(failed)
 
     const nextIndex = findNextTaskIndex(map)
-    if (nextIndex === -1) {
+    if (nextIndex === -1 || attempts.some(attempt => attempt.eventType === 'finish')) {
       setFinished(true)
     } else {
       setCurrentTaskIndex(nextIndex)
@@ -486,6 +543,7 @@ export default function QuestPlay({ session }) {
           const serverAttempt = await startServerQuestAttempt(id, participantProfileId)
 
           attemptId = serverAttempt.id
+          const clock = await loadQuestAttemptClock(attemptId)
 
           setCompletedTasks(serverAttempt.completed_tasks || 0)
           setFailedTasks(serverAttempt.failed_tasks || 0)
@@ -501,7 +559,8 @@ export default function QuestPlay({ session }) {
             attemptId,
             true,
             Boolean(serverAttempt.finished_at),
-            effectiveParticipantProfileId
+            effectiveParticipantProfileId,
+            { startedAt: clock.started_at, deadlineAt: clock.deadline_at }
           )
 
           sessionStorage.setItem(`questAttempt_${id}_${effectiveParticipantProfileId}`, attemptId)
@@ -539,7 +598,8 @@ export default function QuestPlay({ session }) {
         localAttempt = await getActiveLocalQuestAttempt(id, userId, effectiveParticipantProfileId)
         if (!localAttempt || localAttempt.finished) {
           const localId = `local-${Date.now()}`
-          await saveQuestAttempt(localId, id, userId, null, false, false, effectiveParticipantProfileId)
+          const startedAt = new Date().toISOString()
+          await saveQuestAttempt(localId, id, userId, null, false, false, effectiveParticipantProfileId, { startedAt, deadlineAt: makeQuestDeadline(startedAt, quest.time_limit_minutes) })
           localAttempt = await getActiveLocalQuestAttempt(id, userId, effectiveParticipantProfileId)
         }
         attemptId = localAttempt.localId
@@ -557,7 +617,9 @@ export default function QuestPlay({ session }) {
     setQuestAttemptId(attemptId)
     setHasExistingAttempt(true)
     await loadTaskAttempts(attemptId)
-    setStartTime(Date.now())
+    const savedClock = await getQuestAttempt(attemptId)
+    setStartTime(savedClock?.startedAt ? new Date(savedClock.startedAt).getTime() : Date.now())
+    setDeadline(savedClock?.deadlineAt || null)
     setInitAttemptDone(true)
     toast.success('🔓 Квест открыт!')
   }, [hasStarted, isAvailable, quest, tasks, id, session, initAttemptDone, loadTaskAttempts, participantProfileId])
@@ -610,6 +672,7 @@ export default function QuestPlay({ session }) {
       setTaskFailed(false)
       setTaskAttemptsUsed(0)
       setIsLocationPhase(true)
+      setLandmarkOpen(true)
       setTaskStartTime(Date.now())
 
       if (existing) {
@@ -618,6 +681,7 @@ export default function QuestPlay({ session }) {
         setTaskFailed(existing.failed || false)
         if (existing.opened) {
           setIsLocationPhase(false)
+          setLandmarkOpen(false)
         }
         // Если задание уже завершено – переходим
         if (existing.completed || existing.failed) {
@@ -751,6 +815,7 @@ export default function QuestPlay({ session }) {
         setLocationVerified(requiresGps)
         setCodeVerified(requiresCode)
         setIsLocationPhase(false)
+        setLandmarkOpen(false)
 
         toast.success(
           '⏳ Проверка сохранена и будет подтверждена сервером'
@@ -782,6 +847,7 @@ export default function QuestPlay({ session }) {
         setLocationVerified(requiresGps)
         setCodeVerified(requiresCode)
         setIsLocationPhase(false)
+        setLandmarkOpen(false)
         toast.success('🔓 Задание открыто!')
       } else {
         toast.error('Проверка места или кода не пройдена')
@@ -1073,6 +1139,7 @@ export default function QuestPlay({ session }) {
   }
 
   async function completeTask() {
+    if (remainingQuestSeconds(deadline) === 0) { await finishEarly(true); return }
     if (submittingAnswer || taskCompleted || taskFailed) return
 
     setSubmittingAnswer(true)
@@ -1089,15 +1156,6 @@ export default function QuestPlay({ session }) {
     const m = Math.floor((seconds % 3600) / 60)
     const s = seconds % 60
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  }
-
-  function getMediaType(url) {
-    if (!url) return null
-    const ext = url.split('.').pop().toLowerCase()
-    if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return 'image'
-    if (['mp4','webm','ogg'].includes(ext)) return 'video'
-    if (['mp3','wav','aac'].includes(ext)) return 'audio'
-    return 'image'
   }
 
   const handleExit = () => {
@@ -1228,6 +1286,7 @@ export default function QuestPlay({ session }) {
             : '🏁 Квест завершён!'}
         </h1>
         <p className="text-xl mt-4">Завершено заданий: {completedTasks + failedTasks} из {totalTasks}</p>
+        {completedTasks + failedTasks < totalTasks && <p className="text-lg">Не пройдено: {totalTasks - completedTasks - failedTasks}</p>}
         <p className="text-lg mt-2">✅ Успешно: {completedTasks} | ❌ Неуспешно: {failedTasks}</p>
         <p className="text-lg">⏱️ Время: {elapsedSeconds} секунд</p>
         <p className="text-lg">🎯 Процент успеха: {percent}%</p>
@@ -1245,7 +1304,11 @@ export default function QuestPlay({ session }) {
 
   if (showTaskSummary) {
     return (
+      <>
+      <QuestCountdown deadline={deadline} onExpire={() => void finishEarly(true)} />
       <QuestTaskSummary
+        onFinish={finishEarly}
+        finishing={finishingEarly || submittingAnswer}
         quest={quest}
         tasks={tasks}
         taskAttemptsMap={taskAttemptsMap}
@@ -1257,14 +1320,17 @@ export default function QuestPlay({ session }) {
         }}
         onExit={handleExit}
       />
+      </>
     )
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto px-2 py-4 sm:p-6">
+      <QuestCountdown deadline={deadline} onExpire={() => void finishEarly(true)} />
       <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
         <h1 className="text-2xl font-bold">{quest.title}</h1>
         <div className="flex gap-2">
+          <button type="button" disabled={finishingEarly || submittingAnswer} onClick={finishEarly} className="rounded border border-red-500 px-3 py-1 text-sm text-red-700 disabled:opacity-50">Завершить квест</button>
           <button
             type="button"
             onClick={() => setShowTaskSummary(true)}
@@ -1307,36 +1373,33 @@ export default function QuestPlay({ session }) {
           style={{ width: `${progressTaskCount > 0 ? openedTaskCount / progressTaskCount * 100 : 0}%` }}
         />
       </div>
-      <div className="bg-white shadow-sm rounded-sm p-6">
+      <div className="bg-white shadow-sm rounded-sm px-2 py-4 sm:p-6">
         <h2 className="text-xl font-semibold mb-2">{currentTask.title}</h2>
-        {(currentTask.location_text || currentTask.location_image_url) && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-sm">
-            <h4 className="font-semibold text-blue-700 mb-1">
-              📍 Место задания
-            </h4>
-
-            {currentTask.location_text && (
-              <p className="text-sm text-gray-700 mt-1">
-                {currentTask.location_text}
-              </p>
-            )}
-
-            {currentTask.location_image_url && (
-              <img
-                src={currentTask.location_image_url}
-                alt="Место"
-                className="mt-2 max-w-full h-auto rounded-sm max-h-40 object-cover"
-              />
-            )}
+        {(currentTask.location_text || currentTask.location_image_url || (
+          Number.isFinite(Number(currentTask.location_latitude)) &&
+          Number.isFinite(Number(currentTask.location_longitude))
+        )) && <details
+          open={landmarkOpen}
+          onToggle={event => setLandmarkOpen(event.currentTarget.open)}
+          className="mb-4 rounded-sm border border-blue-200 bg-blue-50"
+        >
+          <summary className="cursor-pointer px-2 py-3 sm:px-3 font-semibold text-blue-700">
+            📍 Ориентир
+          </summary>
+          <div className="px-2 pb-3 sm:px-3">
+            {currentTask.location_text && <p className="mb-3 text-sm text-gray-700">{currentTask.location_text}</p>}
+            {!isOnline && currentTask.location_image_offline_unavailable ? <p className="mb-3 text-amber-800">Изображение ориентира недоступно офлайн.</p> : currentTask.location_image_url && <img src={currentTask.location_image_url} alt="Ориентир" className="mb-3 max-h-40 max-w-full rounded-sm object-cover" />}
+            <TaskLocationMap
+              latitude={currentTask.location_latitude}
+              longitude={currentTask.location_longitude}
+              isOnline={isOnline}
+              taskNumber={currentTaskIndex + 1}
+              verificationRadiusMeters={currentTask.requires_gps ? 50 : null}
+              offlineMapImageUrl={currentTask.offline_map_image_url}
+              offlineMapBounds={currentTask.offline_map_bounds}
+            />
           </div>
-        )}
-        <TaskLocationMap
-          latitude={currentTask.location_latitude}
-          longitude={currentTask.location_longitude}
-          isOnline={isOnline}
-          taskNumber={currentTaskIndex + 1}
-          verificationRadiusMeters={currentTask.requires_gps ? 50 : null}
-        />
+        </details>}
         {isLocationPhase && (
           <div className="border-t border-blue-200 pt-4 mt-4">
             <p className="text-gray-700 mb-3">Для доступа к заданию необходимо подтвердить нахождение на месте:</p>
@@ -1386,23 +1449,10 @@ export default function QuestPlay({ session }) {
         {!isLocationPhase && (
           <div className="border-t border-gray-200 pt-4 mt-4">
             {currentTask.description && <p className="text-gray-700 mb-2">{currentTask.description}</p>}
-            {currentTask.media_url && (
-              <div className="mb-3">
-                {getMediaType(currentTask.media_url) === 'image' && (
-                  <img src={currentTask.media_url} alt="Медиа" className="max-w-full h-auto rounded-sm" />
-                )}
-                {getMediaType(currentTask.media_url) === 'video' && (
-                  <video controls className="max-w-full h-auto rounded-sm">
-                    <source src={currentTask.media_url} type={`video/${currentTask.media_url.split('.').pop()}`} />
-                  </video>
-                )}
-                {getMediaType(currentTask.media_url) === 'audio' && (
-                  <audio controls className="w-full">
-                    <source src={currentTask.media_url} type={`audio/${currentTask.media_url.split('.').pop()}`} />
-                  </audio>
-                )}
-              </div>
-            )}
+            <TaskMedia
+              isOnline={isOnline}
+              media={currentTask.media}
+            />
             {currentTask.hint && (
               <details className="mb-3">
                 <summary className="text-blue-500 cursor-pointer">Подсказка</summary>

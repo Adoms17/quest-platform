@@ -4,7 +4,7 @@ import {
 } from './db'
 import { loadTaskEventReceipts } from './questApi'
 
-const SUPPORTED_EVENT_TYPES = new Set(['open', 'answer'])
+const SUPPORTED_EVENT_TYPES = new Set(['open', 'answer', 'finish'])
 
 function isRejectedOpen(record, receipt) {
   return record.eventType === 'open' && (

@@ -8,6 +8,7 @@ import LazyRouteErrorBoundary from './components/LazyRouteErrorBoundary'
 import { selectAuthSession } from './services/authSession'
 import { isTransportError } from './services/network'
 import { createSyncCoordinator } from './services/syncCoordinator'
+import { measureOperation, recordOfflineMetric } from './services/operationTiming'
 import { PENDING_RESULT_ENQUEUED_EVENT } from './services/syncSignals'
 import { OrganizationProvider } from './contexts/OrganizationContext'
 import {
@@ -101,9 +102,22 @@ function App() {
         const { syncPendingResultsWithRetry } =
           await import('./services/sync')
 
-        return syncPendingResultsWithRetry(session, 1, {
-          suppressErrorToast: true,
-        })
+        try {
+          const result = await measureOperation(
+            'background-sync-pending-results',
+            () => syncPendingResultsWithRetry(session, 1, {
+              suppressErrorToast: true,
+            }),
+          )
+          recordOfflineMetric(
+            'sync-result',
+            result.syncedEvents > 0 ? 'success' : 'nothing-to-sync',
+          )
+          return result
+        } catch (error) {
+          recordOfflineMetric('sync-result', 'error')
+          throw error
+        }
       },
     })
 

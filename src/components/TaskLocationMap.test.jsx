@@ -81,6 +81,28 @@ describe('TaskLocationMap', () => {
     expect(screen.queryByTestId('map')).not.toBeInTheDocument()
   })
 
+  it('показывает сохранённую статическую карту офлайн и наносит текущую позицию', async () => {
+    render(
+      <TaskLocationMap
+        latitude={44.6}
+        longitude={33.5}
+        isOnline={false}
+        taskNumber={2}
+        offlineMapImageUrl="blob:offline-map"
+        offlineMapBounds={{ south: 44.59, west: 33.49, north: 44.61, east: 33.51 }}
+      />
+    )
+
+    expect(screen.getByRole('img', { name: 'Сохранённая офлайн-карта места задания 2' }))
+      .toHaveAttribute('src', 'blob:offline-map')
+    expect(screen.getByText('Сохранённая карта доступна без подключения к интернету.'))
+      .toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Показать мою геопозицию' }))
+    expect(await screen.findByLabelText('Ваша текущая позиция на сохранённой карте'))
+      .toBeInTheDocument()
+  })
+
   it('показывает расстояние и направление на офлайн-схеме', async () => {
     render(
       <TaskLocationMap

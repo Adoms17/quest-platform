@@ -20,6 +20,16 @@ import {
 } from './questApi'
 
 describe('questApi', () => {
+  it('routes recorded offline events through the late-delivery policy', async () => {
+    rpc.mockResolvedValue({ data: { accepted: true }, error: null })
+    await submitTaskEvent({ questAttemptId: 'attempt', taskId: 'task', clientEventId: 'event', eventType: 'answer', offlineRecordedAt: '2026-01-01T00:00:00Z' })
+    expect(rpc).toHaveBeenCalledWith('submit_offline_task_event', expect.objectContaining({ p_recorded_at: '2026-01-01T00:00:00Z', p_event_type: 'answer' }))
+  })
+  it('finishes through the dedicated idempotent RPC', async () => {
+    rpc.mockResolvedValue({ data: { accepted: true }, error: null })
+    await submitTaskEvent({ questAttemptId: 'attempt', taskId: 'task', clientEventId: 'event', eventType: 'finish' })
+    expect(rpc).toHaveBeenCalledWith('finish_quest_early', { p_quest_attempt_id: 'attempt', p_task_id: 'task', p_client_event_id: 'event' })
+  })
   beforeEach(() => {
     rpc.mockReset()
   })
@@ -32,6 +42,20 @@ describe('questApi', () => {
     expect(rpc).toHaveBeenCalledWith('get_participant_tasks', {
       p_quest_id: 'quest-1',
     })
+  })
+
+  it('passes route cancellation to participant-loading requests', async () => {
+    const controller = new AbortController()
+    const abortSignal = vi.fn().mockResolvedValue({ data: [], error: null })
+    rpc.mockReturnValue({ abortSignal })
+
+    await expect(loadParticipantTasks(
+      'quest-1',
+      null,
+      controller.signal,
+    )).resolves.toEqual([])
+
+    expect(abortSignal).toHaveBeenCalledWith(controller.signal)
   })
 
   it('loads minimal availability before participant access', async () => {

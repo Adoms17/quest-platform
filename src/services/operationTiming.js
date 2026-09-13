@@ -1,4 +1,10 @@
 const METRIC_PREFIX = 'quest-platform:operation:'
+const OFFLINE_METRIC_PREFIX = 'quest-platform:offline:'
+const ALLOWED_OFFLINE_DETAILS = {
+  'connection-state': new Set(['online', 'offline']),
+  'package-source': new Set(['network', 'cache', 'cache-fallback']),
+  'sync-result': new Set(['success', 'error', 'nothing-to-sync']),
+}
 
 export async function measureOperation(operationName, callback) {
   const startedAt = performance.now()
@@ -26,4 +32,22 @@ export function getOperationTimings() {
   return performance
     .getEntriesByType('measure')
     .filter(entry => entry.name.startsWith(METRIC_PREFIX))
+}
+
+export function recordOfflineMetric(metricName, value) {
+  if (!ALLOWED_OFFLINE_DETAILS[metricName]?.has(value)) return false
+  try {
+    performance.mark(`${OFFLINE_METRIC_PREFIX}${metricName}`, {
+      detail: { value },
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function getOfflineMetrics() {
+  return performance
+    .getEntriesByType('mark')
+    .filter(entry => entry.name.startsWith(OFFLINE_METRIC_PREFIX))
 }

@@ -88,6 +88,8 @@ describe('sanitizeParticipantTask', () => {
       location_latitude: 44.6,
       location_longitude: 33.5,
       required_photo_hash: 'private-hash',
+      media_url: 'https://legacy.test/media.jpg',
+      media: [{ url: 'https://media.test/current.jpg' }],
       answer_verifier: { digest: 'answer-digest' },
       code_verifier: { digest: 'code-digest' },
     }, {
@@ -106,6 +108,8 @@ describe('sanitizeParticipantTask', () => {
     expect(safeTask).not.toHaveProperty('static_code')
     expect(safeTask).not.toHaveProperty('gps_point')
     expect(safeTask).not.toHaveProperty('required_photo_hash')
+    expect(safeTask).not.toHaveProperty('media_url')
+    expect(safeTask.media).toEqual([{ url: 'https://media.test/current.jpg' }])
     expect(safeTask).not.toHaveProperty('answer_verifier')
     expect(safeTask).not.toHaveProperty('code_verifier')
   })

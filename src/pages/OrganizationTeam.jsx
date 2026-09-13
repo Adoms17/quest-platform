@@ -14,6 +14,7 @@ import {
 import { loadLocalSecretLinks, removeLocalSecretLink, saveLocalSecretLink } from '../services/localSecretLinks'
 import { hasOrganizationPermission } from '../services/organizationPermissions'
 import { getUserErrorMessage } from '../services/userErrorMessage'
+import InvitationQrCode from '../components/InvitationQrCode'
 
 function roleNames(roles) {
   return roles?.map(role => role.name).join(', ') || 'Без роли'
@@ -268,12 +269,13 @@ export default function OrganizationTeam() {
         </form>
         {invitationLink && (
           <div className="mt-4 rounded-lg bg-green-50 p-4 text-sm text-green-900">
-            <p className="mb-2 font-medium">Ссылка показывается только сейчас:</p>
+            <p className="mb-2 font-medium">Ссылка сохранена в этом браузере:</p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input readOnly value={invitationLink} className="min-w-0 flex-1 rounded-sm border bg-white px-2 py-1" />
               <button type="button" onClick={copyInvitationLink} className="rounded-sm bg-green-700 px-3 py-1 text-white">
                 Копировать
               </button>
+              <span className="self-center"><InvitationQrCode value={invitationLink} label="в организацию" /></span>
             </div>
           </div>
         )}
@@ -347,9 +349,10 @@ export default function OrganizationTeam() {
               <div key={invitation.id} className="flex flex-col justify-between gap-3 rounded-lg border bg-white p-4 sm:flex-row sm:items-center">
                 <div><strong>{invitation.email}</strong><p className="text-sm text-gray-500">{roleNames(invitation.roles)} · до {formatDate(invitation.expires_at)}</p></div>
                 <div className="flex gap-4">
-                  {savedInvitationLinks[invitation.id] && (
+                  {savedInvitationLinks[invitation.id] && <>
                     <button type="button" onClick={async () => { await navigator.clipboard.writeText(savedInvitationLinks[invitation.id]); toast.success('Ссылка скопирована') }} className="text-sm text-blue-700 hover:underline">Копировать ссылку</button>
-                  )}
+                    <InvitationQrCode value={savedInvitationLinks[invitation.id]} label="в организацию" />
+                  </>}
                   <button type="button" onClick={() => handleRevokeInvitation(invitation.id)} className="self-start text-sm text-red-700 hover:underline">Отозвать</button>
                 </div>
               </div>
