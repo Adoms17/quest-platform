@@ -1,3 +1,5 @@
+import AppBrand from '../components/AppBrand'
+import { getLoginDestination } from '../services/appNavigation'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -64,7 +66,7 @@ export default function Login({ setSession }) {
       }
       setSession(data.session)
       const returnPath = location.state?.from
-      navigate(typeof returnPath === 'string' && returnPath.startsWith('/') ? returnPath : '/quests')
+      navigate(getLoginDestination(returnPath, data.session?.user?.id))
     } catch (error) {
       logAuthError(mode === 'signup' ? 'Ошибка регистрации' : 'Ошибка входа', error)
       toast.error(getAuthErrorMessage(error))
@@ -76,7 +78,7 @@ export default function Login({ setSession }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
       <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow-md">
-        <h1 className="text-center text-2xl font-bold">Quest Platform</h1>
+        <h1 className="flex justify-center text-2xl font-bold"><AppBrand /></h1>
         <div className="mt-6 grid grid-cols-2 rounded-lg bg-gray-100 p-1" role="tablist" aria-label="Режим авторизации">
           <button type="button" role="tab" aria-selected={mode === 'signin'} onClick={() => switchMode('signin')} className={`rounded-md px-3 py-2 ${mode === 'signin' ? 'bg-white font-medium shadow-sm' : 'text-gray-600'}`}>Вход</button>
           <button type="button" role="tab" aria-selected={mode === 'signup'} onClick={() => switchMode('signup')} className={`rounded-md px-3 py-2 ${mode === 'signup' ? 'bg-white font-medium shadow-sm' : 'text-gray-600'}`}>Регистрация</button>

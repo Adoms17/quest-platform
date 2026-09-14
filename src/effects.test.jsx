@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   params: { id: 'quest-1', taskId: undefined },
   navigate: vi.fn(),
   from: vi.fn(),
+  rpc: vi.fn(),
   map: {
     on: vi.fn(),
     off: vi.fn(),
@@ -23,13 +24,13 @@ vi.mock('react-router-dom', async (importOriginal) => {
 })
 
 vi.mock('./supabaseClient', () => ({
-  supabase: { from: mocks.from },
+  supabase: { from: mocks.from, rpc: mocks.rpc },
 }))
 
 vi.mock('./contexts/useOrganization', () => ({
   useOrganization: () => ({
     organizations: [{ id: 'organization-1', name: 'Organization' }],
-    currentOrganization: { id: 'organization-1', name: 'Organization' },
+    currentOrganization: { id: 'organization-1', name: 'Organization', permissions: ['quests.read'] },
     loadingOrganizations: false,
     organizationError: null,
     selectOrganization: vi.fn(),
@@ -105,6 +106,9 @@ function callsFor(table) {
 beforeEach(() => {
   mocks.params = { id: 'quest-1', taskId: undefined }
   mocks.navigate.mockReset()
+  mocks.rpc.mockReset()
+  mocks.rpc.mockResolvedValue({ data: { items: [], has_more: false, next_cursor: null }, error: null })
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   mocks.from.mockReset()
   mocks.from.mockImplementation(createQuery)
   mocks.map.on.mockReset()
@@ -115,14 +119,14 @@ beforeEach(() => {
 describe('stable data-loading effects', () => {
   it('reloads QuestList only when the user id changes', async () => {
     const { rerender } = render(<QuestList session={{ user: { id: 'user-1' } }} />)
-    await waitFor(() => expect(callsFor('quests')).toBe(1))
+    await waitFor(() => expect(mocks.rpc).toHaveBeenCalledTimes(1))
 
     rerender(<QuestList session={{ user: { id: 'user-1' } }} />)
     await act(async () => {})
-    expect(callsFor('quests')).toBe(1)
+    expect(mocks.rpc).toHaveBeenCalledTimes(1)
 
     rerender(<QuestList session={{ user: { id: 'user-2' } }} />)
-    await waitFor(() => expect(callsFor('quests')).toBe(2))
+    await waitFor(() => expect(mocks.rpc).toHaveBeenCalledTimes(2))
   })
 
   it('reloads QuestEdit only when the quest id changes', async () => {

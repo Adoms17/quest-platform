@@ -1,393 +1,68 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import toast from 'react-hot-toast'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useOrganization } from '../contexts/useOrganization'
-import {
-  createOrganizationInvitation,
-  listAssignableOrganizationRoles,
-  listOrganizationAuditEvents,
-  listOrganizationInvitations,
-  listOrganizationTeam,
-  revokeOrganizationInvitation,
-  revokeOrganizationMembership,
-  setOrganizationMemberRoles,
-} from '../services/teamApi'
-import { loadLocalSecretLinks, removeLocalSecretLink, saveLocalSecretLink } from '../services/localSecretLinks'
 import { hasOrganizationPermission } from '../services/organizationPermissions'
-import { getUserErrorMessage } from '../services/userErrorMessage'
-import InvitationQrCode from '../components/InvitationQrCode'
-
-function roleNames(roles) {
-  return roles?.map(role => role.name).join(', ') || 'Без роли'
+import OrganizationInvitationActions from '../components/OrganizationInvitationActions'
+import { loadLocalSecretLinks } from '../services/localSecretLinks'
+import OrganizationMemberActions from '../components/OrganizationMemberActions'
+import { useTeamCatalog } from '../hooks/useTeamCatalog'
+const Invite = lazy(() => import('../components/OrganizationInvite'))
+const Audit = lazy(() => import('../components/OrganizationAudit'))
+const labels = { active: 'Активен', invited: 'Приглашён', suspended: 'Приостановлен', revoked: 'Доступ отозван', pending: 'Ожидает принятия', accepted: 'Принято', expired: 'Истекло' }
+const date = value => value ? new Date(value).toLocaleString('ru-RU') : '—'
+export default function OrganizationTeam({ session }) {
+  const { currentOrganization, loadingOrganizations, organizationError, reloadOrganizations } = useOrganization()
+  if (loadingOrganizations) return <p className="p-4" role="status">Загрузка организации…</p>
+  if (organizationError) return <div className="p-4" role="alert"><p>Не удалось загрузить организации.</p><button type="button" onClick={() => void reloadOrganizations()} className="py-3 text-blue-700">Повторить</button></div>
+  if (!currentOrganization) return <p className="p-4">Нет доступной организации.</p>
+  const canRead = hasOrganizationPermission(currentOrganization, 'members.read')
+  const canManage = hasOrganizationPermission(currentOrganization, 'members.manage')
+  if (!canRead && !canManage) return <p className="p-4">Нет доступа к команде организации.</p>
+  return <Team key={`${session?.user?.id}:${currentOrganization.id}:${canRead}:${canManage}`} organization={currentOrganization} actorId={session?.user?.id} canRead={canRead} canManage={canManage} />
 }
-
-function formatDate(value) {
-  return new Intl.DateTimeFormat('ru-RU', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value))
+function Team({ organization, actorId, canRead, canManage }) {
+  const [kind, setKind] = useState(canRead ? 'members' : 'invitations')
+  const [inviting, setInviting] = useState(false)
+  const [revision, setRevision] = useState(0)
+  if (inviting) return <div className="mx-auto max-w-3xl space-y-4 p-4 [overflow-wrap:anywhere]"><p className="font-medium">{organization.name}</p><Suspense fallback={<p role="status">Загрузка формы…</p>}><Invite organizationId={organization.id} onClose={() => { setInviting(false); setKind('invitations'); setRevision(n => n + 1) }} onCheck={() => { setInviting(false); setKind('invitations'); setRevision(n => n + 1) }} /></Suspense></div>
+  return <div className="mx-auto max-w-5xl space-y-4 px-4 py-6 [overflow-wrap:anywhere] sm:px-6">
+    <header><p className="text-sm text-gray-600">{organization.name}</p><h1 className="text-2xl font-bold">Команда организации</h1></header>
+    <div role="group" aria-label="Списки команды" className="flex flex-wrap gap-2">
+      {canRead && <button type="button" aria-pressed={kind === 'members'} onClick={() => setKind('members')} className={`rounded-lg border px-4 py-3 ${kind === 'members' ? 'bg-blue-600 text-white' : ''}`}>Сотрудники</button>}
+      {canManage && <button type="button" aria-pressed={kind === 'invitations'} onClick={() => setKind('invitations')} className={`rounded-lg border px-4 py-3 ${kind === 'invitations' ? 'bg-blue-600 text-white' : ''}`}>Приглашения</button>}
+      {canManage && <button type="button" aria-pressed={kind === 'audit'} onClick={() => setKind('audit')} className={`rounded-lg border px-4 py-3 ${kind === 'audit' ? 'bg-blue-600 text-white' : ''}`}>Журнал</button>}
+    </div>
+    {canManage && <button type="button" onClick={() => setInviting(true)} className="rounded-lg bg-blue-600 px-4 py-3 text-white">Пригласить сотрудника</button>}
+    {kind === 'audit' ? <Suspense fallback={<p role="status">Загрузка журнала…</p>}><Audit organizationId={organization.id} actorId={actorId} /></Suspense> : <Catalog key={`${kind}:${revision}`} organizationId={organization.id} actorId={actorId} kind={kind} canManage={canManage} />}
+  </div>
 }
-
-const auditActionLabels = {
-  'invitation.created': 'Создано приглашение в команду',
-  'invitation.accepted': 'Приглашение принято',
-  'invitation.revoked': 'Приглашение отозвано',
-  'membership.roles_changed': 'Изменены роли участника команды',
-  'membership.revoked': 'Отозван доступ участника команды',
-  'quest_access.credential_created': 'Создан способ доступа к квесту',
-  'quest_access.credential_redeemed': 'Активирован доступ к квесту',
-  'quest_access.credential_revoked': 'Отозван способ доступа к квесту',
-  'quest_access.grant_revoked': 'Отозван выданный доступ к квесту',
-}
-
-export default function OrganizationTeam() {
-  const { currentOrganization, loadingOrganizations } = useOrganization()
-  const [members, setMembers] = useState([])
-  const [invitations, setInvitations] = useState([])
-  const [availableRoles, setAvailableRoles] = useState([])
-  const [auditEvents, setAuditEvents] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [email, setEmail] = useState('')
-  const [selectedRoles, setSelectedRoles] = useState([])
-  const [submitting, setSubmitting] = useState(false)
-  const [invitationLink, setInvitationLink] = useState('')
-  const [editingMemberId, setEditingMemberId] = useState(null)
-  const [memberRoleKeys, setMemberRoleKeys] = useState([])
-  const [savingMemberId, setSavingMemberId] = useState(null)
-  const [savedInvitationLinks, setSavedInvitationLinks] = useState({})
-  const linkScope = `organization:${currentOrganization?.id || 'none'}`
-  const canManageTeam = hasOrganizationPermission(currentOrganization, 'members.manage')
-
-  const pendingInvitations = useMemo(
-    () => invitations.filter(invitation => invitation.status === 'pending'),
-    [invitations]
-  )
-
-  const loadTeam = useCallback(async () => {
-    if (!currentOrganization?.id || !hasOrganizationPermission(currentOrganization, 'members.manage')) {
-      setMembers([])
-      setInvitations([])
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-    try {
-      const [nextMembers, nextInvitations, nextRoles, nextAuditEvents] = await Promise.all([
-        listOrganizationTeam(currentOrganization.id),
-        listOrganizationInvitations(currentOrganization.id),
-        listAssignableOrganizationRoles(),
-        listOrganizationAuditEvents(currentOrganization.id),
-      ])
-      setMembers(nextMembers)
-      setInvitations(nextInvitations)
-      setAvailableRoles(nextRoles)
-      setAuditEvents(nextAuditEvents)
-      setSelectedRoles(current => current.length ? current : [nextRoles[0]?.key].filter(Boolean))
-    } catch (nextError) {
-      console.error('Ошибка загрузки команды:', {
-        code: nextError?.code,
-        message: nextError?.message,
-      })
-      setError(nextError)
-    } finally {
-      setLoading(false)
-    }
-  }, [currentOrganization])
-
-  useEffect(() => {
-    const timeout = setTimeout(() => void loadTeam(), 0)
-    return () => clearTimeout(timeout)
-  }, [loadTeam])
-
+function Catalog({ organizationId, actorId, kind, canManage }) {
+  const [search, setSearch] = useState(''), [status, setStatus] = useState(kind === 'members' ? 'active' : 'pending'), [revision, setRevision] = useState(0)
+  const [links, setLinks] = useState({})
   useEffect(() => {
     let active = true
-    void loadLocalSecretLinks(linkScope).then(links => {
-      if (active) setSavedInvitationLinks(links)
-    })
+    if (kind === 'invitations') loadLocalSecretLinks(`organization:${organizationId}`).then(data => { if (active) setLinks(data) })
     return () => { active = false }
-  }, [linkScope])
-
-  const toggleRole = roleKey => {
-    setSelectedRoles(current => current.includes(roleKey)
-      ? current.filter(key => key !== roleKey)
-      : [...current, roleKey])
-  }
-
-  const handleInvite = async event => {
-    event.preventDefault()
-    if (!currentOrganization || selectedRoles.length === 0) return
-
-    setSubmitting(true)
-    setInvitationLink('')
-    try {
-      const invitation = await createOrganizationInvitation({
-        organizationId: currentOrganization.id,
-        email,
-        roleKeys: selectedRoles,
-      })
-      const link = `${window.location.origin}/invitations/accept?token=${encodeURIComponent(invitation.invitation_token)}`
-      setSavedInvitationLinks(await saveLocalSecretLink(linkScope, invitation.invitation_id, link))
-      setInvitationLink(link)
-      setEmail('')
-      toast.success('Приглашение создано')
-      await loadTeam()
-    } catch (nextError) {
-      toast.error(getUserErrorMessage(nextError, 'Не удалось создать приглашение.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const copyInvitationLink = async () => {
-    await navigator.clipboard.writeText(invitationLink)
-    toast.success('Ссылка скопирована')
-  }
-
-  const handleRevokeInvitation = async invitationId => {
-    try {
-      await revokeOrganizationInvitation(invitationId)
-      setSavedInvitationLinks(await removeLocalSecretLink(linkScope, invitationId))
-      toast.success('Приглашение отозвано')
-      await loadTeam()
-    } catch (nextError) {
-      toast.error(getUserErrorMessage(nextError, 'Не удалось отозвать приглашение.'))
-    }
-  }
-
-  const handleRevokeMember = async member => {
-    if (!window.confirm(`Отозвать доступ у ${member.username || member.email}?`)) return
-    try {
-      await revokeOrganizationMembership(member.membership_id)
-      toast.success('Доступ отозван')
-      await loadTeam()
-    } catch (nextError) {
-      toast.error(getUserErrorMessage(nextError, 'Не удалось отозвать доступ.'))
-    }
-  }
-
-  const startEditingMember = member => {
-    setEditingMemberId(member.membership_id)
-    setMemberRoleKeys(member.roles?.map(role => role.key) || [])
-  }
-
-  const toggleMemberRole = roleKey => {
-    setMemberRoleKeys(current => current.includes(roleKey)
-      ? current.filter(key => key !== roleKey)
-      : [...current, roleKey])
-  }
-
-  const handleSaveMemberRoles = async member => {
-    if (memberRoleKeys.length === 0) return
-    setSavingMemberId(member.membership_id)
-    try {
-      await setOrganizationMemberRoles(member.membership_id, memberRoleKeys)
-      toast.success('Роли обновлены')
-      setEditingMemberId(null)
-      await loadTeam()
-    } catch (nextError) {
-      toast.error(getUserErrorMessage(nextError, 'Не удалось изменить роли.'))
-    } finally {
-      setSavingMemberId(null)
-    }
-  }
-
-  if (loadingOrganizations || loading) {
-    return <div className="mx-auto max-w-6xl p-6">Загрузка команды...</div>
-  }
-
-  if (!currentOrganization) {
-    return <div className="mx-auto max-w-6xl p-6">Нет доступной организации.</div>
-  }
-
-  if (!canManageTeam) {
-    return <div className="mx-auto max-w-6xl p-6">Нет доступа к управлению командой.</div>
-  }
-
-  if (error) {
-    return (
-      <div className="mx-auto max-w-6xl p-6">
-        <h1 className="mb-3 text-2xl font-bold">Команда</h1>
-        <p className="rounded-lg bg-red-50 p-4 text-red-800">
-          Нет доступа к управлению командой или данные временно недоступны.
-        </p>
-        <button
-          type="button"
-          onClick={() => void loadTeam()}
-          className="mt-4 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white"
-        >
-          Повторить загрузку
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6">
-      <header>
-        <p className="text-sm text-gray-500">{currentOrganization.name}</p>
-        <h1 className="text-2xl font-bold">Команда организации</h1>
-      </header>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-        <h2 className="mb-4 text-lg font-semibold">Пригласить сотрудника</h2>
-        <form className="space-y-4" onSubmit={handleInvite}>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">Email</span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={event => setEmail(event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 sm:max-w-md"
-              placeholder="manager@example.com"
-            />
-          </label>
-          <fieldset>
-            <legend className="mb-2 text-sm font-medium">Роли</legend>
-            <div className="flex flex-wrap gap-3">
-              {availableRoles.map(role => (
-                <label key={role.key} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedRoles.includes(role.key)}
-                    onChange={() => toggleRole(role.key)}
-                  />
-                  {role.name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <button
-            type="submit"
-            disabled={submitting || selectedRoles.length === 0}
-            className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white disabled:opacity-50"
-          >
-            {submitting ? 'Создание...' : 'Создать приглашение'}
-          </button>
-        </form>
-        {invitationLink && (
-          <div className="mt-4 rounded-lg bg-green-50 p-4 text-sm text-green-900">
-            <p className="mb-2 font-medium">Ссылка сохранена в этом браузере:</p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input readOnly value={invitationLink} className="min-w-0 flex-1 rounded-sm border bg-white px-2 py-1" />
-              <button type="button" onClick={copyInvitationLink} className="rounded-sm bg-green-700 px-3 py-1 text-white">
-                Копировать
-              </button>
-              <span className="self-center"><InvitationQrCode value={invitationLink} label="в организацию" /></span>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Участники команды</h2>
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50">
-              <tr><th className="p-3">Пользователь</th><th className="p-3">Роли</th><th className="p-3">Статус</th><th className="p-3"><span className="sr-only">Действия</span></th></tr>
-            </thead>
-            <tbody>
-              {members.map(member => (
-                <tr key={member.membership_id} className="border-t">
-                  <td className="p-3"><strong className="block">{member.username || member.email}</strong><span className="text-gray-500">{member.email}</span></td>
-                  <td className="p-3">
-                    {editingMemberId === member.membership_id ? (
-                      <fieldset className="flex min-w-56 flex-col gap-2">
-                        <legend className="sr-only">Роли пользователя</legend>
-                        {availableRoles.map(role => (
-                          <label key={role.key} className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={memberRoleKeys.includes(role.key)}
-                              onChange={() => toggleMemberRole(role.key)}
-                            />
-                            {role.name}
-                          </label>
-                        ))}
-                      </fieldset>
-                    ) : roleNames(member.roles)}
-                  </td>
-                  <td className="p-3">{member.status === 'active' ? 'Активен' : 'Доступ отозван'}</td>
-                  <td className="p-3 text-right">
-                    {!member.roles?.some(role => role.key === 'owner') && member.status === 'active' && (
-                      <div className="flex flex-col items-end gap-2">
-                        {editingMemberId === member.membership_id ? (
-                          <>
-                            <button
-                              type="button"
-                              disabled={savingMemberId === member.membership_id || memberRoleKeys.length === 0}
-                              onClick={() => handleSaveMemberRoles(member)}
-                              className="text-blue-700 hover:underline disabled:opacity-50"
-                            >
-                              {savingMemberId === member.membership_id ? 'Сохранение...' : 'Сохранить роли'}
-                            </button>
-                            <button type="button" onClick={() => setEditingMemberId(null)} className="text-gray-600 hover:underline">Отмена</button>
-                          </>
-                        ) : (
-                          <button type="button" onClick={() => startEditingMember(member)} className="text-blue-700 hover:underline">Изменить роли</button>
-                        )}
-                        <button type="button" onClick={() => handleRevokeMember(member)} className="text-red-700 hover:underline">Отозвать доступ</button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Активные приглашения</h2>
-        {pendingInvitations.length === 0 ? (
-          <p className="text-sm text-gray-500">Активных приглашений нет.</p>
-        ) : (
-          <div className="space-y-2">
-            {pendingInvitations.map(invitation => (
-              <div key={invitation.id} className="flex flex-col justify-between gap-3 rounded-lg border bg-white p-4 sm:flex-row sm:items-center">
-                <div><strong>{invitation.email}</strong><p className="text-sm text-gray-500">{roleNames(invitation.roles)} · до {formatDate(invitation.expires_at)}</p></div>
-                <div className="flex gap-4">
-                  {savedInvitationLinks[invitation.id] && <>
-                    <button type="button" onClick={async () => { await navigator.clipboard.writeText(savedInvitationLinks[invitation.id]); toast.success('Ссылка скопирована') }} className="text-sm text-blue-700 hover:underline">Копировать ссылку</button>
-                    <InvitationQrCode value={savedInvitationLinks[invitation.id]} label="в организацию" />
-                  </>}
-                  <button type="button" onClick={() => handleRevokeInvitation(invitation.id)} className="self-start text-sm text-red-700 hover:underline">Отозвать</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <div className="mb-3 flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">Журнал действий</h2>
-          <button type="button" onClick={() => void loadTeam()} className="text-sm text-blue-700 hover:underline">
-            Обновить
-          </button>
-        </div>
-        {auditEvents.length === 0 ? (
-          <p className="text-sm text-gray-500">Событий пока нет.</p>
-        ) : (
-          <ol className="space-y-2">
-            {auditEvents.map(event => (
-              <li key={event.id} className="rounded-lg border bg-white p-4">
-                <p className="font-medium">{auditActionLabels[event.action] || event.action}</p>
-                <p className="mt-1 text-sm text-gray-500">
-                  {formatDate(event.created_at)} · {event.actor_username || 'Системное действие'}
-                </p>
-                {event.participant_display_name && (
-                  <p className="mt-1 text-sm text-gray-600">
-                    Участник: {event.participant_display_name}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-    </div>
-  )
+  }, [organizationId, kind, revision])
+  const { reloadOrganizations } = useOrganization()
+  const catalog = useTeamCatalog(actorId, organizationId, kind, status, search, revision)
+  const refresh = () => setRevision(n => n + 1)
+  return <section aria-label="Каталог команды" className="space-y-4">
+    <label className="block">{kind === 'members' ? 'Найти по имени или email' : 'Найти приглашение по email'}<input type="search" maxLength={200} value={search} onChange={event => setSearch(event.target.value)} className="mt-1 w-full rounded-lg border p-3" /></label>
+    <label className="block">Статус<select value={status} onChange={event => setStatus(event.target.value)} className="mt-1 w-full rounded-lg border p-3"><option value="all">Все статусы</option>{(kind === 'members' ? ['active','invited','suspended','revoked'] : ['pending','accepted','expired','revoked']).map(value => <option key={value} value={value}>{labels[value]}</option>)}</select></label>
+    <p className="text-sm text-gray-500">Новые записи сверху. {kind === 'members' ? 'Для просмотра прежних сотрудников измените статус.' : 'Просроченные приглашения находятся в статусе «Истекло».'}</p>
+    {catalog.loading && <p role="status">Загрузка списка…</p>}
+    {catalog.error && <div role="alert"><p>{catalog.denied ? 'Нет права просмотра этого списка.' : 'Не удалось загрузить список.'}</p><button type="button" onClick={() => catalog.hasMore ? void catalog.loadMore() : refresh()} className="py-3 text-blue-700">Повторить</button></div>}
+    {!catalog.loading && !catalog.error && !catalog.items.length && <p role="status">Записи не найдены. Попробуйте изменить поиск или статус.</p>}
+    {catalog.items.map(item => <article key={item.id} className="space-y-2 rounded-xl border bg-white p-4">
+      <h2 className="font-semibold">{item.username || item.email || 'Сотрудник'}</h2>
+      {item.username && <p className="text-sm text-gray-600">{item.email}</p>}
+      <p>{item.roles?.map(role => role.name).join(', ') || 'Без роли'}</p>
+      <p>{labels[item.display_status || item.status] || 'Статус недоступен'}</p>
+      <p className="text-sm text-gray-600">{kind === 'members' ? 'Запись создана' : 'Создано'} {date(item.created_at)}{kind === 'invitations' && <><br />Действует до {date(item.expires_at)}</>}</p>
+      {kind === 'invitations' && canManage && <OrganizationInvitationActions key={`${item.id}:${revision}`} invitation={item} link={links[item.id]} onRefresh={refresh} />}
+      {kind === 'members' && canManage && <OrganizationMemberActions key={`${item.id}:${revision}`} member={item} onRefresh={() => { refresh(); void reloadOrganizations() }} />}
+    </article>)}
+    {catalog.hasMore && <button type="button" disabled={catalog.moreLoading} onClick={() => void catalog.loadMore()} className="rounded-lg border px-4 py-3 text-blue-700">Показать ещё</button>}
+    <button type="button" disabled={catalog.loading || catalog.moreLoading} onClick={refresh} className="block py-3 text-blue-700">Обновить список</button>
+  </section>
 }
