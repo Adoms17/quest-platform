@@ -1,60 +1,56 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import ParticipantProfileSelect from '../components/ParticipantProfileSelect'
+import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import ParticipantProfileSearch from '../components/ParticipantProfileSearch'
 import Loader from '../components/Loader'
-import { listParticipantQuestHistory } from '../services/participantHistoryApi'
+import { useParticipantHistory } from '../hooks/useParticipantHistory'
 
 function formatDate(value) {
   return value ? new Date(value).toLocaleString('ru-RU') : 'ещё не завершено'
 }
 
-export default function ParticipantHistory() {
-  const [participantProfileId, setParticipantProfileId] = useState('')
-  const [history, setHistory] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+export default function ParticipantHistory({ session }) {
+  const [params] = useSearchParams()
+  const requestedProfile = params.get('participant') || ''
+  return <History key={`${session?.user?.id}:${requestedProfile}`} requestedProfile={requestedProfile} actorId={session?.user?.id} />
+}
 
-  const loadHistory = useCallback(async () => {
-    if (!participantProfileId) return
-    setLoading(true)
-    setError('')
-    try {
-      setHistory(await listParticipantQuestHistory(participantProfileId))
-    } catch {
-      setHistory([])
-      setError('Не удалось загрузить историю выбранного участника.')
-    } finally {
-      setLoading(false)
-    }
-  }, [participantProfileId])
-
-  useEffect(() => {
-    const timeout = setTimeout(() => void loadHistory(), 0)
-    return () => clearTimeout(timeout)
-  }, [loadHistory])
+function History({ requestedProfile, actorId }) {
+  const [participantProfileId, setParticipantProfileId] = useState(requestedProfile)
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8">
+    <div className="mx-auto max-w-4xl space-y-6 break-words p-4 sm:p-8">
       <div>
         <h1 className="text-2xl font-bold">История прохождений</h1>
         <p className="mt-2 text-gray-600">Результаты вашего профиля и участников, которыми вы управляете.</p>
       </div>
 
       <div className="rounded-xl border bg-white p-4">
-        <ParticipantProfileSelect
+        <ParticipantProfileSearch
+          actorId={actorId}
           value={participantProfileId}
           onChange={setParticipantProfileId}
-          label="Участник"
         />
       </div>
 
+      <HistoryResults key={participantProfileId} participantProfileId={participantProfileId} />
+    </div>
+  )
+}
+
+function HistoryResults({ participantProfileId }) {
+  const { items: history, loading, error, denied, has_more: hasMore, moreLoading, loadMore, retry } = useParticipantHistory(participantProfileId)
+  if (!participantProfileId) return null
+  return <>
       {loading && <Loader text="Загрузка истории..." />}
-      {error && <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-700">{error}</p>}
-      {!loading && !error && participantProfileId && history.length === 0 && (
+      {error && <div role="alert" className="rounded-lg bg-red-50 p-4 text-red-700">
+        <p>{denied ? 'Доступ к истории участника больше недоступен.' : 'Не удалось загрузить историю выбранного участника.'}</p>
+        {!hasMore && <button type="button" className="mt-2 underline" onClick={retry}>Повторить загрузку</button>}
+      </div>}
+      {!loading && !error && history.length === 0 && (
         <p className="rounded-lg border bg-white p-5 text-gray-600">У этого участника пока нет прохождений.</p>
       )}
 
-      {!loading && !error && history.map(attempt => {
+      {!loading && history.map(attempt => {
         const total = attempt.total_tasks || 0
         const processed = (attempt.completed_tasks || 0) + (attempt.failed_tasks || 0)
         const percent = total > 0
@@ -86,6 +82,8 @@ export default function ParticipantHistory() {
           </article>
         )
       })}
-    </div>
-  )
+      {hasMore && <button type="button" disabled={moreLoading} onClick={loadMore} className="w-full rounded-xl border bg-white px-4 py-3 font-medium text-blue-700 disabled:opacity-50">
+        {moreLoading ? 'Загрузка…' : error ? 'Повторить загрузку следующей порции' : 'Показать ещё прохождения'}
+      </button>}
+  </>
 }

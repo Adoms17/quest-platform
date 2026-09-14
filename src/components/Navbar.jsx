@@ -1,212 +1,104 @@
-import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
 import { useOrganization } from '../contexts/useOrganization'
 import { hasOrganizationPermission } from '../services/organizationPermissions'
 import { getUserErrorMessage } from '../services/userErrorMessage'
+import { loadAccountProfile } from '../services/accountProfile'
+import { isOrganizationPath, rememberAppContext } from '../services/appNavigation'
+import AppBrand from './AppBrand'
+import AppIcon from './AppIcon'
 
 export default function Navbar({ session }) {
   const navigate = useNavigate()
-  const [profile, setProfile] = useState(null)
-  const [personalProfileName, setPersonalProfileName] = useState('')
+  const { pathname } = useLocation()
+  const userId = session?.user?.id
+  const [account, setAccount] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const {
-    organizations,
-    currentOrganization,
-    loadingOrganizations,
-    organizationError,
-    selectOrganization,
-  } = useOrganization()
+  const [organizationSearch, setOrganizationSearch] = useState('')
+  const menuRef = useRef(null)
+  const buttonRef = useRef(null)
+  const { organizations, currentOrganization, loadingOrganizations, organizationError, selectOrganization } = useOrganization()
+  const organizationContext = isOrganizationPath(pathname)
   const canManageTeam = hasOrganizationPermission(currentOrganization, 'members.manage')
 
   useEffect(() => {
-    async function fetchProfile() {
-      if (!session?.user?.id) {
-        setLoading(false)
-        return
-      }
+    if (!userId) return
+    let active = true
+    let request = 0
+    const refresh = async () => {
+      const version = ++request
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('username, avatar_url')
-          .eq('id', session.user.id)
-          .single()
-        if (error) throw error
-        setProfile(data)
-        const { data: participantProfiles, error: participantError } = await supabase.rpc('get_my_participant_profiles')
-        if (participantError) throw participantError
-        setPersonalProfileName(participantProfiles?.find(item => item.relationship === 'self')?.display_name || '')
-      } catch (err) {
-        console.error('Ошибка загрузки профиля:', err)
-      } finally {
-        setLoading(false)
-      }
+        const profile = await loadAccountProfile(userId)
+        if (active && version === request) setAccount({ userId, ...profile })
+      } catch { /* Имя аккаунта доступно и без сети. */ }
     }
-    void fetchProfile()
-    window.addEventListener('participant-profile-updated', fetchProfile)
-    return () => window.removeEventListener('participant-profile-updated', fetchProfile)
-  }, [session])
+    void refresh()
+    window.addEventListener('participant-profile-updated', refresh)
+    return () => { active = false; window.removeEventListener('participant-profile-updated', refresh) }
+  }, [userId])
 
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      toast.error(getUserErrorMessage(error, 'Не удалось выйти из аккаунта.'))
-    } else {
-      toast.success('Вы вышли')
-      navigate('/login')
-    }
-  }
-
-  // Отображаемое имя: username или email или 'Пользователь'
-  const displayName = personalProfileName || profile?.username || session?.user?.email?.split('@')[0] || 'Пользователь'
-  const avatarUrl = profile?.avatar_url || null
-
-  // Закрываем меню при клике вне
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (menuOpen && !e.target.closest('.user-menu')) {
-        setMenuOpen(false)
-      }
+    if (!menuOpen) return
+    const outside = event => { if (!menuRef.current?.contains(event.target)) setMenuOpen(false) }
+    const escape = event => {
+      if (event.key === 'Escape') { setMenuOpen(false); buttonRef.current?.focus() }
     }
-    document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
   }, [menuOpen])
 
-  // Если нет сессии — не показываем навбар (но по логике он только для авторизованных)
   if (!session) return null
-
-  return (
-    <nav className="bg-blue-600 text-white p-4 shadow-sm flex justify-between items-center">
-      {/* Левый блок: логотип и имя пользователя (на больших экранах) */}
-      <div className="flex items-center gap-4">
-        <Link to="/quests" className="text-xl font-bold hover:underline">
-          🧭 Quest Platform
-        </Link>
-        <span className="hidden sm:inline text-sm opacity-80">
-          {loading ? '...' : displayName}
-        </span>
-        <Link to="/downloads" className="block rounded-sm px-4 py-2 hover:bg-blue-700">
-          📥 Мои загрузки
-        </Link>
-        <Link to="/access/code" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
-          🔑 Ввести код
-        </Link>
-        <Link to="/participants/group" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
-          👨‍👩‍👧 Мои группы
-        </Link>
-        <Link to="/participants/history" className="hidden lg:block px-3 py-2 hover:bg-blue-700 rounded-sm">
-          📊 История
-        </Link>
-        {canManageTeam && (
-          <Link to="/organization/team" className="hidden sm:block px-3 py-2 hover:bg-blue-700 rounded-sm">
-            👥 Команда
-          </Link>
-        )}
-        {organizations.length > 0 && (
-          <label className="hidden md:flex items-center gap-2 text-sm">
-            <span className="sr-only">Текущая организация</span>
-            <select
-              aria-label="Текущая организация"
-              value={currentOrganization?.id || ''}
-              disabled={loadingOrganizations}
-              onChange={event => selectOrganization(event.target.value)}
-              className="max-w-56 rounded-sm border border-blue-400 bg-blue-700 px-2 py-1 text-white"
-            >
-              {organizations.map(organization => (
-                <option key={organization.id} value={organization.id}>
-                  {organization.name}
-                  {' · '}
-                  {organization.personal_owner_id === session.user.id
-                    ? 'личная'
-                    : 'по приглашению'}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {organizationError && (
-          <span className="hidden lg:inline text-xs text-yellow-200">
-            Организации недоступны
-          </span>
-        )}
-      </div>
-
-      {/* Правый блок: аватар + выпадающее меню */}
-      <div className="relative user-menu">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="flex items-center gap-2 focus:outline-hidden"
-        >
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt="Аватар"
-              className="w-8 h-8 rounded-full border-2 border-white"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-blue-800 flex items-center justify-center text-white text-sm font-bold">
-              {displayName.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <span className="hidden sm:inline text-sm">{displayName}</span>
-          <svg
-            className={`w-4 h-4 transition-transform ${menuOpen ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+  const profile = account?.userId === userId ? account : null
+  const displayName = profile?.displayName || session.user.email?.split('@')[0] || 'Мой профиль'
+  const contextName = organizationContext ? currentOrganization?.name || 'Организация' : displayName
+  const closeMenu = () => { setMenuOpen(false); setOrganizationSearch('') }
+  const switchContext = organization => {
+    if (organization) selectOrganization(organization.id)
+    rememberAppContext(userId, organization ? 'organization' : 'participant')
+    closeMenu()
+    navigate(organization ? '/quests' : '/home')
+  }
+  const logout = async () => {
+    const { error } = await supabase.auth.signOut()
+    if (error) toast.error(getUserErrorMessage(error, 'Не удалось выйти из аккаунта.'))
+    else { closeMenu(); navigate('/login') }
+  }
+  const links = organizationContext
+    ? [{ to: '/quests', label: 'Квесты', icon: 'map' }, ...(canManageTeam ? [{ to: '/organization/team', label: 'Команда', icon: 'users' }] : [])]
+    : [{ to: '/home', label: 'Главная', icon: 'home' }, { to: '/my-quests', label: 'Квесты', icon: 'map' }, { to: '/participants/group', label: 'Люди', icon: 'users' }]
+  const navigation = links.map(link => <NavLink key={link.to} to={link.to} className={({ isActive }) => `app-nav-link${isActive ? ' is-active' : ''}`}><AppIcon name={link.icon} /><span>{link.label}</span></NavLink>)
+  const filteredOrganizations = organizations.filter(item => item.name.toLocaleLowerCase().includes(organizationSearch.trim().toLocaleLowerCase()))
+  return <>
+    <header className="app-header">
+      <Link to={organizationContext ? '/quests' : '/home'} className="app-brand-link" aria-label="Квеста — главная"><AppBrand compact /></Link>
+      <nav className="app-desktop-nav" aria-label="Основная навигация">{navigation}</nav>
+      <div className="app-context" ref={menuRef} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) closeMenu() }}>
+        <button type="button" ref={buttonRef} className="app-context-trigger" aria-label={`Открыть меню профиля: ${contextName}`} aria-expanded={menuOpen} aria-controls="app-context-menu" onClick={() => setMenuOpen(value => !value)}>
+          {!organizationContext && profile?.avatar_url ? <img className="app-avatar" src={profile.avatar_url} alt="" /> : <span className="app-avatar">{contextName.slice(0, 1).toUpperCase()}</span>}
+          <span className="app-context-name">{contextName}</span><AppIcon name="chevron-down" />
         </button>
-
-        {/* Выпадающее меню */}
-        {menuOpen && (
-          <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-sm shadow-lg py-1 z-10">
-            <div className="px-4 py-2 border-b">
-              <p className="font-medium">{displayName}</p>
-              <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
-            </div>
-            {canManageTeam && (
-              <Link
-                to="/organization/team"
-                onClick={() => setMenuOpen(false)}
-                className="block px-4 py-2 hover:bg-gray-100 transition"
-              >
-                👥 Команда
-              </Link>
-            )}
-            <Link
-              to="/participants/group"
-              onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2 hover:bg-gray-100 transition"
-            >
-              👨‍👩‍👧 Мои группы
-            </Link>
-            <Link
-              to="/participants/history"
-              onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2 hover:bg-gray-100 transition"
-            >
-              📊 История
-            </Link>
-            <Link
-              to="/access/code"
-              onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2 hover:bg-gray-100 transition sm:hidden"
-            >
-              🔑 Ввести код
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="block w-full text-left px-4 py-2 hover:bg-gray-100 transition"
-            >
-              🚪 Выйти
-            </button>
+        {menuOpen && <div id="app-context-menu" className="app-context-menu">
+          <p className="app-menu-heading">Выбрать профиль или организацию</p>
+          <button className="app-menu-item" onClick={() => switchContext(null)} aria-current={!organizationContext ? 'true' : undefined}>{displayName}<small>Личный профиль</small></button>
+          {loadingOrganizations && <p className="app-menu-heading" role="status">Загружаем организации…</p>}
+          {organizationError && <p className="app-menu-heading" role="status">Организации недоступны. Обновите страницу при подключении к сети.</p>}
+          {organizations.length > 5 && <label className="app-org-search">Найти организацию<input value={organizationSearch} onChange={event => setOrganizationSearch(event.target.value)} type="search" /></label>}
+          <div className="app-org-list">
+            {filteredOrganizations.map(item => <button key={item.id} className="app-menu-item" aria-current={organizationContext && currentOrganization?.id === item.id ? 'true' : undefined} onClick={() => switchContext(item)}>{item.name}</button>)}
+            {organizationSearch && filteredOrganizations.length === 0 && <p className="app-menu-heading">Ничего не найдено</p>}
           </div>
-        )}
+          <div className="app-menu-secondary">
+            <Link className="app-menu-item" to="/participants/history" onClick={closeMenu}>История прохождений</Link>
+            <Link className="app-menu-item" to="/downloads" onClick={closeMenu}>Хранилище</Link>
+            <Link className="app-menu-item" to="/access/code" onClick={closeMenu}>Ввести код</Link>
+            <button className="app-menu-item" onClick={logout}>Выйти</button>
+          </div>
+        </div>}
       </div>
-    </nav>
-  )
+    </header>
+    {!pathname.startsWith('/play/') && <nav className="app-mobile-nav" aria-label="Мобильная навигация">{navigation}</nav>}
+  </>
 }

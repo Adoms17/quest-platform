@@ -2,17 +2,19 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { localDevWorker } from './scripts/vite-dev-worker.mjs'
 
 export default defineConfig({
   plugins: [
+    localDevWorker(),
     tailwindcss(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['brand/kvesta-symbol.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Quest Platform',
-        short_name: 'Quest',
+        name: 'Квеста — Qvesta',
+        short_name: 'Квеста',
         description: 'Создавайте и проходите квесты в реальном мире!',
         theme_color: '#3b82f6',
         background_color: '#ffffff',
@@ -31,9 +33,9 @@ export default defineConfig({
             purpose: 'any'
           },
           {
-            src: 'favicon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'brand/kvesta-symbol.png',
+            sizes: '1280x1280',
+            type: 'image/png',
             purpose: 'any'
           }
         ]
