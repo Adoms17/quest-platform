@@ -235,7 +235,8 @@ export async function getParticipantProfiles(userId) {
 }
 
 // ---------- Квесты ----------
-export async function saveQuestToDB(questData, tasks, participantProfileId = null) {
+export async function saveQuestToDB(questData, tasks, participantProfileId = null, signal = null) {
+  signal?.throwIfAborted()
   const db = await initDB()
   const existingQuest = await db.get('quests', questData.id)
   const participantAccess = { ...(existingQuest?.participantAccess || {}) }
@@ -282,6 +283,7 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
     lastSyncDate: existing?.lastSyncDate || null,
   }
   const oldAssets = await db.getAllFromIndex('offlineAssets', 'by_quest_id', questData.id)
+  signal?.throwIfAborted()
   const transaction = db.transaction(
     ['quests', 'downloadedQuests', 'offlineAssets'],
     'readwrite',
@@ -432,6 +434,9 @@ export async function getDownloadedQuestPackages(now = Date.now()) {
       packages.push({
         ...download,
         title: quest.title || 'Без названия',
+        is_open: quest.is_open,
+        start_at: quest.start_at,
+        end_at: quest.end_at,
         participantProfileId,
         validatedAt,
         expiresAt: Number.isFinite(validatedAtMs)
@@ -726,6 +731,14 @@ export async function saveQuestAttempt(localId, questId, userId, serverId = null
 export async function getQuestAttempt(localId) {
   const db = await initDB()
   return db.get('questAttempts', localId)
+}
+
+// Только метаданные попыток текущего аккаунта; ответы здесь не читаются.
+export async function getLocalParticipantAttempts(userId) {
+  if (!userId) return []
+  const db = await initDB()
+  const attempts = await db.getAll('questAttempts')
+  return attempts.filter(attempt => attempt.userId === userId)
 }
 
 export async function getActiveLocalQuestAttempt(questId, userId, participantProfileId = userId) {

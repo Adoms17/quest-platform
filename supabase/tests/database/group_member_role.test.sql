@@ -1,0 +1,34 @@
+begin;
+select no_plan();
+insert into auth.users(id,email,raw_user_meta_data) values
+('99000000-0000-4000-8000-000000000001','role-owner@example.test','{"username":"Owner"}'),
+('99000000-0000-4000-8000-000000000002','role-other@example.test','{"username":"Other"}');
+insert into public.participant_groups(id,name,created_by_user_id) values('99000000-0000-4000-8000-000000000021','Группа','99000000-0000-4000-8000-000000000001');
+insert into public.participant_group_members(group_id,participant_profile_id) select '99000000-0000-4000-8000-000000000021',participant_profile_id from public.participant_profile_accounts where user_id='99000000-0000-4000-8000-000000000002' and relationship='self';
+create function pg_temp.change_role(old_role text,new_role text) returns void language sql as $$select public.change_participant_group_member_role('99000000-0000-4000-8000-000000000021',(select participant_profile_id from public.participant_profile_accounts where user_id='99000000-0000-4000-8000-000000000002' and relationship='self'),old_role,new_role)$$;
+select set_config('request.jwt.claim.sub','99000000-0000-4000-8000-000000000002',true);
+set local role authenticated;
+select throws_ok($$select pg_temp.change_role('member','leader')$$,'42501','participant group management denied','участник не повышает себя');
+reset role;
+select set_config('request.jwt.claim.sub','99000000-0000-4000-8000-000000000001',true);
+set local role authenticated;
+select lives_ok($$select pg_temp.change_role('member','leader')$$,'повышение');
+select lives_ok($$select pg_temp.change_role('member','leader')$$,'retry');
+reset role;
+select is((select member_role from public.participant_group_members m join public.participant_profile_accounts a on a.participant_profile_id=m.participant_profile_id where a.user_id='99000000-0000-4000-8000-000000000002' and m.group_id='99000000-0000-4000-8000-000000000021'),'leader','роль сохранена');
+set local role authenticated;
+select lives_ok($$select pg_temp.change_role('leader','member')$$,'понижение');
+select throws_ok($$select pg_temp.change_role('leader','leader')$$,'40001','participant group membership changed','неверное ожидаемое состояние');
+reset role;
+update public.participant_group_members set status='removed' where participant_profile_id in(select participant_profile_id from public.participant_profile_accounts where user_id='99000000-0000-4000-8000-000000000002');
+set local role authenticated;
+select throws_ok($$select pg_temp.change_role('member','leader')$$,'40001','participant group membership changed','не восстанавливает удалённого');
+reset role;
+insert into public.participant_profiles(id,display_name,created_by_user_id) values('99000000-0000-4000-8000-000000000011','Без аккаунта','99000000-0000-4000-8000-000000000001');
+insert into public.participant_group_members(group_id,participant_profile_id) values('99000000-0000-4000-8000-000000000021','99000000-0000-4000-8000-000000000011');
+set local role authenticated;
+select throws_ok($$select public.change_participant_group_member_role('99000000-0000-4000-8000-000000000021','99000000-0000-4000-8000-000000000011','member','leader')$$,'22023','participant group leader requires account','руководителю нужен аккаунт');
+reset role;
+select ok(not has_function_privilege('anon','public.change_participant_group_member_role(uuid,uuid,text,text)','execute'),'anon запрещён');
+select * from finish();
+rollback;

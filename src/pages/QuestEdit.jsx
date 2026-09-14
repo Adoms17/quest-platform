@@ -300,16 +300,16 @@ export default function QuestEdit() {
   if (!quest) return <div className="p-8 text-center text-red-500">Квест не найден</div>
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <OfflinePackageCheck quest={{ ...quest, cover_image_url: coverImageUrl }} />
-      <div className="flex items-start gap-2 mb-6">
+    <div className="mx-auto max-w-5xl break-words p-4 sm:p-6">
+      <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row">
         {editMode ? (
-          <div className="flex-1 space-y-2">
+          <div className="min-w-0 w-full flex-1 space-y-2">
             <input
               type="text"
               value={questTitle}
               onChange={(e) => setQuestTitle(e.target.value)}
               className="w-full border p-2 rounded-sm text-xl font-bold"
+              aria-label="Название квеста"
               placeholder="Название квеста"
             />
             <textarea
@@ -317,6 +317,7 @@ export default function QuestEdit() {
               onChange={(e) => setQuestDescription(e.target.value)}
               className="w-full border p-2 rounded-sm"
               rows="2"
+              aria-label="Описание квеста"
               placeholder="Описание квеста"
             />
             <div>
@@ -437,7 +438,7 @@ export default function QuestEdit() {
             </div>
           </div>
         ) : (
-          <div className="flex-1">
+          <div className="min-w-0 w-full flex-1">
             {quest.cover_image_url && (
               <img
                 src={quest.cover_image_url}
@@ -464,15 +465,29 @@ export default function QuestEdit() {
             </div>
           </div>
         )}
-        <button
+        {!editMode && <button
+          type="button"
           onClick={() => setEditMode(true)}
-          className="text-blue-500 hover:text-blue-700 text-sm"
-          title="Редактировать квест"
+          className="shrink-0 rounded-lg border px-4 py-3 text-blue-700"
         >
-          ✏️
-        </button>
+          Изменить квест
+        </button>}
       </div>
 
+      {/* Ссылка на управление заданиями */}
+      <div className="mb-6 rounded-xl border bg-white p-4">
+        <h3 className="text-lg font-semibold mb-2">Управление заданиями</h3>
+        <Link
+          to={`/quests/${id}/tasks`}
+          className="inline-block rounded-lg bg-blue-600 px-4 py-3 text-white"
+        >
+          Перейти к заданиям
+        </Link>
+      </div>
+
+      <details className="mb-6 rounded-xl border bg-white p-4">
+        <summary className="cursor-pointer py-2 font-semibold">Правила прохождения</summary>
+        <p className="my-3 text-sm text-gray-600">Изменения в этом разделе сохраняются сразу. Проверьте настройки перед началом прохождений.</p>
       <div className="bg-gray-50 p-4 rounded-sm mb-6 border">
         <label className="block font-semibold mb-2">
           Порядок прохождения заданий
@@ -641,16 +656,11 @@ export default function QuestEdit() {
         </div>
       </div>
 
-      {/* Ссылка на управление заданиями */}
-      <div className="border-t pt-4 mt-4">
-        <h3 className="text-lg font-semibold mb-2">Управление заданиями</h3>
-        <Link
-          to={`/quests/${id}/tasks`}
-          className="inline-block bg-blue-500 text-white px-4 py-2 rounded-sm hover:bg-blue-600"
-        >
-          Перейти к заданиям
-        </Link>
-      </div>
+      </details>
+      <details className="rounded-xl border bg-white p-4">
+        <summary className="cursor-pointer py-2 font-semibold">Проверка офлайн-материалов</summary>
+        <OfflinePackageCheck quest={{ ...quest, cover_image_url: coverImageUrl }} />
+      </details>
 
       <div className="mt-6">
         <button

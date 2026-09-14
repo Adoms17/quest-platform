@@ -3,10 +3,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const rpc = vi.hoisted(() => vi.fn())
 vi.mock('../supabaseClient', () => ({ supabase: { rpc } }))
 
-import { listParticipantQuestHistory } from './participantHistoryApi'
+import { listParticipantQuestHistory, searchParticipantQuestHistory } from './participantHistoryApi'
 
 describe('participantHistoryApi', () => {
-  beforeEach(() => rpc.mockReset())
+  beforeEach(() => { rpc.mockReset() })
+
+  it('запрашивает ограниченную страницу с серверным курсором', async () => {
+    const page = { items: [], has_more: false, next_cursor: null }
+    rpc.mockResolvedValue({ data: page })
+    await expect(searchParticipantQuestHistory('p1', { id: 'cursor' })).resolves.toEqual(page)
+    expect(rpc).toHaveBeenCalledWith('search_participant_quest_history', {
+      p_participant_profile_id: 'p1', p_after: { id: 'cursor' }, p_limit: 25,
+    })
+  })
+
+  it('не превращает некорректный ответ в пустую историю', async () => {
+    rpc.mockResolvedValue({ data: [] })
+    await expect(searchParticipantQuestHistory('p1')).rejects.toThrow('Некорректная страница истории')
+  })
 
   it('loads history for the explicitly selected participant profile', async () => {
     rpc.mockResolvedValue({ data: [{ quest_attempt_id: 'attempt-1' }], error: null })
