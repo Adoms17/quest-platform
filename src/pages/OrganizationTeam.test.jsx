@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ context: {}, catalog: vi.fn() }))
+vi.mock('../supabaseClient', () => ({ supabase: {} }))
 vi.mock('../contexts/useOrganization', () => ({ useOrganization: () => mocks.context }))
 vi.mock('../hooks/useTeamCatalog', () => ({ useTeamCatalog: mocks.catalog }))
 import OrganizationTeam from './OrganizationTeam'
@@ -12,7 +13,7 @@ it('читатель видит сотрудников без приглашен
   render(<OrganizationTeam session={{ user: { id: 'a1' } }} />)
   expect(screen.getByRole('button', { name: 'Сотрудники' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Приглашения' })).toBeNull()
-  expect(screen.queryByRole('button', { name: 'Управление и журнал' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Журнал', exact: true })).toBeNull()
   expect(mocks.catalog).toHaveBeenCalledWith('a1', 'o1', 'members', 'active', '', 0)
 })
 it('смена организации сбрасывает поисковый контекст', () => {
