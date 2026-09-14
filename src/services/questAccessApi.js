@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient'
+import { withAbortSignal } from './requestCancellation'
 import { getDeviceId } from './deviceIdentity'
 
 function unwrap({ data, error }) {
@@ -50,4 +51,12 @@ export async function revokeQuestAccessCredential(id) {
 
 export async function revokeQuestAccessGrant(id) {
   return unwrap(await supabase.rpc('revoke_quest_access_grant', { p_grant_id: id }))
+}
+
+export async function searchQuestAccess(questId, kind, { search = '', cursor = null, limit = 25 } = {}, signal) {
+  const data = unwrap(await withAbortSignal(supabase.rpc('search_quest_access_catalog', {
+    p_quest_id: questId, p_kind: kind, p_search: search.trim(), p_after: cursor, p_limit: limit,
+  }), signal))
+  if (data?.quest_id !== questId || data.kind !== kind || !Array.isArray(data.items) || typeof data.has_more !== 'boolean' || (data.has_more && !data.next_cursor)) throw new Error('Некорректный ответ списка доступа.')
+  return data
 }

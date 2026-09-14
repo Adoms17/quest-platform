@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useMatch } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppToaster from './components/Toaster'
 import Navbar from './components/Navbar'
+import QuestWorkspaceNav from './components/QuestWorkspaceNav'
+import { getAppEntry, getLoginDestination } from './services/appNavigation'
 import LazyRouteErrorBoundary from './components/LazyRouteErrorBoundary'
 import { selectAuthSession } from './services/authSession'
 import { isTransportError } from './services/network'
@@ -18,6 +20,7 @@ import {
 } from './services/participantMode'
 import ParticipantModeBar from './components/ParticipantModeBar'
 
+const ParticipantQuests = lazy(() => import('./pages/ParticipantQuests'))
 const Login = lazy(() => import('./pages/Login'))
 const QuestList = lazy(() => import('./pages/QuestList'))
 const QuestCreate = lazy(() => import('./pages/QuestCreate'))
@@ -32,6 +35,17 @@ const AcceptOrganizationInvitation = lazy(() => import('./pages/AcceptOrganizati
 const QuestAccess = lazy(() => import('./pages/QuestAccess'))
 const RedeemQuestAccess = lazy(() => import('./pages/RedeemQuestAccess'))
 const RedeemQuestCode = lazy(() => import('./pages/RedeemQuestCode'))
+const ParticipantGroupMembers = lazy(() => import('./pages/ParticipantGroupMembers'))
+const ParticipantProfileCard = lazy(() => import('./pages/ParticipantProfileCard'))
+const ParticipantProfileCreate = lazy(() => import('./pages/ParticipantProfileCreate'))
+const ParticipantGroupCreate = lazy(() => import('./pages/ParticipantGroupCreate'))
+const ParticipantAudit = lazy(() => import('./pages/ParticipantAudit'))
+const ParticipantArchive = lazy(() => import('./pages/ParticipantArchive'))
+const ParticipantSupervisionProfiles = lazy(() => import('./pages/ParticipantSupervisionProfiles'))
+const ParticipantSupervisors = lazy(() => import('./pages/ParticipantSupervisors'))
+const ParticipantProfileInvitations = lazy(() => import('./pages/ParticipantProfileInvitations'))
+const ParticipantGroupInvitations = lazy(() => import('./pages/ParticipantGroupInvitations'))
+const PeopleCatalog = lazy(() => import('./pages/PeopleCatalog'))
 const ParticipantGroup = lazy(() => import('./pages/ParticipantGroup'))
 const AcceptParticipantInvitation = lazy(() => import('./pages/AcceptParticipantInvitation'))
 const ParticipantHistory = lazy(() => import('./pages/ParticipantHistory'))
@@ -39,6 +53,7 @@ const AcceptParticipantGroupInvitation = lazy(() => import('./pages/AcceptPartic
 
 function Layout({ children, session }) {
   const location = useLocation()
+  const questRoute = useMatch('/quests/:id/:section')
   const [participantMode, setParticipantMode] = useState(() => getParticipantModeLock())
 
   useEffect(() => {
@@ -64,10 +79,18 @@ function Layout({ children, session }) {
     <>
       {participantMode
         ? <ParticipantModeBar lock={participantMode} />
-        : <Navbar session={session} />}
-      <main>{children}</main>
+        : <Navbar key={session?.user?.id} session={session} />}
+      <main className={!participantMode && !location.pathname.startsWith('/play/') ? 'app-main' : undefined}>
+        {!participantMode && questRoute && ['edit', 'tasks', 'access', 'stats'].includes(questRoute.params.section) && <QuestWorkspaceNav key={`${session?.user?.id}:${location.pathname}`} questId={questRoute.params.id} />}
+        {children}
+      </main>
     </>
   )
+}
+
+function LoginRedirect({ session }) {
+  const location = useLocation()
+  return <Navigate to={getLoginDestination(location.state?.from, session.user.id)} replace />
 }
 
 function App() {
@@ -149,15 +172,17 @@ function App() {
   return (
     <BrowserRouter>
       <AppToaster />
-      <OrganizationProvider session={session}>
+      <OrganizationProvider key={session?.user?.id || 'anonymous'} session={session}>
         <LazyRouteErrorBoundary>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
           <Routes>
+        <Route path="/home" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantQuests key={session?.user?.id} session={session} home /></Layout></ProtectedRoute>} />
+        <Route path="/my-quests" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantQuests key={session?.user?.id} session={session} /></Layout></ProtectedRoute>} />
         <Route
           path="/login"
           element={
             session ? (
-              <Navigate to="/quests" replace />
+              <LoginRedirect session={session} />
             ) : (
               <Login setSession={setSession} />
             )
@@ -258,14 +283,14 @@ function App() {
           element={
             <ProtectedRoute session={session}>
               <Layout session={session}>
-                <OrganizationTeam />
+                <OrganizationTeam session={session} />
               </Layout>
             </ProtectedRoute>
           }
         />
         <Route
           path="/quests/:id/access"
-          element={<ProtectedRoute session={session}><Layout session={session}><QuestAccess /></Layout></ProtectedRoute>}
+          element={<ProtectedRoute session={session}><Layout session={session}><QuestAccess session={session} /></Layout></ProtectedRoute>}
         />
         <Route
           path="/access/redeem"
@@ -277,7 +302,36 @@ function App() {
         />
         <Route
           path="/participants/group"
-          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantGroup session={session} /></Layout></ProtectedRoute>}
+          element={<ProtectedRoute session={session}><Layout session={session}><PeopleCatalog key={session?.user?.id} session={session} /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/participants/group/create-group"
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantGroupCreate key={session?.user?.id} /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/participants/group/create"
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantProfileCreate key={session?.user?.id} session={session} /></Layout></ProtectedRoute>}
+        />
+        <Route path="/participants/group/archive" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantArchive key={session?.user?.id} session={session} /></Layout></ProtectedRoute>} />
+        <Route path="/participants/group/supervision" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantSupervisionProfiles key={session?.user?.id} session={session} /></Layout></ProtectedRoute>} />
+        <Route path="/participants/group/profiles/:profileId/audit" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantAudit session={session} /></Layout></ProtectedRoute>} />
+        <Route path="/participants/group/profiles/:profileId/supervisors" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantSupervisors session={session} /></Layout></ProtectedRoute>} />
+        <Route path="/participants/group/profiles/:profileId/invitations" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantProfileInvitations session={session} /></Layout></ProtectedRoute>} />
+        <Route
+          path="/participants/group/profiles/:profileId"
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantProfileCard session={session} /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/participants/group/:groupId/invitations"
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantGroupInvitations session={session} /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/participants/group/:groupId"
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantGroupMembers session={session} /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/participants/group/manage"
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantGroup key={session?.user?.id} session={session} /></Layout></ProtectedRoute>}
         />
         <Route
           path="/participants/invitations/accept"
@@ -285,7 +339,7 @@ function App() {
         />
         <Route
           path="/participants/history"
-          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantHistory /></Layout></ProtectedRoute>}
+          element={<ProtectedRoute session={session}><Layout session={session}><ParticipantHistory key={session?.user?.id} session={session} /></Layout></ProtectedRoute>}
         />
         <Route path="/participants/groups/invitations/accept" element={<ProtectedRoute session={session}><Layout session={session}><AcceptParticipantGroupInvitation /></Layout></ProtectedRoute>} />
         <Route
@@ -298,7 +352,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<Navigate to={session ? '/quests' : '/login'} />} />
+        <Route path="*" element={<Navigate to={session ? getAppEntry(session.user.id) : '/login'} />} />
           </Routes>
         </Suspense>
         </LazyRouteErrorBoundary>

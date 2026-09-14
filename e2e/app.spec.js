@@ -7,7 +7,7 @@ function collectPageErrors(page) {
 }
 
 async function expectLoginPage(page) {
-  await expect(page.getByRole('heading', { name: 'Quest Platform' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Квеста' })).toBeVisible()
   await expect(page.getByLabel('Email')).toBeVisible()
   await expect(page.getByLabel('Пароль', { exact: true })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Регистрация' })).toBeVisible()
@@ -56,7 +56,7 @@ test('redirects an unknown route and renders the application', async ({ page }) 
   await page.goto('/unknown-e2e-route')
 
   await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByRole('heading', { name: 'Quest Platform' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Квеста' })).toBeVisible()
   expect(pageErrors).toEqual([])
 })
 
@@ -385,7 +385,7 @@ test('restores and synchronizes a complete authorized offline attempt without du
   }, { email, password })
 
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Квесты', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Главная', exact: true })).toBeVisible()
   await page.evaluate(() => import('/src/services/db.js').then(() => true))
   await page.context().setOffline(true)
 
@@ -537,8 +537,8 @@ test('completes an authorized quest through the participant UI', async ({ page }
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Пароль', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Войти' }).click()
-  await expect(page).toHaveURL(/\/quests$/)
-  await expect(page.getByRole('heading', { name: 'Квесты', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/home$/)
+  await expect(page.getByRole('heading', { name: 'Главная', exact: true })).toBeVisible()
 
   await page.goto(`/play/${setup.questId}`)
   await expect(page).toHaveURL(new RegExp(`participant=${setup.participantProfileId}`))
@@ -607,51 +607,46 @@ test('manages a dependent profile and group membership through the UI', async ({
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Пароль', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Войти' }).click()
-  await expect(page).toHaveURL(/\/quests$/)
-  await page.getByRole('link', { name: /Мои группы/ }).click()
-  await expect(page).toHaveURL(/\/participants\/group$/)
-  await expect(page.getByRole('heading', { name: 'Моя группа' })).toBeVisible()
+  await expect(page).toHaveURL(/\/home$/)
+  await page.goto('/participants/group?view=groups')
+  await page.getByRole('link', { name: 'Создать группу', exact: true }).click()
+  await page.getByLabel('Название группы').fill(groupName)
+  await page.getByRole('button', { name: 'Создать группу', exact: true }).click()
+  await expect(page.getByRole('heading', { name: groupName, exact: true })).toBeVisible()
+  const groupUrl = page.url()
 
-  const createGroupForm = page.getByRole('heading', { name: 'Создать группу' }).locator('..')
-  await createGroupForm.getByLabel('Название').fill(groupName)
-  await createGroupForm.getByRole('button', { name: 'Создать группу' }).click()
-  await expect(page.getByRole('heading', { name: groupName })).toBeVisible()
+  await page.goto('/participants/group')
+  await page.getByRole('link', { name: 'Добавить участника', exact: true }).click()
+  await page.getByLabel('Имя участника', { exact: true }).fill(initialProfileName)
+  await page.getByLabel('Возрастная категория').selectOption('child')
+  await page.getByRole('button', { name: 'Выбрать группу', exact: true }).click()
+  await page.getByLabel('Найти группу', { exact: true }).fill(groupName)
+  await page.getByRole('region', { name: 'Группа участника' }).getByRole('button', { name: groupName, exact: true }).click()
+  await page.getByRole('button', { name: 'Создать профиль', exact: true }).click()
+  await expect(page.getByRole('heading', { name: initialProfileName, exact: true })).toBeVisible()
+  const profileUrl = page.url()
+  await page.getByRole('button', { name: 'Изменить имя', exact: true }).click()
+  await page.getByLabel('Имя для отображения').fill(renamedProfileName)
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(page.getByRole('heading', { name: renamedProfileName, exact: true })).toBeVisible()
 
-  const createProfileForm = page.getByRole('heading', { name: 'Добавить участника' }).locator('..')
-  await createProfileForm.getByLabel('Имя для отображения').fill(initialProfileName)
-  await createProfileForm.getByLabel('Возрастная категория').selectOption('child')
-  await createProfileForm.getByLabel('Группа').selectOption({ label: groupName })
-  await createProfileForm.getByRole('button', { name: 'Добавить участника' }).click()
-
-  const initialProfileCard = page.locator('article').filter({
-    has: page.getByRole('heading', { name: initialProfileName, exact: true }),
-  })
-  await expect(initialProfileCard).toBeVisible()
-  await expect(initialProfileCard.getByText('Ребёнок', { exact: true })).toBeVisible()
-  await initialProfileCard.getByRole('button', { name: 'Изменить имя' }).click()
-  await initialProfileCard.getByLabel(`Новое имя профиля ${initialProfileName}`).fill(renamedProfileName)
-  await initialProfileCard.getByRole('button', { name: 'Сохранить' }).click()
-
-  const renamedProfileCard = page.locator('article').filter({
-    has: page.getByRole('heading', { name: renamedProfileName, exact: true }),
-  })
-  await expect(renamedProfileCard).toBeVisible()
-
-  const groupCard = page.locator('article').filter({
-    has: page.getByRole('heading', { name: groupName, exact: true }),
-  })
-  const participantRow = groupCard.locator('li').filter({ hasText: renamedProfileName })
-  await expect(participantRow.getByText('Участник группы', { exact: true })).toBeVisible()
-  await participantRow.getByRole('button', { name: 'Удалить' }).click()
+  await page.goto(groupUrl)
+  const participantRow = page.locator('article').filter({ has: page.getByRole('heading', { name: renamedProfileName, exact: true }) })
+  await expect(participantRow).toBeVisible()
+  await participantRow.getByRole('button', { name: 'Удалить из группы', exact: true }).click()
+  await participantRow.getByRole('button', { name: 'Подтвердить действие', exact: true }).click()
   await expect(participantRow).toHaveCount(0)
+  await page.getByRole('button', { name: 'Добавить в группу', exact: true }).click()
+  const add = page.getByRole('region', { name: 'Добавление в группу' })
+  await add.getByLabel('Найти доступный профиль').fill(renamedProfileName)
+  await add.getByRole('button', { name: renamedProfileName + ' Доступный профиль', exact: true }).click()
+  await add.getByRole('button', { name: 'Добавить выбранного', exact: true }).click()
+  await expect(participantRow).toBeVisible()
 
-  await groupCard.getByRole('button', { name: `Добавить: ${renamedProfileName}` }).click()
-  await expect(groupCard.locator('li').filter({ hasText: renamedProfileName })).toBeVisible()
-
-  const auditSection = page.getByRole('heading', { name: 'История управления профилями' }).locator('..')
-  await expect(auditSection.getByText('Участник добавлен в группу', { exact: true }).first()).toBeVisible()
-  await expect(auditSection.getByText('Участник удалён из группы', { exact: true })).toBeVisible()
-  await expect(auditSection.getByText(`Профиль: ${renamedProfileName}`, { exact: true }).first()).toBeVisible()
+  await page.goto(profileUrl)
+  await page.getByRole('link', { name: 'Журнал управления', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Участник добавлен в группу', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Участник удалён из группы', exact: true })).toBeVisible()
 
   await page.evaluate(async () => {
     const { supabase } = await import('/src/supabaseClient.js')

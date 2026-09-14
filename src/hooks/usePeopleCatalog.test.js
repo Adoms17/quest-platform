@@ -1,0 +1,60 @@
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { beforeEach, expect, it, vi } from 'vitest'
+const mocks = vi.hoisted(() => ({ search: vi.fn() }))
+vi.mock('../services/peopleCatalogApi', () => ({ searchSupervisionProfiles: mocks.search, searchParticipantProfiles: mocks.search, searchParticipantGroups: mocks.search, searchParticipantGroupMembers: mocks.search }))
+import { usePeopleCatalog } from './usePeopleCatalog'
+const page = (items, more = false) => ({ items, has_more: more, next_cursor: more ? { id: items.at(-1).id } : null })
+beforeEach(() => vi.resetAllMocks())
+it('при понижении роли убирает ранее загруженные профили группы', async () => {
+  mocks.search.mockResolvedValueOnce({ ...page([{ id: 'old' }], true), group: { id: 'g1', can_manage: true } })
+    .mockResolvedValueOnce({ ...page([]), group: { id: 'g1', can_manage: false } })
+  const { result } = renderHook(() => usePeopleCatalog('a1', 'members', '', 0, 'g1'))
+  await waitFor(() => expect(result.current.items).toHaveLength(1))
+  await act(() => result.current.loadMore())
+  expect(result.current.items).toEqual([])
+  expect(result.current.group).toBeNull()
+  expect(result.current.denied).toBe(true)
+  expect(mocks.search.mock.calls[0][0]).toBe('g1')
+})
+it('не запрашивает сервер без аккаунта', () => {
+  const { result } = renderHook(() => usePeopleCatalog(null, 'profiles', '', 0))
+  expect(result.current.items).toEqual([]); expect(mocks.search).not.toHaveBeenCalled()
+})
+it('передаёт курсор, сохраняет строки при ошибке и устраняет дубликаты после retry', async () => {
+  mocks.search.mockResolvedValueOnce(page([{ id: 'q1' }], true)).mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(page([{ id: 'q1' }, { id: 'q2' }]))
+  const { result } = renderHook(() => usePeopleCatalog('p1', 'profiles', '', 0))
+  await waitFor(() => expect(result.current.items).toHaveLength(1))
+  await act(() => result.current.loadMore())
+  expect(result.current.error).toBe(true); expect(result.current.items).toHaveLength(1)
+  await act(() => result.current.loadMore())
+  expect(result.current.items).toEqual([{ id: 'q1' }, { id: 'q2' }])
+  expect(mocks.search.mock.calls[1][0].cursor).toEqual({ id: 'q1' })
+})
+it('при смене профиля немедленно убирает строки и игнорирует поздний ответ', async () => {
+  let finish
+  mocks.search.mockResolvedValueOnce(page([{ id: 'old' }], true)).mockImplementationOnce(() => new Promise(resolve => { finish = resolve })).mockResolvedValueOnce(page([{ id: 'new' }]))
+  const { result, rerender } = renderHook(({ profile }) => usePeopleCatalog(profile, 'profiles', '', 0), { initialProps: { profile: 'p1' } })
+  await waitFor(() => expect(result.current.items).toHaveLength(1))
+  act(() => { void result.current.loadMore() })
+  rerender({ profile: 'p2' }); expect(result.current.items).toEqual([])
+  await waitFor(() => expect(result.current.items).toEqual([{ id: 'new' }]))
+  await act(async () => finish(page([{ id: 'leak' }])))
+  expect(result.current.items).toEqual([{ id: 'new' }])
+})
+it('отказ в доступе при догрузке очищает выдачу', async () => {
+  mocks.search.mockResolvedValueOnce(page([{ id: 'q1' }], true)).mockRejectedValueOnce({ code: '42501' })
+  const { result } = renderHook(() => usePeopleCatalog('p1', 'profiles', '', 0))
+  await waitFor(() => expect(result.current.items).toHaveLength(1))
+  await act(() => result.current.loadMore())
+  expect(result.current.items).toEqual([]); expect(result.current.denied).toBe(true)
+})
+
+it('каталог собственных связей работает без выбранного профиля и очищается при смене аккаунта', async () => {
+  mocks.search.mockResolvedValueOnce(page([{ id: 'revoked' }])).mockResolvedValueOnce(page([]))
+  const { result, rerender } = renderHook(({ actor }) => usePeopleCatalog(actor, 'supervision-profiles', 'Имя', 0), { initialProps: { actor: 'a1' } })
+  await waitFor(() => expect(result.current.items).toHaveLength(1))
+  expect(mocks.search.mock.calls[0][0]).toEqual({ search: 'Имя', limit: 25 })
+  rerender({ actor: 'a2' })
+  expect(result.current.items).toEqual([])
+  await waitFor(() => expect(result.current.loading).toBe(false))
+})
