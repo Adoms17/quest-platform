@@ -43,9 +43,10 @@ select throws_ok(
 
 reset role;
 set local role anon;
+-- Проверяем запрет доступа независимо от наличия начального EXECUTE grant.
 select throws_ok(
   $$select * from public.get_quest_participant_labels('9e100000-0000-4000-8000-000000000001')$$,
-  '42501', 'quest statistics access denied',
+  '42501', null,
   'anonymous users cannot receive participant labels'
 );
 

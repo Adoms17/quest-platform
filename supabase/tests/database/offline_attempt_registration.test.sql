@@ -1,0 +1,62 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('offline-registration-owner')::uuid,'offline-registration@example.test');
+insert into public.quests(id,creator_id,title,is_open,is_public) select md5('offline-registration-quest-'||n)::uuid,md5('offline-registration-owner')::uuid,'Offline fixture',true,true from generate_series(1,2)n;
+select set_config('request.jwt.claim.sub',md5('offline-registration-owner')::uuid::text,true);
+create function pg_temp.register_attempt() returns jsonb language sql as $$select public.register_offline_quest_attempt(md5('offline-registration-quest-1')::uuid,md5('offline-registration-owner')::uuid,'local-stable')$$;
+set local role authenticated;
+select set_config('test.offline_id',pg_temp.register_attempt()->>'id',true);
+select is(pg_temp.register_attempt()->>'id',current_setting('test.offline_id'),'retry возвращает исходный серверный ID');
+select throws_ok($$select public.register_offline_quest_attempt(md5('offline-registration-quest-2')::uuid,md5('offline-registration-owner')::uuid,'local-stable')$$,'42501','offline attempt scope mismatch','ключ нельзя переиспользовать для другого квеста');
+select throws_ok($$select * from public.offline_attempt_registrations$$,'42501',null,'прямой доступ к сопоставлениям закрыт');
+select throws_ok($$delete from public.offline_attempt_registrations$$,'42501',null,'клиент не удаляет сопоставление');
+reset role;
+update public.quest_attempts set finished_at=now() where id=current_setting('test.offline_id')::uuid;
+-- Моделируем ранее зарегистрированную попытку прошлого месяца без изменения часов сервера.
+update public.participant_usage_registrations set
+ registered_at=(date_trunc('month',now() at time zone 'Europe/Moscow')-interval '1 month') at time zone 'Europe/Moscow',
+ period_start=(date_trunc('month',now() at time zone 'Europe/Moscow')-interval '1 month') at time zone 'Europe/Moscow',
+ period_end=date_trunc('month',now() at time zone 'Europe/Moscow') at time zone 'Europe/Moscow'
+where server_attempt_id=current_setting('test.offline_id')::uuid;
+set local role authenticated;
+select is(pg_temp.register_attempt()->>'id',current_setting('test.offline_id'),'завершение не превращает retry в новый старт');
+select ok(pg_temp.register_attempt()->>'finished_at' is not null,'закрытая попытка остаётся закрытой');
+select is(public.register_offline_quest_attempt(md5('offline-registration-quest-1')::uuid,md5('offline-registration-owner')::uuid,'legacy-local',current_setting('test.offline_id')::uuid)->>'id',current_setting('test.offline_id'),'старый локальный ID привязывается к известной завершённой попытке');
+select throws_ok($$select public.register_offline_quest_attempt(md5('offline-registration-quest-2')::uuid,md5('offline-registration-owner')::uuid,'wrong-legacy',current_setting('test.offline_id')::uuid)$$,'42501','offline attempt scope mismatch','подсказка server ID не обходит проверку квеста');
+select throws_ok($$select public.register_offline_quest_attempt(md5('offline-registration-quest-1')::uuid,md5('offline-registration-owner')::uuid,'local-stable',md5('other-attempt')::uuid)$$,'42501','offline attempt scope mismatch','существующее сопоставление нельзя переназначить');
+reset role;
+select is((select period_end from public.participant_usage_registrations where server_attempt_id=current_setting('test.offline_id')::uuid),date_trunc('month',now() at time zone 'Europe/Moscow') at time zone 'Europe/Moscow','retry в новом месяце не переносит исходное потребление');
+insert into public.participant_profiles(id,display_name,profile_kind,age_group,created_by_user_id) values(md5('offline-other-profile')::uuid,'Synthetic child','dependent','child',md5('offline-registration-owner')::uuid);
+insert into public.participant_supervisions(supervisor_user_id,participant_profile_id) values(md5('offline-registration-owner')::uuid,md5('offline-other-profile')::uuid);
+set local role authenticated;
+select throws_ok($$select public.register_offline_quest_attempt(md5('offline-registration-quest-1')::uuid,md5('offline-other-profile')::uuid,'local-stable')$$,'42501','offline attempt scope mismatch','даже доступный другой профиль не переиспользует ключ');
+reset role;
+select is((select count(*) from public.offline_attempt_registrations where local_attempt_id='wrong-legacy'),0::bigint,'неверная привязка откатывается');
+select is((select count(*) from public.participant_usage_registrations where server_attempt_id=current_setting('test.offline_id')::uuid),1::bigint,'привязка не создаёт повторный факт использования');
+delete from public.quest_attempts where id=current_setting('test.offline_id')::uuid;
+set local role authenticated;
+select throws_ok($$select pg_temp.register_attempt()$$,'P0001','registered offline attempt removed','удалённая попытка не пересоздаётся');
+reset role;
+select throws_ok($$select public.register_offline_quest_attempt(md5('offline-registration-quest-1')::uuid,md5('offline-registration-owner')::uuid,'removed-legacy',current_setting('test.offline_id')::uuid)$$,'P0001','registered offline attempt removed','старый удалённый server ID не заменяется новым');
+select is((select count(*) from public.offline_attempt_registrations where actor_user_id=md5('offline-registration-owner')::uuid),2::bigint,'сопоставления сохраняются после удаления результатов');
+select is((select count(*) from public.participant_usage_registrations where server_attempt_id=current_setting('test.offline_id')::uuid),1::bigint,'исходная запись потребления сохранена');
+set local role anon;
+select throws_ok($$select pg_temp.register_attempt()$$,'42501',null,'anon не регистрирует попытки');
+reset role;
+insert into auth.users(id,email) values(md5('offline-second-actor')::uuid,'offline-second@example.test');
+select set_config('request.jwt.claim.sub',md5('offline-second-actor')::uuid::text,true);
+set local role authenticated;
+select lives_ok($$select public.register_offline_quest_attempt(md5('offline-registration-quest-1')::uuid,md5('offline-second-actor')::uuid,'local-stable')$$,'такой же ключ другого аккаунта независим');
+select throws_ok($$select pg_temp.register_attempt()$$,'42501','quest access denied','второй аккаунт не читает регистрацию чужого профиля');
+reset role;
+select is((select count(distinct actor_user_id) from public.offline_attempt_registrations where local_attempt_id='local-stable'),2::bigint,'одинаковый ключ хранится в двух областях аккаунта');
+select set_config('request.jwt.claim.sub',md5('offline-registration-owner')::uuid::text,true);
+set local role authenticated;
+select lives_ok($$select public.register_offline_quest_attempt(md5('offline-registration-quest-2')::uuid,md5('offline-other-profile')::uuid,'child-local')$$,'контролёр регистрирует доступный профиль');
+reset role;
+update public.participant_supervisions set status='revoked',revoked_at=now() where supervisor_user_id=md5('offline-registration-owner')::uuid and participant_profile_id=md5('offline-other-profile')::uuid;
+set local role authenticated;
+select throws_ok($$select public.register_offline_quest_attempt(md5('offline-registration-quest-2')::uuid,md5('offline-other-profile')::uuid,'child-local')$$,'42501','quest access denied','после отзыва контроля retry не раскрывает попытку');
+reset role;
+select * from finish();
+rollback;

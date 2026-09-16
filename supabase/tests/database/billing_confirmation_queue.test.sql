@@ -1,0 +1,26 @@
+begin;
+select no_plan();
+select throws_ok($$select public.process_due_billing_confirmations(0)$$,'22023','invalid billing batch size','zero rejected');
+select throws_ok($$select public.process_due_billing_confirmations(501)$$,'22023','invalid billing batch size','large rejected');
+select throws_ok($$select public.process_due_billing_confirmations(null)$$,'22023','invalid billing batch size','null rejected');
+insert into auth.users(id,email) values(md5('queue-owner')::uuid,'queue@example.test');
+select set_config('test.queue_org',(select id::text from public.organizations where personal_owner_id=md5('queue-owner')::uuid),true);
+select set_config('test.queue_before',public.get_billing_confirmation_queue_summary()::text,true);
+select public.enqueue_billing_confirmation(current_setting('test.queue_org')::uuid,md5('queue-event')::uuid,0,
+  (select id from public.billing_plan_versions where plan_key='pro' and version=1),'0001-01-01 UTC','0001-02-01 UTC');
+set local role service_role;
+select is((public.get_billing_confirmation_queue_summary()->>'pending')::int,(current_setting('test.queue_before')::jsonb->>'pending')::int+1,'summary counts pending');
+select is(public.process_due_billing_confirmations(1)->>'processed','1','process bounded item');
+reset role;
+select is((select state from public.billing_confirmation_inbox where confirmation_id=md5('queue-event')::uuid),'review','elapsed event to review');
+select is((public.get_billing_confirmation_queue_summary()->>'review')::int,(current_setting('test.queue_before')::jsonb->>'review')::int+1,'review visible in summary');
+select is((select revision from public.organization_subscriptions where organization_id=current_setting('test.queue_org')::uuid),0::bigint,'review does not change subscription');
+select set_config('request.jwt.claim.sub',md5('queue-owner')::uuid::text,true);
+set local role authenticated;
+select throws_ok($$select public.get_billing_confirmation_queue_summary()$$,'42501',null,'owner cannot read global summary');
+select throws_ok($$select public.process_due_billing_confirmations(1)$$,'42501',null,'owner cannot run queue');
+set local role anon;
+select throws_ok($$select public.get_billing_confirmation_queue_summary()$$,'42501',null,'anon denied');
+reset role;
+select * from finish();
+rollback;

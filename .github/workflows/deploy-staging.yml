@@ -11,6 +11,11 @@ on:
         options:
           - dry-run
           - deploy
+      deploy_sandbox:
+        description: Publish test billing Edge Functions (staging only)
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -54,6 +59,13 @@ jobs:
       - name: Link staging project
         run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
+      - name: Verify test billing shop before migrations
+        if: inputs.operation == 'deploy' && inputs.deploy_sandbox
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/verify-sandbox-shop.mjs
+
       - name: Preview migrations
         if: inputs.operation == 'dry-run'
         run: npx supabase db push --dry-run
@@ -73,3 +85,18 @@ jobs:
       - name: Deploy quest code gateway
         if: inputs.operation == 'deploy'
         run: npx supabase functions deploy redeem-quest-code --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Publish disabled sandbox functions
+        if: inputs.operation == 'deploy' && inputs.deploy_sandbox
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: |
+          npx supabase secrets set YOOKASSA_SANDBOX_ENABLED=false YOOKASSA_SANDBOX_SHOP_ID="$YOOKASSA_SANDBOX_SHOP_ID" YOOKASSA_SANDBOX_SECRET_KEY="$YOOKASSA_SANDBOX_SECRET_KEY" --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-checkout --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy yookassa-sandbox-webhook --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Enable verified sandbox after publication
+        if: inputs.operation == 'deploy' && inputs.deploy_sandbox
+        run: npx supabase secrets set YOOKASSA_SANDBOX_ENABLED=true --project-ref "$SUPABASE_PROJECT_ID"
