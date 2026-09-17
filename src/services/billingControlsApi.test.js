@@ -37,3 +37,16 @@ it('отклоняет ответ чужой организации', async () =
   mocks.rpc.mockResolvedValue({ data: { organization_id: 'other' } })
   await expect(loadBillingControls('org')).rejects.toThrow()
 })
+it('сохраняет только команду повторной отправки, без снимка подписки из RPC', async () => {
+  mocks.rpc.mockResolvedValue({ data: { organization_id: 'org', revision: 3,
+    cancel_intent_state: 'none', scheduled_intent_state: 'none', can_request: true,
+    can_manage: true, cancel_at_period_end: false, downgrade_targets: [],
+    private_note: 'must-not-be-persisted' } })
+  const controls = await loadBillingControls('org')
+  const command = prepareBillingCommand('actor', 'org', controls.revision, 'cancel_renewal')
+  const saved = sessionStorage.getItem('billing-command:actor:org')
+  expect(JSON.parse(saved)).toEqual({ p_organization_id: 'org', p_command_id: command.p_command_id,
+    p_expected_revision: 3, p_action: 'cancel_renewal', p_target_plan_version_id: null })
+  expect(saved).not.toContain('must-not-be-persisted')
+  expect(readBillingCommand('actor', 'org')).toEqual(command)
+})
