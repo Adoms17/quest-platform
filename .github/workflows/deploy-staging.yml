@@ -11,6 +11,7 @@ on:
         options:
           - dry-run
           - deploy
+          - reconcile
       deploy_sandbox:
         description: Publish test billing Edge Functions (staging only)
         type: boolean
@@ -26,6 +27,7 @@ concurrency:
 
 jobs:
   migrate:
+    if: inputs.operation != 'reconcile'
     runs-on: ubuntu-latest
     environment: staging
     env:
@@ -105,3 +107,20 @@ jobs:
       - name: Enable verified sandbox after publication
         if: inputs.operation == 'deploy' && inputs.deploy_sandbox
         run: npx supabase secrets set YOOKASSA_SANDBOX_ENABLED=true --project-ref "$SUPABASE_PROJECT_ID"
+
+  reconcile:
+    if: inputs.operation == 'reconcile'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment: staging
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+      - name: Reconcile test payments and refunds
+        env:
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+        run: node scripts/run-stage-billing-worker.mjs
