@@ -11,6 +11,7 @@ export function getUserErrorMessage(
     return OFFLINE_ERROR_MESSAGE
   }
   if (isTransportError(error)) return OFFLINE_ERROR_MESSAGE
+  if (error?.code === '23514' && error.message === 'quest completion limit reached') return 'Лимит прохождений этого квеста исчерпан. Новое прохождение недоступно.'
   if (error?.code === 'OFFLINE_START_PERMISSION_REQUIRED') return 'Для нового офлайн-прохождения заранее подготовьте старт в разделе «Мои квесты» при подключении к интернету.'
 
   if (error?.code === 'P0001' && ['quest start billing unavailable', 'offline permit billing unavailable'].includes(error.message)) {

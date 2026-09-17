@@ -16,7 +16,9 @@ const mocks = vi.hoisted(() => ({
   finishQuestAttemptAliases: vi.fn(),
   clearFinishedQuestAttempts: vi.fn(),
   reconcilePendingReceipts: vi.fn(),
+  preserveOfflineReview: vi.fn(),
 }))
+vi.mock('./offlineReview', () => ({ preserveOfflineReview: mocks.preserveOfflineReview }))
 
 vi.mock('../supabaseClient', () => ({
   supabase: {
@@ -103,6 +105,20 @@ describe('syncPendingResults', () => {
       syncedQuestIds: [],
       finishedLocalAttemptIds: [],
     }))
+  })
+
+  it('при отказе по лимиту очищает очередь только после сохранения архива; retry не отправляет ответы в статистику', async () => {
+    mocks.getPendingResults.mockResolvedValue([event({})])
+    mocks.registerOfflineQuestAttempt.mockRejectedValueOnce({ code: '23514', message: 'quest completion limit reached' })
+      .mockRejectedValueOnce({ code: 'P0001', message: 'offline attempt rejected by limit' })
+    mocks.preserveOfflineReview.mockRejectedValueOnce(new Error('lost response')).mockResolvedValueOnce(undefined)
+    await expect(syncPendingResults(session)).rejects.toThrow('lost response')
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+    expect(mocks.clearSyncedResults).not.toHaveBeenCalled()
+    await expect(syncPendingResults(session)).resolves.toMatchObject({ invalidEvents: 1 })
+    expect(mocks.markResultsSynced).toHaveBeenCalledWith([1])
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+    expect(mocks.toastSuccess).not.toHaveBeenCalled()
   })
 
   it('submits every event in local insertion order without task deduplication', async () => {
