@@ -64,7 +64,10 @@ jobs:
         env:
           YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
           YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
-        run: node scripts/verify-sandbox-shop.mjs
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+        run: |
+          node -e "if (!/^[a-f0-9]{64}$/.test(process.env.YOOKASSA_SANDBOX_WORKER_TOKEN ?? '')) process.exit(1)"
+          node scripts/verify-sandbox-shop.mjs
 
       - name: Preview migrations
         if: inputs.operation == 'dry-run'
@@ -91,8 +94,10 @@ jobs:
         env:
           YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
           YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
         run: |
           npx supabase secrets set YOOKASSA_SANDBOX_ENABLED=false YOOKASSA_SANDBOX_SHOP_ID="$YOOKASSA_SANDBOX_SHOP_ID" YOOKASSA_SANDBOX_SECRET_KEY="$YOOKASSA_SANDBOX_SECRET_KEY" --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase secrets set YOOKASSA_SANDBOX_WORKER_TOKEN="$YOOKASSA_SANDBOX_WORKER_TOKEN" --project-ref "$SUPABASE_PROJECT_ID"
           npx supabase functions deploy sandbox-checkout --project-ref "$SUPABASE_PROJECT_ID"
           npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
           npx supabase functions deploy yookassa-sandbox-webhook --project-ref "$SUPABASE_PROJECT_ID"
