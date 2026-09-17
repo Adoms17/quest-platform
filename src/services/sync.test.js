@@ -318,6 +318,30 @@ describe('syncPendingResults', () => {
     expect(mocks.clearFinishedQuestAttempts).not.toHaveBeenCalled()
   })
 
+  it.each(['offline permit already bound', 'offline permit conflict requires review'])('архивирует конфликт permit и его повтор: %s', async message => {
+    const records = [event({})]
+    mocks.getPendingResults.mockResolvedValue(records)
+    mocks.getQuestAttempt.mockResolvedValue({ localId: 'local-1', userId: 'user-1', offlinePermitId: 'permit-1' })
+    mocks.registerOfflineQuestAttempt.mockRejectedValueOnce({ code: message.includes('requires') ? 'P0001' : '23505', message })
+    mocks.preserveOfflineReview.mockResolvedValue(undefined)
+    await syncPendingResults(session)
+    expect(mocks.preserveOfflineReview).toHaveBeenCalledWith('quest-1', 'user-1', 'local-1', 'user-1', records, 'needs_review', 'permit-1')
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+    expect(mocks.markQuestAttemptSynced).not.toHaveBeenCalled()
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+  })
+
+  it('сбой архивации конфликта не подтверждает и не удаляет события', async () => {
+    mocks.getPendingResults.mockResolvedValue([event({})])
+    mocks.getQuestAttempt.mockResolvedValue({ localId: 'local-1', userId: 'user-1', offlinePermitId: 'permit-1' })
+    mocks.registerOfflineQuestAttempt.mockRejectedValueOnce({ code: '23505', message: 'offline permit already bound' })
+    mocks.preserveOfflineReview.mockRejectedValueOnce(new Error('lost archive response'))
+    await expect(syncPendingResults(session)).rejects.toThrow('lost archive response')
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+    expect(mocks.clearSyncedResults).not.toHaveBeenCalled()
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+  })
+
   it('does not retry a server validation error', async () => {
     mocks.getPendingResults.mockResolvedValue([event({})])
 

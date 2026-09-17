@@ -5,6 +5,16 @@ vi.mock('./db', () => ({ markResultsForReview: mocks.mark }))
 import { preserveOfflineReview } from './offlineReview'
 const records = [{ id: 1, clientEventId: 'event', taskId: 'task', eventType: 'answer', submittedValue: 'answer' }]
 beforeEach(() => vi.resetAllMocks())
+
+test('конфликт permit передаётся отдельному RPC и подтверждается до изменения очереди', async () => {
+  mocks.rpc.mockResolvedValueOnce({ data: { state: 'needs_review', receipts: [] } })
+    .mockResolvedValueOnce({ data: { state: 'needs_review', receipts: [{ id: 'receipt', client_event_id: 'event', state: 'needs_review' }] } })
+  await expect(preserveOfflineReview('quest','profile','local','actor',records,'needs_review','permit')).rejects.toThrow('не подтвердил')
+  expect(mocks.mark).not.toHaveBeenCalled()
+  await preserveOfflineReview('quest','profile','local','actor',records,'needs_review','permit')
+  expect(mocks.rpc).toHaveBeenLastCalledWith('preserve_conflicting_offline_events', expect.objectContaining({ p_permit_id: 'permit' }))
+  expect(mocks.mark).toHaveBeenCalledTimes(1)
+})
 test('частичный receipt не меняет локальную очередь', async () => {
   mocks.rpc.mockResolvedValue({ data: { state: 'needs_review', receipts: [] } })
   await expect(preserveOfflineReview('quest','profile','local','actor',records)).rejects.toThrow('не подтвердил')
