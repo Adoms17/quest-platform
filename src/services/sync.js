@@ -161,6 +161,7 @@ export async function syncPendingResults(
     )
     let rejectedEvents = 0
     let reviewEvents = 0
+    let invalidEvents = 0
 
     for (const [localId, records] of groups) {
       const questId = records[0].questId
@@ -208,6 +209,17 @@ export async function syncPendingResults(
         try {
           serverAttemptId = await getServerAttemptId(localId, questId, user.id, participantProfileId)
         } catch (error) {
+          if ((error?.code === '23514' && error.message === 'quest completion limit reached') ||
+            (error?.code === 'P0001' && error.message === 'offline attempt rejected by limit')) {
+            await preserveOfflineReview(questId, participantProfileId, localId, user.id, records, 'invalid_limit')
+            await finishQuestAttemptAliases(localId)
+            await markResultsSynced(records.map(record => record.id))
+            finishedLocalAttemptIds.add(localId)
+            syncedQuestIds.add(questId)
+            syncedEvents += records.length
+            invalidEvents += records.length
+            continue
+          }
           if (!((error?.code === '23514' && error.message === 'quest is not available') ||
             (error?.code === 'P0001' && ['offline attempt requires review', 'quest start billing unavailable'].includes(error.message)))) throw error
           await preserveOfflineReview(questId, participantProfileId, localId, user.id, records)
@@ -291,6 +303,9 @@ export async function syncPendingResults(
       }
     }
 
+    if (invalidEvents > 0) {
+      toast.error('Офлайн-прохождение сохранено в истории как недействительное: лимит прохождений исчерпан. В статистику оно не включено.', { duration: 7000 })
+    }
     if (reviewEvents > 0) {
       window.dispatchEvent(new CustomEvent(SYNC_COMPLETE_EVENT))
       toast.error('Результаты сохранены на сервере и устройстве, требуется проверка организатора. В итог они пока не засчитаны.', { duration: 7000 })
@@ -304,7 +319,7 @@ export async function syncPendingResults(
         'Сервер не подтвердил открытие задания. Проверьте код и повторите попытку.',
         { duration: 7000 }
       )
-    } else if (syncedEvents > 0) {
+    } else if (syncedEvents > 0 && invalidEvents === 0) {
       toast.success('Результаты синхронизированы!')
     }
 
@@ -312,6 +327,7 @@ export async function syncPendingResults(
       syncedEvents,
       skippedLegacyEvents,
       ...(reviewEvents ? { reviewEvents } : {}),
+      ...(invalidEvents ? { invalidEvents } : {}),
     }
   } catch (error) {
     if (!suppressErrorToast) {

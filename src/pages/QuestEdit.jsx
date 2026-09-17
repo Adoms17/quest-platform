@@ -401,11 +401,9 @@ export default function QuestEdit() {
               <p className="text-sm text-gray-500 mt-1">0 — неограниченно</p>
             </div>
             <div>
-              <label className="block font-medium mb-1">Лимит прохождений квеста участником</label>
-              <label className="block font-medium">Время прохождения, минут (0 — без ограничения)<input type="number" min="0" max="10080" step="1" value={timeLimitMinutes} onChange={e => setTimeLimitMinutes(e.target.value)} className="w-full border p-2" /></label>
-              <label className="mt-3 flex items-start gap-2"><input type="checkbox" checked={allowLateOfflineAnswers} onChange={e => setAllowLateOfflineAnswers(e.target.checked)} />Принимать офлайн-ответы после истечения времени</label>
-              <p className="text-sm text-gray-500">Разрешает позднюю доставку ответов, введённых до окончания таймера по времени устройства. Применяется к новым попыткам; требует доверия к времени устройства.</p>
+              <label htmlFor="quest-completion-limit" className="block font-medium mb-1">Лимит прохождений квеста участником</label>
               <input
+                id="quest-completion-limit"
                 type="number"
                 min="0"
                 value={maxQuestAttempts}
@@ -415,6 +413,11 @@ export default function QuestEdit() {
               <p className="text-sm text-gray-500 mt-1">
                 0 — неограниченно. Учитываются все завершённые прохождения.
               </p>
+            </div>
+            <div>
+              <label className="block font-medium">Время прохождения, минут (0 — без ограничения)<input type="number" min="0" max="10080" step="1" value={timeLimitMinutes} onChange={e => setTimeLimitMinutes(e.target.value)} className="w-full border p-2 rounded-sm" /></label>
+              <label className="mt-3 flex items-start gap-2"><input type="checkbox" checked={allowLateOfflineAnswers} onChange={e => setAllowLateOfflineAnswers(e.target.checked)} /><span>Принимать офлайн-ответы после истечения времени</span></label>
+              <p className="text-sm text-gray-500">Разрешает позднюю доставку ответов, введённых до окончания таймера по времени устройства. Применяется к новым попыткам; требует доверия к времени устройства.</p>
             </div>
             <div className="flex gap-2">
               <button

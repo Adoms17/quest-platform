@@ -16,3 +16,11 @@ test('доставка помечается для проверки только
   await preserveOfflineReview('quest','profile','local','actor',records)
   expect(mocks.mark).toHaveBeenCalledWith('actor',records,receipts)
 })
+test('отказ по лимиту требует полного серверного подтверждения и не помечается как ожидающий проверки', async () => {
+  mocks.rpc.mockResolvedValueOnce({ data: { state: 'invalid_limit', receipts: [] } })
+    .mockResolvedValueOnce({ data: { state: 'invalid_limit', receipts: [{ id: 'receipt', client_event_id: 'event', state: 'invalid_limit' }] } })
+  await expect(preserveOfflineReview('quest','profile','local','actor',records,'invalid_limit')).rejects.toThrow()
+  await preserveOfflineReview('quest','profile','local','actor',records,'invalid_limit')
+  expect(mocks.rpc.mock.calls[1][0]).toBe('preserve_limit_rejected_offline_events')
+  expect(mocks.mark).not.toHaveBeenCalled()
+})

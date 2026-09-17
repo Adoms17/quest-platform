@@ -24,12 +24,12 @@ export default function OfflineEventReviews({ questId }) {
   return <section className="rounded-xl border p-4" aria-label="Поздние офлайн-результаты">
     <button type="button" className="py-2 font-semibold text-blue-700" onClick={() => setOpened(value => !value)}>Поздние офлайн-результаты</button>
     {opened && <>
-      <p className="text-sm text-gray-600">Сохранены после закрытия квеста и требуют проверки. В итоговую статистику не включены; время устройства не подтверждено сервером.</p>
+      <p className="text-sm text-gray-600">Офлайн-результаты: после закрытия квеста — требуют проверки; при исчерпанном лимите — недействительны. В итоговую статистику не включены; время устройства не подтверждено сервером.</p>
       {error && <p role="alert">Не удалось загрузить данные. <button onClick={() => setPage(old => ({ ...old, revision: old.revision + 1 }))}>Повторить</button></p>}
       {loading && <p role="status">Загрузка…</p>}
       {!loading && !error && !rows.length && <p>Нет результатов для проверки.</p>}
       <ul className="space-y-3">{rows.map(row => <li key={row.id} className="border-t pt-3 break-words">
-        <p>Требует проверки · получено {new Date(row.received_at).toLocaleString('ru-RU')}</p>
+        <p>{row.state === 'invalid_limit' ? 'Недействительное прохождение: лимит исчерпан' : 'Требует проверки'} · получено {new Date(row.received_at).toLocaleString('ru-RU')}</p>
         <p className="text-sm">Участник: {row.participant_name || 'Профиль недоступен'} · событие: {{ open: 'открытие задания', answer: 'ответ', finish: 'завершение' }[row.payload?.eventType] || 'событие'}</p>
         {row.payload?.submittedValue != null && <p>Ответ: {String(row.payload.submittedValue)}</p>}
       </li>)}</ul>

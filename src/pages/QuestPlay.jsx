@@ -1249,8 +1249,8 @@ export default function QuestPlay({ session }) {
           offlinePackageStatus={offlinePackageStatus}
           offlinePackageMetadata={offlinePackageMetadata}
           hasExistingAttempt={hasExistingAttempt}
-          startDisabled={attemptLimitReached || connectionRequired}
-          startMessage={attemptLimitReached
+          startDisabled={attemptLimitReached || questSummary?.completion_limit_reached === true || connectionRequired}
+          startMessage={attemptLimitReached || questSummary?.completion_limit_reached === true
             ? 'Вы использовали все доступные прохождения этого квеста.'
             : connectionRequired
               ? 'Для запуска этого квеста необходимо подключение к интернету.'
