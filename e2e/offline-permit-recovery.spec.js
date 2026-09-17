@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test'
 
 for (const state of ['active', 'closed', 'access-denied', 'conflict']) {
   const closed = state === 'closed'
-  const denied = ['profile-mismatch', 'access-denied', 'conflict'].includes(state)
+  const denied = ['profile-mismatch', 'access-denied'].includes(state)
+  const conflict = state === 'conflict'
   test(`permit после перезапуска: состояние=${state}`, async ({ page }) => {
     const registrations = []
     const submitted = []
@@ -20,6 +21,13 @@ for (const state of ['active', 'closed', 'access-denied', 'conflict']) {
         submitted.push(route.request().postDataJSON())
         if (failDelivery) return route.abort('failed')
         return route.fulfill({ json: { accepted: true, opened: true } })
+      }
+      if (path.endsWith('/preserve_conflicting_offline_events')) {
+        const args = route.request().postDataJSON()
+        expect(args.p_permit_id).toBe('11111111-1111-4111-8111-111111111111')
+        return route.fulfill({ json: { state: 'needs_review', receipts: failDelivery ? [] : args.p_events.map(event => ({
+          id: `review-${event.clientEventId}`, client_event_id: event.clientEventId, state: 'needs_review',
+        })) } })
       }
       return route.fulfill({ json: [] })
     })
@@ -42,7 +50,7 @@ for (const state of ['active', 'closed', 'access-denied', 'conflict']) {
       catch { return 'error' }
     }, state === 'conflict')
     expect(await sync()).toBe('error')
-    if (state === 'conflict') await expect(page.getByText('Не удалось связать результаты с исходным прохождением. Они сохранены на этом устройстве. Не удаляйте загрузку и обратитесь к организатору.')).toBeVisible()
+    if (conflict) await expect(page.getByText('Не удалось синхронизировать результаты.')).toBeVisible()
     await page.reload()
     const pending = await page.evaluate(async () => (await import('/src/services/db.js')).getPendingResults('adult'))
     expect(pending).toHaveLength(1)
@@ -62,14 +70,18 @@ for (const state of ['active', 'closed', 'access-denied', 'conflict']) {
     expect(registrations.map(item => item.p_permit_id)).toEqual(['11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111'])
     expect(registrations[1]).not.toHaveProperty('p_existing_attempt_id')
     expect(registrations.map(item => item.p_participant_profile_id)).toEqual(['child', 'child'])
-    if (closed || denied) expect(submitted).toHaveLength(0)
+    if (closed || denied || conflict) expect(submitted).toHaveLength(0)
     else {
       expect(submitted).toHaveLength(2)
       expect(submitted[0].p_client_event_id).toBe(submitted[1].p_client_event_id)
       expect(submitted[1].p_quest_attempt_id).toBe('server-attempt')
     }
     const remaining = await page.evaluate(async () => (await import('/src/services/db.js')).getPendingResults('adult'))
-    expect(remaining).toHaveLength(closed || denied ? 1 : 0)
+    expect(remaining).toHaveLength(closed || denied || conflict ? 1 : 0)
     if (denied) expect(remaining).toEqual(pending)
+    if (conflict) {
+      expect(remaining[0]).toMatchObject({ clientEventId: pending[0].clientEventId, reviewState: 'needs_review', synced: false })
+      await expect(page.getByText('Результаты сохранены на сервере и устройстве, требуется проверка организатора. В итог они пока не засчитаны.')).toBeVisible()
+    }
   })
 }
