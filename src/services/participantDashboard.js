@@ -22,7 +22,7 @@ export async function loadParticipantDashboard(userId, signal) {
   }
   if (offline) profiles = await getParticipantProfiles(userId)
   const [packages, attempts, pending] = await Promise.all([
-    getDownloadedQuestPackages(), getLocalParticipantAttempts(userId), getPendingResults(userId),
+    getDownloadedQuestPackages(Date.now(), userId), getLocalParticipantAttempts(userId), getPendingResults(userId),
   ])
   signal?.throwIfAborted()
   const ids = new Set(profiles.map(p => p.participant_profile_id))
@@ -41,6 +41,7 @@ export function packageReadiness(pkg, now = Date.now()) {
     return { key: 'expired', text: 'Нужно обновить доступ онлайн', ready: false }
   }
   if (pkg.is_open === false || Date.parse(pkg.end_at) < now || Date.parse(pkg.start_at) > now) return { key: 'unavailable', text: 'Прохождение сейчас недоступно', ready: false }
+  if (pkg.offlineStartRequiresPermit && !pkg.offlineStartPrepared) return { key: 'needs-permit', text: 'Подготовьте старт онлайн', ready: false }
   if (pkg.offlineMediaFailures?.length) return { key: 'partial', text: 'Пакет неполный', ready: false }
   return { key: 'ready', text: 'Готов офлайн', ready: true }
 }
@@ -65,7 +66,7 @@ export function buildParticipantQuestRows(data, profileId, now = Date.now()) {
     if (!old || String(attempt.updatedAt || '') > String(old.updatedAt || '')) attempts.set(attempt.questId, attempt)
   }
   return [...rows.values()].map(row => ({
-    ...row, profileId, readiness: packageReadiness(row.package, now),
+    ...row, profileId, readiness: packageReadiness(row.package ? { ...row.package, offlineStartPrepared: row.package.offlineStartPrepared || Boolean(row.active_attempt_id || attempts.get(row.id)) } : null, now),
     attempt: data.pending.some(p => p.questId === row.id && p.participantProfileId === profileId && p.eventType === 'finish') ? null
       : row.active_attempt_id ? { serverId: row.active_attempt_id, updatedAt: row.attempt_started_at, remote: true } : attempts.get(row.id) || null,
     pendingCount: data.pending.filter(p => p.questId === row.id && p.participantProfileId === profileId).length,

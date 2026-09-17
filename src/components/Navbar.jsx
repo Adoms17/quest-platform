@@ -91,6 +91,7 @@ export default function Navbar({ session }) {
             {organizationSearch && filteredOrganizations.length === 0 && <p className="app-menu-heading">Ничего не найдено</p>}
           </div>
           <div className="app-menu-secondary">
+            {organizationContext && hasOrganizationPermission(currentOrganization, 'billing.read') && <Link className="app-menu-item" to="/organization/billing" onClick={closeMenu}>Тариф и лимиты</Link>}
             <Link className="app-menu-item" to="/participants/history" onClick={closeMenu}>История прохождений</Link>
             <Link className="app-menu-item" to="/downloads" onClick={closeMenu}>Хранилище</Link>
             <Link className="app-menu-item" to="/access/code" onClick={closeMenu}>Ввести код</Link>

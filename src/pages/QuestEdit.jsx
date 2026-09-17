@@ -341,7 +341,6 @@ export default function QuestEdit() {
                     type="checkbox"
                     checked={isOpen}
                     onChange={(e) => {
-                      setIsOpen(e.target.checked)
                       updateAvailability('is_open', e.target.checked)
                     }}
                   />

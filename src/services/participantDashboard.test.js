@@ -13,6 +13,11 @@ beforeEach(() => {
 })
 afterEach(() => vi.restoreAllMocks())
 describe('готовность и изоляция участника', () => {
+  it('скачанный пакет при включённой политике требует отдельного разрешения', () => {
+    const now = Date.parse('2026-09-14')
+    expect(packageReadiness({ ...pkg, offlineStartRequiresPermit: true }, now)).toMatchObject({ key: 'needs-permit', ready: false })
+    expect(packageReadiness({ ...pkg, offlineStartRequiresPermit: true, offlineStartPrepared: true }, now).ready).toBe(true)
+  })
   it('не обещает offline для просроченного, неполного, старого или закрытого пакета', () => {
     const now = Date.parse('2026-09-14')
     expect(packageReadiness(pkg, now).ready).toBe(true)

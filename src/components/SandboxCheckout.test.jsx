@@ -1,0 +1,64 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, expect, test, vi } from 'vitest'
+const mocks = vi.hoisted(() => ({ readSandboxCheckout: vi.fn(), recoverSandboxCheckout: vi.fn(), loadSandboxOffer: vi.fn(), checkSandboxCheckout: vi.fn() }))
+vi.mock('../services/sandboxCheckoutApi', () => mocks)
+import SandboxCheckout from './SandboxCheckout'
+beforeEach(() => {
+  vi.resetAllMocks()
+  mocks.readSandboxCheckout.mockReturnValue('order')
+  mocks.recoverSandboxCheckout.mockResolvedValue('order')
+  mocks.loadSandboxOffer.mockResolvedValue({ order_id: 'order', plan_name: 'Тестовый тариф', amount_minor: 100, period_start: '2026-09-16T00:00:00Z', period_end: '2026-10-16T00:00:00Z', state: 'reserved' })
+})
+test('просмотр не вызывает оплату; требуется подтверждение и двойной клик блокируется', async () => {
+  mocks.checkSandboxCheckout.mockReturnValue(new Promise(() => {}))
+  render(<SandboxCheckout actorId="a" organizationId="o" />)
+  const button = await screen.findByRole('button', { name: 'Подтвердить тестовую оплату' })
+  expect(button.disabled).toBe(true)
+  expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('checkbox'))
+  fireEvent.click(button); fireEvent.click(button)
+  expect(mocks.checkSandboxCheckout).toHaveBeenCalledTimes(1)
+})
+test('ошибка допускает повтор того же заказа, success не заявляет активацию', async () => {
+  mocks.checkSandboxCheckout.mockRejectedValueOnce(new Error('secret')).mockResolvedValue({ status: 'succeeded', confirmationUrl: null })
+  render(<SandboxCheckout actorId="a" organizationId="o" />)
+  fireEvent.click(await screen.findByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button', { name: 'Подтвердить тестовую оплату' }))
+  await screen.findByRole('alert')
+  expect(screen.queryByText('secret')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Проверить платёж' }))
+  await screen.findByText('Тестовая оплата прошла. Активация подписки проверяется отдельно.')
+  expect(mocks.checkSandboxCheckout).toHaveBeenCalledTimes(2)
+})
+test.each([
+  ['canceled', false, 'Платёж отменён. Этот заказ не продлевает подписку. Для новой оплаты закройте заказ и выберите доступное предложение.'],
+  ['waiting_for_capture', false, 'Платёж ожидает подтверждения списания. Оплаченный период ещё не подтверждён.'],
+  ['canceled', true, 'Статус платежа требует проверки. Не создавайте повторную оплату до завершения сверки.'],
+])('серверный статус %s виден после загрузки без новой оплаты', async (payment_status, payment_requires_review, message) => {
+  mocks.loadSandboxOffer.mockResolvedValue({ order_id: 'order', plan_name: 'Тест', amount_minor: 100, period_start: '2026-09-16', period_end: '2026-10-16', state: 'finished', payment_status, payment_requires_review })
+  render(<SandboxCheckout actorId="a" organizationId="o" />)
+  await screen.findByText(message)
+  expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
+  if (payment_requires_review) {
+    expect(screen.queryByText(/Этот заказ не продлевает/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Закрыть завершённый заказ' })).toBeNull()
+  }
+})
+
+test('возврат показан отдельно от действующего доступа', async () => {
+  mocks.loadSandboxOffer.mockResolvedValue({ order_id: 'order', plan_name: 'Тест', amount_minor: 1000, period_start: '2026-09-16', period_end: '2026-10-16', state: 'finished', fulfillment_state: 'applied', refunded_minor: 400, refund_pending_minor: 600 })
+  render(<SandboxCheckout actorId="a" organizationId="o" />)
+  await screen.findByText(/Возвращено:.*4,00/)
+  expect(screen.getByText('Возврат обрабатывается. Доступ по подписке не изменён.')).toBeTruthy()
+  expect(screen.getByText('Оплаченный тестовый период применён.')).toBeTruthy()
+  expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
+})
+
+test('смена сохранённого заказа после просмотра запрещает отправку', async () => {
+  render(<SandboxCheckout actorId="a" organizationId="o" />)
+  fireEvent.click(await screen.findByRole('checkbox'))
+  mocks.readSandboxCheckout.mockReturnValue('another')
+  fireEvent.click(screen.getByRole('button', { name: 'Подтвердить тестовую оплату' }))
+  await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
+  expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
+})

@@ -271,18 +271,21 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
     return upgradedState
   })
 
-  expect(result.version).toBe(11)
+  expect(result.version).toBe(14)
   expect(result.hasPackageVersionIndex).toBe(true)
   expect(result.hasParticipantProfilesStore).toBe(true)
   expect(result.hasOfflineAssetsStore).toBe(true)
   expect(result.quest?.title).toBe('Saved quest')
   expect(result.attempt).toMatchObject({
     localId: 'attempt-before-upgrade',
+    offlinePermitId: null,
     participantProfileId: 'child-1',
     synced: false,
   })
   expect(result.pending).toMatchObject({
     clientEventId: 'event-before-upgrade',
+    reviewState: null,
+    reviewReceiptId: null,
     participantProfileId: 'child-1',
     synced: false,
   })

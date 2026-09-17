@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   acceptParticipantProfileInvitation,
@@ -7,10 +7,12 @@ import {
 import { adoptParticipantOfflineData } from '../services/db'
 import { getParticipantGroupErrorMessage } from '../services/participantGroupErrors'
 import { getUserErrorMessage } from '../services/userErrorMessage'
+import { checkParticipantClaimPending } from '../services/participantClaimPreflight'
 
 export default function AcceptParticipantInvitation({ session }) {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
+  const accepting = useRef(false)
   const [preview, setPreview] = useState(null)
   const [status, setStatus] = useState(token ? 'loading' : 'error')
   const [message, setMessage] = useState(token ? 'Проверяем приглашение...' : 'В ссылке отсутствует токен приглашения.')
@@ -38,9 +40,25 @@ export default function AcceptParticipantInvitation({ session }) {
   }, [token])
 
   const accept = async () => {
+    if (accepting.current) return
+    accepting.current = true
     setStatus('loading')
     setMessage('Принимаем приглашение...')
     try {
+      if (preview.invitation_kind === 'claim') {
+        try {
+          const pending = await checkParticipantClaimPending(session?.user?.id)
+          if (pending > 0) {
+            setStatus('ready')
+            setMessage('Объединение отложено: на этом устройстве есть неотправленные результаты вашего профиля. Синхронизируйте их в разделе «Загрузки» и повторите принятие приглашения.')
+            return
+          }
+        } catch (error) {
+          setStatus('ready')
+          setMessage(getUserErrorMessage(error, 'Не удалось проверить неотправленные результаты. Объединение не выполнено. Попробуйте ещё раз.'))
+          return
+        }
+      }
       const result = await acceptParticipantProfileInvitation(token)
       let localDataRecovered = true
       if (preview.invitation_kind === 'claim' && result?.participant_profile_id) {
@@ -63,8 +81,10 @@ export default function AcceptParticipantInvitation({ session }) {
     } catch (error) {
       setStatus('error')
       setMessage(getParticipantGroupErrorMessage(error, 'Не удалось принять приглашение.'))
+    } finally {
+      accepting.current = false
     }
   }
 
-  return <div className="mx-auto max-w-xl p-6"><div className="rounded-xl border bg-white p-6 text-center shadow-sm"><div className="text-4xl">{status === 'success' ? '✅' : status === 'error' ? '⚠️' : '👨‍👩‍👧'}</div><h1 className="mt-3 text-2xl font-bold">Приглашение к профилю участника</h1>{preview && status !== 'success' && <><p className="mt-3 text-lg font-medium">{preview.participant_display_name}</p><p className="mt-2 text-gray-600">{preview.invitation_kind === 'claim' ? 'Связать этот профиль с вашим самостоятельным аккаунтом с сохранением истории?' : 'Стать контролирующим взрослым для этого профиля?'}</p>{preview.invitation_kind === 'claim' && <p className="mt-2 text-sm text-gray-500">История завершённых прохождений, доступы к квестам и группы вашего текущего профиля будут объединены с принимаемым профилем.</p>}</>}<p className={`mt-3 ${status === 'error' ? 'text-red-700' : 'text-gray-700'}`}>{message}</p>{status === 'ready' && <button type="button" onClick={() => void accept()} className="mt-5 rounded-lg bg-blue-600 px-5 py-3 text-white">Принять приглашение</button>}{(status === 'success' || status === 'error') && <Link to="/participants/group" className="mt-5 inline-block rounded-lg bg-blue-600 px-5 py-3 text-white">Открыть мою группу</Link>}</div></div>
+  return <div className="mx-auto max-w-xl p-6"><div className="rounded-xl border bg-white p-6 text-center shadow-sm"><div className="text-4xl">{status === 'success' ? '✅' : status === 'error' ? '⚠️' : '👨‍👩‍👧'}</div><h1 className="mt-3 text-2xl font-bold">Приглашение к профилю участника</h1>{preview && status !== 'success' && <><p className="mt-3 text-lg font-medium">{preview.participant_display_name}</p><p className="mt-2 text-gray-600">{preview.invitation_kind === 'claim' ? 'Связать этот профиль с вашим самостоятельным аккаунтом с сохранением истории?' : 'Стать контролирующим взрослым для этого профиля?'}</p>{preview.invitation_kind === 'claim' && <p className="mt-2 text-sm text-gray-500">История завершённых прохождений, доступы к квестам и группы вашего текущего профиля будут объединены с принимаемым профилем. Перед объединением синхронизируйте результаты на всех устройствах: проверить очередь других устройств здесь невозможно.</p>}</>}<p className={`mt-3 ${status === 'error' ? 'text-red-700' : 'text-gray-700'}`}>{message}</p>{preview?.invitation_kind === 'claim' && status === 'ready' && <Link to="/downloads" className="mt-4 block text-blue-700 underline">Открыть загрузки и синхронизацию</Link>}{status === 'ready' && <button type="button" onClick={() => void accept()} className="mt-5 rounded-lg bg-blue-600 px-5 py-3 text-white">Принять приглашение</button>}{(status === 'success' || status === 'error') && <Link to="/participants/group" className="mt-5 inline-block rounded-lg bg-blue-600 px-5 py-3 text-white">Открыть мою группу</Link>}</div></div>
 }
