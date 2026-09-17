@@ -1,6 +1,6 @@
 begin;
 
-select plan(21);
+select no_plan();
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -131,15 +131,31 @@ select throws_ok(
   'self participant profile has active quest attempt',
   'claim refuses to alter an active attempt on the automatically provisioned profile'
 );
+select lives_ok($$select public.register_offline_quest_attempt(
+  '6f100000-0000-4000-8000-000000000001', '6f000000-0000-4000-8000-000000000003',
+  'local-before-claim', '6f300000-0000-4000-8000-000000000002')$$,
+  'offline identity registered before profile merge');
 select is(
   (select count(*) from public.get_participant_profile_invitation_preview(current_setting('app.test_claim_token'))),
   1::bigint,
   'failed merge leaves the invitation available for retry'
 );
 reset role;
+select is((select count(*) from public.participant_usage_profile_merges where source_profile_id='6f000000-0000-4000-8000-000000000003'),0::bigint,'failed claim leaves no usage merge');
 update public.quest_attempts
 set finished_at = now()
 where id = '6f300000-0000-4000-8000-000000000002';
+insert into public.quests(id,creator_id,title,is_public,is_open) values(md5('claim-permit-quest')::uuid,'6f000000-0000-4000-8000-000000000001','Permit merge',true,true);
+update public.organization_subscriptions set status='free',plan_version_id=(select id from public.billing_plan_versions where plan_key='free' and version=1)
+ where organization_id=(select organization_id from public.quests where id=md5('claim-permit-quest')::uuid);
+select set_config('test.claim_permit',public.prepare_offline_start_permit(md5('claim-permit-quest')::uuid,'6f000000-0000-4000-8000-000000000003',md5('claim-permit-command')::uuid)->>'id',true);
+savepoint conflicting_reserves;
+select set_config('request.jwt.claim.sub','6f000000-0000-4000-8000-000000000001',true);
+select public.prepare_offline_start_permit(md5('claim-permit-quest')::uuid,current_setting('app.test_invited_profile_id')::uuid,md5('target-permit-command')::uuid);
+select set_config('request.jwt.claim.sub','6f000000-0000-4000-8000-000000000003',true);
+select throws_ok(format($$select * from public.accept_participant_profile_invitation(%L)$$,current_setting('app.test_claim_token')),'55000','participant merge has conflicting offline permits','two reserves prevent unsafe automatic merge');
+rollback to conflicting_reserves;
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '6f000000-0000-4000-8000-000000000003', true);
 select lives_ok(
@@ -218,5 +234,24 @@ select lives_ok(
   'claim retry is idempotent'
 );
 
+reset role;
+select is(public.participant_usage_identity('6f000000-0000-4000-8000-000000000003'::uuid),public.participant_usage_identity(current_setting('app.test_invited_profile_id')::uuid),'successful claim merges usage identity');
+set local role authenticated;
+select is(public.register_offline_quest_attempt(
+  '6f100000-0000-4000-8000-000000000001', '6f000000-0000-4000-8000-000000000003',
+  'local-before-claim', '6f300000-0000-4000-8000-000000000002')->>'id',
+  '6f300000-0000-4000-8000-000000000002','old profile retry preserves the same finished attempt');
+select is(public.register_offline_quest_attempt(
+  '6f100000-0000-4000-8000-000000000001',current_setting('app.test_invited_profile_id')::uuid,
+  'local-before-claim','6f300000-0000-4000-8000-000000000002')->>'id',
+  '6f300000-0000-4000-8000-000000000002','new profile resolves the same registered identity');
+reset role;
+select is((select participant_profile_id from public.offline_attempt_registrations
+  where actor_user_id='6f000000-0000-4000-8000-000000000003' and local_attempt_id='local-before-claim'),
+  current_setting('app.test_invited_profile_id')::uuid,'registration follows explicit profile merge');
+select is((select participant_profile_id from public.offline_start_permits where id=current_setting('test.claim_permit')::uuid),current_setting('app.test_invited_profile_id')::uuid,'reserve moved without changing permit ID');
+select set_config('test.claim_attempt',public.register_permitted_offline_attempt(md5('claim-permit-quest')::uuid,'6f000000-0000-4000-8000-000000000003','old-device',current_setting('test.claim_permit')::uuid)->>'id',true);
+select is(public.register_permitted_offline_attempt(md5('claim-permit-quest')::uuid,'6f000000-0000-4000-8000-000000000003','old-device',current_setting('test.claim_permit')::uuid)->>'id',current_setting('test.claim_attempt'),'old device retry after merge keeps one attempt');
+select is((select participant_profile_id from public.quest_attempts where id=current_setting('test.claim_attempt')::uuid),current_setting('app.test_invited_profile_id')::uuid,'redeemed attempt belongs to merged profile');
 select * from finish();
 rollback;

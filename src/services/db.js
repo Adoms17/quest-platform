@@ -7,7 +7,7 @@ import {
 } from './offlineMedia'
 
 const DB_NAME = 'QuestPlatformDB'
-const DB_VERSION = 11
+const DB_VERSION = 14
 export const OFFLINE_PACKAGE_VERSION = 2
 export const PARTICIPANT_PACKAGE_ACCESS_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -183,6 +183,28 @@ export async function initDB() {
         : db.createObjectStore('offlineAssets', { keyPath: 'id' })
       if (!offlineAssetStore.indexNames.contains('by_quest_id')) {
         offlineAssetStore.createIndex('by_quest_id', 'questId')
+      }
+
+      if (!db.objectStoreNames.contains('offlineStartPermits')) {
+        db.createObjectStore('offlineStartPermits', { keyPath: ['userId', 'participantProfileId', 'questId'] })
+      }
+
+      if (oldVersion < 13) {
+        let cursor = await pendingStore.openCursor()
+        while (cursor) {
+          await cursor.update({ reviewState: null, reviewReceiptId: null, ...cursor.value })
+          cursor = await cursor.continue()
+        }
+      }
+
+      if (oldVersion < 12) {
+        let cursor = await qaStore.openCursor()
+        while (cursor) {
+          if (cursor.value.offlinePermitId === undefined) {
+            await cursor.update({ ...cursor.value, offlinePermitId: null })
+          }
+          cursor = await cursor.continue()
+        }
       }
 
       if (oldVersion < 8) {
@@ -406,9 +428,10 @@ export async function getDownloadedQuests() {
   return db.getAll('downloadedQuests')
 }
 
-export async function getDownloadedQuestPackages(now = Date.now()) {
+export async function getDownloadedQuestPackages(now = Date.now(), userId = null) {
   const db = await initDB()
   const downloads = await db.getAll('downloadedQuests')
+  const permits = userId ? (await db.getAll('offlineStartPermits')).filter(permit => permit.userId === userId && !permit.consumedBy) : []
   const packages = []
 
   for (const download of downloads) {
@@ -434,6 +457,8 @@ export async function getDownloadedQuestPackages(now = Date.now()) {
       packages.push({
         ...download,
         title: quest.title || 'Без названия',
+        offlineStartRequiresPermit: quest.offline_start_requires_permit === true,
+        offlineStartPrepared: permits.some(permit => permit.questId === quest.id && permit.participantProfileId === participantProfileId),
         is_open: quest.is_open,
         start_at: quest.start_at,
         end_at: quest.end_at,
@@ -684,6 +709,71 @@ export async function markResultsSynced(ids) {
   await tx.done
 }
 
+// Подтверждение хранения отдельно от подтверждения результата. Очередь сохраняется.
+export async function markResultsForReview(userId, records, receipts) {
+  const db = await initDB()
+  const tx = db.transaction('pendingResults', 'readwrite')
+  const store = tx.objectStore('pendingResults')
+  for (const source of records) {
+    const record = await store.get(source.id)
+    const receipt = receipts.find(item => item.client_event_id === source.clientEventId)
+    if (record && record.userId === userId && record.clientEventId === source.clientEventId && receipt?.id) {
+      await store.put({ ...record, reviewState: 'needs_review', reviewReceiptId: receipt.id })
+    }
+  }
+  await tx.done
+}
+
+export async function saveOfflineStartPermit(userId, profileId, questId, permit) {
+  if (!userId || !permit?.id || permit.quest_id !== questId || permit.participant_profile_id !== profileId || permit.state !== 'reserved') {
+    throw new Error('Сервер не подтвердил подготовку офлайн-старта.')
+  }
+  const db = await initDB()
+  const tx = db.transaction('offlineStartPermits', 'readwrite')
+  const store = tx.objectStore('offlineStartPermits')
+  const existing = await store.get([userId, profileId, questId])
+  await store.put({ userId, participantProfileId: profileId, questId, permitId: permit.id,
+    consumedBy: existing?.permitId === permit.id ? existing.consumedBy : null })
+  await tx.done
+}
+
+export async function createLocalOfflineAttempt(questId, userId, profileId, clock) {
+  const db = await initDB()
+  const tx = db.transaction(['offlineStartPermits', 'questAttempts', 'quests'], 'readwrite')
+  const permits = tx.objectStore('offlineStartPermits')
+  const attempts = tx.objectStore('questAttempts')
+  const active = (await attempts.index('by_quest_user').getAll([questId, userId]))
+    .find(attempt => (attempt.participantProfileId || attempt.userId) === profileId && !attempt.finished)
+  if (active) { await tx.done; return active }
+  const permit = await permits.get([userId, profileId, questId])
+  const quest = await tx.objectStore('quests').get(questId)
+  if (!permit && quest?.offline_start_requires_permit) {
+    await tx.done
+    throw Object.assign(new Error('offline start permission required'), { code: 'OFFLINE_START_PERMISSION_REQUIRED' })
+  }
+  if (permit?.consumedBy) {
+    await tx.done
+    throw new Error('Подготовленное офлайн-прохождение уже использовано. Подключитесь к интернету перед новым стартом.')
+  }
+  const localId = `local-${createClientEventId()}`
+  const attempt = { localId, questId, userId, participantProfileId: profileId, serverId: null,
+    synced: false, finished: false, offlinePermitId: permit?.permitId || null,
+    ...clock, updatedAt: new Date().toISOString() }
+  await attempts.put(attempt)
+  if (permit) await permits.put({ ...permit, consumedBy: localId })
+  await tx.done
+  return attempt
+}
+
+export async function markOfflineStartUsed(userId, profileId, questId, attemptId) {
+  const db = await initDB()
+  const tx = db.transaction('offlineStartPermits', 'readwrite')
+  const store = tx.objectStore('offlineStartPermits')
+  const permit = await store.get([userId, profileId, questId])
+  if (permit) await store.put({ ...permit, consumedBy: attemptId })
+  await tx.done
+}
+
 // ... остальные функции без изменений ...
 
 export async function clearSyncedResults(userId = null) {
@@ -712,11 +802,18 @@ export async function clearSyncedResults(userId = null) {
 // ---------- Локальные попытки прохождения (questAttempts) ----------
 export async function saveQuestAttempt(localId, questId, userId, serverId = null, synced = false, finished = false, participantProfileId = userId, clock = {}) {
   const db = await initDB()
-  const existing = await db.get('questAttempts', localId)
-  await db.put('questAttempts', {
+  const tx = db.transaction('questAttempts', 'readwrite')
+  const store = tx.objectStore('questAttempts')
+  const existing = await store.get(localId)
+  if (existing?.offlinePermitId && (existing.questId !== questId || existing.userId !== userId ||
+    (existing.participantProfileId || existing.userId) !== participantProfileId)) {
+    throw new Error('Нельзя изменить владельца попытки с офлайн-разрешением')
+  }
+  await store.put({
     ...existing,
     startedAt: existing?.startedAt || new Date().toISOString(),
     ...clock,
+    offlinePermitId: existing?.offlinePermitId || null,
     localId,
     questId,
     userId,
@@ -726,6 +823,29 @@ export async function saveQuestAttempt(localId, questId, userId, serverId = null
     finished,
     updatedAt: new Date().toISOString(),
   })
+  await tx.done
+}
+
+// Привязка только до записи событий; это локальные метаданные, не доказательство доступа.
+export async function attachOfflinePermit(localId, userId, permit) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(permit?.id || '')) {
+    throw new Error('Некорректное офлайн-разрешение')
+  }
+  const db = await initDB()
+  const tx = db.transaction(['questAttempts', 'pendingResults'], 'readwrite')
+  const store = tx.objectStore('questAttempts')
+  const attempt = await store.get(localId)
+  if (!attempt || attempt.userId !== userId || attempt.questId !== permit.quest_id ||
+    (attempt.participantProfileId || attempt.userId) !== permit.participant_profile_id) {
+    throw new Error('Офлайн-разрешение принадлежит другой попытке')
+  }
+  if (attempt.offlinePermitId === permit.id) return tx.done
+  if (attempt.offlinePermitId || attempt.serverId || attempt.synced || attempt.finished ||
+    await tx.objectStore('pendingResults').index('by_local_attempt').count(localId)) {
+    throw new Error('Нельзя заменить разрешение начатой попытки')
+  }
+  await store.put({ ...attempt, offlinePermitId: permit.id })
+  await tx.done
 }
 
 export async function getQuestAttempt(localId) {
@@ -818,7 +938,7 @@ export async function finishQuestAttemptAliases(localId, serverId = null) {
 
 export async function clearAllLocalData() {
   const db = await initDB()
-  const stores = ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts', 'participantProfiles', 'offlineAssets']
+  const stores = ['quests', 'pendingResults', 'downloadedQuests', 'questAttempts', 'participantProfiles', 'offlineAssets', 'offlineStartPermits']
   const tx = db.transaction(stores, 'readwrite')
   for (const store of stores) {
     await tx.objectStore(store).clear()

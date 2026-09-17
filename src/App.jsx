@@ -31,6 +31,7 @@ const Downloads = lazy(() => import('./pages/Downloads'))
 const TaskManager = lazy(() => import('./pages/TaskManager'))
 const TaskForm = lazy(() => import('./pages/TaskForm'))
 const OrganizationTeam = lazy(() => import('./pages/OrganizationTeam'))
+const OrganizationBilling = lazy(() => import('./pages/OrganizationBilling'))
 const AcceptOrganizationInvitation = lazy(() => import('./pages/AcceptOrganizationInvitation'))
 const QuestAccess = lazy(() => import('./pages/QuestAccess'))
 const RedeemQuestAccess = lazy(() => import('./pages/RedeemQuestAccess'))
@@ -277,6 +278,10 @@ function App() {
               </Layout>
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/organization/billing"
+          element={<ProtectedRoute session={session}><Layout session={session}><OrganizationBilling session={session} /></Layout></ProtectedRoute>}
         />
         <Route
           path="/organization/team"

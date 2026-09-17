@@ -1,0 +1,17 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('gateway-owner')::uuid,'gateway-owner@example.test'),(md5('gateway-other')::uuid,'gateway-other@example.test');
+select set_config('request.jwt.claim.sub',md5('gateway-owner')::uuid::text,true);
+select set_config('test.order',public.reserve_sandbox_payment_order((select id from public.organizations where personal_owner_id=auth.uid()),gen_random_uuid(),0,(select id from public.billing_plan_versions where plan_key='pro' and version=1),100,'123','https://stage.qvesta.ru',now(),now()+interval '1 month')->>'id',true);
+select set_config('request.jwt.claim.sub','',true);
+set local role service_role;
+select is(public.sandbox_checkout_from_gateway(md5('gateway-owner')::uuid,'read',current_setting('test.order')::uuid)->'order'->>'id',current_setting('test.order'),'service шлюз передаёт владельца');
+select is(auth.uid(),null::uuid,'после успеха контекст восстановлен');
+select throws_ok($$select public.sandbox_checkout_from_gateway(md5('gateway-other')::uuid,'read',current_setting('test.order')::uuid)$$,'42501','billing management denied','чужой заказ запрещён');
+select is(auth.uid(),null::uuid,'после отказа контекст восстановлен');
+select throws_ok($$select public.sandbox_checkout_from_gateway(md5('gateway-owner')::uuid,'arbitrary',current_setting('test.order')::uuid)$$,'22023','invalid sandbox gateway request','произвольный вызов запрещён');
+reset role;
+select ok(not has_function_privilege('authenticated','public.sandbox_checkout_from_gateway(uuid,text,uuid,jsonb)','execute'),'пользователь не может выдать себя за другого через шлюз');
+select ok(not has_function_privilege('anon','public.sandbox_checkout_from_gateway(uuid,text,uuid,jsonb)','execute'),'anon закрыт');
+select * from finish();
+rollback;

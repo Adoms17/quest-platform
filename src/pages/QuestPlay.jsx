@@ -16,6 +16,8 @@ import {
   saveQuestToDB,
   getActiveLocalQuestAttempt,
   saveQuestAttempt,
+  createLocalOfflineAttempt,
+  markOfflineStartUsed,
   getQuestAttempt, // <-- добавить
   getPendingResults,
   createClientEventId,
@@ -543,6 +545,7 @@ export default function QuestPlay({ session }) {
           const serverAttempt = await startServerQuestAttempt(id, participantProfileId)
 
           attemptId = serverAttempt.id
+          await markOfflineStartUsed(userId, effectiveParticipantProfileId, id, attemptId)
           const clock = await loadQuestAttemptClock(attemptId)
 
           setCompletedTasks(serverAttempt.completed_tasks || 0)
@@ -597,10 +600,8 @@ export default function QuestPlay({ session }) {
       if (!stored) {
         localAttempt = await getActiveLocalQuestAttempt(id, userId, effectiveParticipantProfileId)
         if (!localAttempt || localAttempt.finished) {
-          const localId = `local-${Date.now()}`
           const startedAt = new Date().toISOString()
-          await saveQuestAttempt(localId, id, userId, null, false, false, effectiveParticipantProfileId, { startedAt, deadlineAt: makeQuestDeadline(startedAt, quest.time_limit_minutes) })
-          localAttempt = await getActiveLocalQuestAttempt(id, userId, effectiveParticipantProfileId)
+          localAttempt = await createLocalOfflineAttempt(id, userId, effectiveParticipantProfileId, { startedAt, deadlineAt: makeQuestDeadline(startedAt, quest.time_limit_minutes) })
         }
         attemptId = localAttempt.localId
         sessionStorage.setItem(storageKey, attemptId)

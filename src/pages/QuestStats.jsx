@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQuestResultsCatalog } from '../hooks/useQuestResultsCatalog'
 import QuestResultTasks from '../components/QuestResultTasks'
 import QuestResultsMaintenanceAccess from '../components/QuestResultsMaintenanceAccess'
+import OfflineEventReviews from '../components/OfflineEventReviews'
 
 const date = value => value ? new Date(value).toLocaleString('ru-RU') : '—'
 const confidence = { trusted: 'Серверное', bounded: 'Ограниченное', reported: 'С устройства' }
@@ -37,6 +38,7 @@ function Results({ questId, actorId }) {
     </article>)}</section>
     {catalog.hasMore && <button type="button" disabled={catalog.moreLoading} onClick={() => void catalog.loadMore()} className="rounded-lg border px-4 py-3 text-blue-700">{catalog.moreLoading ? 'Загрузка…' : 'Показать ещё'}</button>}
     <button type="button" disabled={catalog.loading || catalog.moreLoading} onClick={refresh} className="block py-3 text-blue-700">Обновить результаты</button>
+    {!catalog.denied && <OfflineEventReviews key={questId} questId={questId} />}
     {!catalog.denied && <QuestResultsMaintenanceAccess actorId={actorId} questId={questId} revision={revision} onRefresh={refresh} />}
   </div>
 }
