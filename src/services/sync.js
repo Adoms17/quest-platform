@@ -209,6 +209,15 @@ export async function syncPendingResults(
         try {
           serverAttemptId = await getServerAttemptId(localId, questId, user.id, participantProfileId)
         } catch (error) {
+          if ((error?.code === '23505' && error.message === 'offline permit already bound') ||
+            (error?.code === 'P0001' && error.message === 'offline permit conflict requires review')) {
+            const attempt = await getQuestAttempt(localId)
+            if (attempt?.offlinePermitId) {
+              await preserveOfflineReview(questId, participantProfileId, localId, user.id, records, 'needs_review', attempt.offlinePermitId)
+              reviewEvents += records.length
+              continue
+            }
+          }
           if ((error?.code === '23514' && error.message === 'quest completion limit reached') ||
             (error?.code === 'P0001' && error.message === 'offline attempt rejected by limit')) {
             await preserveOfflineReview(questId, participantProfileId, localId, user.id, records, 'invalid_limit')
