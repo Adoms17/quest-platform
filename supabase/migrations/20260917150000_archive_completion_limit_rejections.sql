@@ -6,8 +6,10 @@ create index offline_event_reviews_profile_history on public.offline_event_revie
 create or replace function public.preserve_limit_rejected_offline_events(p_quest_id uuid,p_participant_profile_id uuid,p_local_attempt_id text,p_events jsonb)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare actor uuid:=auth.uid(); q public.quests%rowtype; event jsonb;
- existing public.offline_event_reviews%rowtype; receipts jsonb:='[]'; event_id uuid;
+existing public.offline_event_reviews%rowtype; receipts jsonb:='[]'; event_id uuid;
 begin
+ perform pg_advisory_xact_lock_shared(16014000,1);
+ p_participant_profile_id:=public.resolve_billing_participant_profile(p_participant_profile_id);
  if actor is null or not public.can_actor_access_quest(p_quest_id,p_participant_profile_id) then
    raise exception 'quest access denied' using errcode='42501'; end if;
  if p_local_attempt_id is null or length(p_local_attempt_id) not between 1 and 200
@@ -57,7 +59,8 @@ revoke all on function public.preserve_limit_rejected_offline_events(uuid,uuid,t
 grant execute on function public.preserve_limit_rejected_offline_events(uuid,uuid,text,jsonb) to authenticated;
 
 
-create or replace function public.register_offline_quest_attempt(p_quest_id uuid, p_participant_profile_id uuid, p_local_attempt_id text, p_existing_attempt_id uuid)
+-- Публичные обёртки сохраняют блокировку объединения профилей и разрешение alias.
+create or replace function public.register_offline_quest_attempt_core(p_quest_id uuid, p_participant_profile_id uuid, p_local_attempt_id text, p_existing_attempt_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   actor uuid := auth.uid();
@@ -103,7 +106,8 @@ begin
     insert into public.offline_attempt_registrations(actor_user_id,local_attempt_id,quest_id,participant_profile_id,server_attempt_id)
       values(actor,p_local_attempt_id,p_quest_id,p_participant_profile_id,resolved_id);
   end if;
-  if exists(select 1 from public.offline_start_permits where server_attempt_id=resolved_id) then
+  if exists(select 1 from public.offline_start_permits where server_attempt_id=resolved_id)
+    and not coalesce(p_existing_attempt_id=resolved_id and p_local_attempt_id=resolved_id::text,false) then
     raise exception 'offline permit registration required' using errcode='23505';
   end if;
   select * into attempt from public.quest_attempts where id=resolved_id for update;
@@ -118,7 +122,7 @@ begin
   return jsonb_build_object('id',resolved_id,'quest_id',p_quest_id,'participant_profile_id',p_participant_profile_id,'finished_at',attempt.finished_at);
 end;
 $$;
-create or replace function public.register_permitted_offline_attempt(
+create or replace function public.register_permitted_offline_attempt_core(
   p_quest_id uuid,p_participant_profile_id uuid,p_local_attempt_id text,p_permit_id uuid
 ) returns jsonb language plpgsql security definer set search_path='' as $$
 declare actor uuid:=auth.uid(); p public.offline_start_permits%rowtype;

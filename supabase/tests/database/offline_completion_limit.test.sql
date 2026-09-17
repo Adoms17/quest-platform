@@ -8,6 +8,8 @@ select set_config('request.jwt.claim.sub',md5('limit-owner')::uuid::text,true);
 select set_config('test.events',jsonb_build_array(jsonb_build_object('clientEventId',md5('limit-event')::uuid,'taskId',md5('limit-task')::uuid,'eventType','answer','submittedValue','input'))::text,true);
 create function pg_temp.deliver() returns jsonb language sql as $$select public.preserve_limit_rejected_offline_events(md5('limit-quest')::uuid,md5('limit-owner')::uuid,'local-limit',current_setting('test.events')::jsonb)$$;
 set local role authenticated;
+select throws_ok($$select public.register_offline_quest_attempt_core(md5('limit-quest')::uuid,md5('limit-owner')::uuid,'local-limit',null)$$,'42501',null,'клиент не обходит обёртку регистрации');
+select throws_ok($$select public.register_permitted_offline_attempt_core(md5('limit-quest')::uuid,md5('limit-owner')::uuid,'local-limit',md5('permit')::uuid)$$,'42501',null,'клиент не обходит обёртку разрешения');
 select is(public.get_participant_quest_summary(md5('limit-quest')::uuid,md5('limit-owner')::uuid)->>'completion_limit_reached','false','до прохождения старт доступен');
 select throws_ok($$select pg_temp.deliver()$$,'23514','quest completion limit not reached','клиент не назначает отказ самостоятельно');
 reset role;

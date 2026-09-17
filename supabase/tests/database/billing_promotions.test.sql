@@ -18,7 +18,7 @@ select set_config('test.promo1',pg_temp.issue(1)::text,true);
 select ok((current_setting('test.promo1')::jsonb->>'code') ~ '^[0-9A-F]{32}$','случайный код 128 бит');
 select is(pg_temp.issue(1)->>'already_issued','true','повтор выпуска не создаёт второй код');
 select is(pg_temp.issue(1)->>'code',null,'код повторно не раскрывается');
-select is((select count(*) from public.billing_promotions),1::bigint,'одна запись выпуска');
+select is((select count(*) from public.billing_promotions where organization_id=pg_temp.org(1)),1::bigint,'одна запись выпуска тестовой организации');
 select ok(not exists(select 1 from information_schema.columns where table_schema='public' and table_name='billing_promotions' and column_name in ('code','raw_code')),'сырой код не хранится');
 select throws_ok($$select public.issue_organization_promotion(pg_temp.org(2),(select id from public.billing_plan_versions where plan_key='business' and version=1),21,now()+interval '7 days',md5('operator')::uuid,md5('issue-1-1')::uuid)$$,'22023','promotion issue conflict','смена организации при retry выпуска запрещена');
 select throws_ok($$select public.issue_organization_promotion(pg_temp.org(2),(select id from public.billing_plan_versions where plan_key='free' and version=1),21,now()+interval '7 days',md5('operator')::uuid,gen_random_uuid())$$,'22023','invalid promotion issue','Free не является платным промотарифом');
