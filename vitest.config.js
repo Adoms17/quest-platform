@@ -6,6 +6,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
-    exclude: [...configDefaults.exclude, 'e2e/**', 'landing-prototype/**'],
+    exclude: [...configDefaults.exclude, 'e2e/**', 'website/**'],
   },
 })
