@@ -13,9 +13,11 @@ const code = (await Promise.all(scripts.map(src => {
 }))).join('\n');
 const expected = environment === 'staging' ? 'https://stage.qvesta.ru' : 'https://app.qvesta.ru';
 const forbidden = environment === 'staging' ? 'https://app.qvesta.ru' : 'https://stage.qvesta.ru';
-assert.ok(code.includes(expected), `Missing application origin: ${expected}`);
-assert.ok(!code.includes(forbidden), `Wrong application environment: ${forbidden}`);
-assert.ok(!code.includes('quest-platform.alexdomdev.workers.dev'), 'Obsolete application origin');
+const origins = new Set([...code.matchAll(/["'`](https?:\/\/[^"'`\s\\]+)["'`]/g)]
+  .map(match => new URL(match[1]).origin));
+assert.ok(origins.has(expected), `Missing application origin: ${expected}`);
+assert.ok(!origins.has(forbidden), `Wrong application environment: ${forbidden}`);
+assert.ok(!origins.has('https://quest-platform.alexdomdev.workers.dev'), 'Obsolete application origin');
 for (const name of await readdir(root)) {
   assert.ok(!name.startsWith('.env') && name !== '.openai' && name !== 'server', 'Unexpected deployment file');
 }
