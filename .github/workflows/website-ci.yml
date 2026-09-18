@@ -1,0 +1,44 @@
+name: Website CI
+
+on:
+  pull_request:
+    branches: [main, staging]
+    paths: ['website/**', '.github/workflows/website-ci.yml']
+  push:
+    branches: [main, staging]
+    paths: ['website/**', '.github/workflows/website-ci.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  website:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [production, staging]
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - name: Build production
+        if: matrix.environment == 'production'
+        run: npm run build
+      - name: Build stage
+        if: matrix.environment == 'staging'
+        run: npm run build:stage
+      - run: npm run test:sites
+      - run: npm run test:build -- ${{ matrix.environment }}
