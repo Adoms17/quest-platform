@@ -20,3 +20,14 @@ it('читает Linux-таблицу и JSON без потери remote-only с
   expect(parseMigrationHistory(JSON.stringify({ migrations: rows() })).migrations).toHaveLength(8)
   expect(() => parseMigrationHistory('Local | Remote | Time\n123 | | bad')).toThrow()
 })
+
+it('catalog release requires applied foundation and allows only catalog', () => {
+ const applied = rows().map(row => ({ ...row, remote: row.local }))
+ const catalog = {local:'20260919010000',remote:''}
+ expect(validateAdminMigrationHistory({migrations:[...applied,catalog]},true)).toEqual(['20260919010000'])
+ expect(validateAdminMigrationHistory({migrations:[...applied,{...catalog,remote:catalog.local}]},true)).toEqual([])
+ expect(()=>validateAdminMigrationHistory({migrations:[...rows(),catalog]},true)).toThrow()
+ expect(()=>validateAdminMigrationHistory({migrations:applied},true)).toThrow()
+ expect(()=>validateAdminMigrationHistory({migrations:[...applied,catalog,{local:'20260920010000',remote:''}]},true)).toThrow()
+ expect(()=>validateAdminMigrationHistory({migrations:[...applied,catalog]})).toThrow()
+})

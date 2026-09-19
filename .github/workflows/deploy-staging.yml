@@ -14,6 +14,8 @@ on:
           - reconcile
           - admin-dry-run
           - admin-deploy
+          - admin-catalog-dry-run
+          - admin-catalog-deploy
       deploy_sandbox:
         description: Publish test billing Edge Functions (staging only)
         type: boolean
@@ -128,7 +130,7 @@ jobs:
         run: node scripts/run-stage-billing-worker.mjs
 
   admin-migrate:
-    if: inputs.operation == 'admin-dry-run' || inputs.operation == 'admin-deploy'
+    if: inputs.operation == 'admin-dry-run' || inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-dry-run' || inputs.operation == 'admin-catalog-deploy'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: staging
@@ -150,12 +152,23 @@ jobs:
           test -n "$SUPABASE_DB_PASSWORD"
       - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
       - name: Check exact pending migration set
-        run: node scripts/check-admin-stage-migrations.mjs
+        env:
+          ADMIN_OPERATION: ${{ inputs.operation }}
+        run: |
+          if [[ "$ADMIN_OPERATION" == admin-catalog-* ]]; then
+            node scripts/check-admin-stage-migrations.mjs --catalog
+          else
+            node scripts/check-admin-stage-migrations.mjs
+          fi
       - name: Preview admin migrations
         run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
       - name: Apply only admin migrations
-        if: inputs.operation == 'admin-deploy'
+        if: inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-deploy'
         run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
       - name: Verify administrative RLS and RPC
         if: inputs.operation == 'admin-deploy'
         run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform*.test.sql
+
+      - name: Verify tariff catalog RLS without re-running owner bootstrap
+        if: inputs.operation == 'admin-catalog-deploy'
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_tariff_catalog.test.sql

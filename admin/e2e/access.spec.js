@@ -90,6 +90,10 @@ test('карточка получает фокус и возвращает ег�
   await page.getByRole('button', { name: 'Выйти' }).focus()
   await expect(page.getByRole('button', { name: 'Выйти' })).toBeFocused()
   await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Организации', exact: true })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Тарифы', exact: true })).toBeFocused()
+  await page.keyboard.press('Tab')
   await expect(page.getByLabel('Название или ID организации')).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: 'Найти', exact: true })).toBeFocused()
@@ -171,4 +175,21 @@ test('CSP блокирует встраивание admin даже с того �
   await expect.poll(() => requested).toBe(true)
   await expect.poll(() => errors.some(value => /frame-ancestors|X-Frame-Options/i.test(value))).toBe(true)
   await expect(page.frameLocator('iframe').getByRole('heading', { name: 'Вход для сотрудников' })).toHaveCount(0)
+})
+
+test('каталог тарифов: карточка, отказ после отзыва, без переполнения', async ({ page }) => {
+ await mockApi(page, 'aal2')
+ let denied = false
+ await page.route('**/rest/v1/rpc/read_platform_tariff_catalog', route => route.fulfill({ status: denied ? 403 : 200, contentType: 'application/json', body: JSON.stringify(denied ? {code:'42501'} : {items:[{id:'00000000-0000-4000-8000-000000000012',plan_key:'free',version:1,display_name:'Free',active_quests_limit:0,team_members_limit:1,trial_duration_days:14,created_at:'2026-09-19T00:00:00Z'}],next_cursor:null}) }))
+ await page.goto('/')
+ await page.getByRole('button',{name:'Тарифы',exact:true}).click()
+ await page.getByText('Загрузить каталог').click()
+ await page.getByRole('button',{name:'Free · версия 1'}).click()
+ await expect(page.getByRole('article')).toBeFocused()
+ await expect(page.getByText('Не применяется')).toBeVisible()
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width)
+ denied=true
+ await page.getByText('К каталогу').click()
+ await expect(page.getByRole('alert')).toContainText('Доступ не предоставлен')
+ await expect(page.getByRole('article')).toHaveCount(0)
 })
