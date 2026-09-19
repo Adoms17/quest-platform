@@ -21,10 +21,25 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try {
     output = execFileSync('npx', ['supabase', 'migration', 'list', '--linked', '--project-ref', process.env.SUPABASE_PROJECT_ID, '--output', 'json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 })
   } catch { throw new Error('Не удалось прочитать историю stage; применение запрещено') }
-  let data
-  try { data = JSON.parse(output) } catch {
-    const line = output.split('\n').find(value => value.trim().startsWith('{'))
-    try { data = JSON.parse(line) } catch { throw new Error('Неизвестный формат истории; применение запрещено') }
-  }
+  const data = parseMigrationHistory(output)
   console.log('Ожидают применения admin:', validateAdminMigrationHistory(data).join(', ') || 'нет')
+}
+
+export function parseMigrationHistory(output) {
+  try {
+    const parsed = JSON.parse(output)
+    return Array.isArray(parsed) ? { migrations: parsed } : parsed
+  } catch { /* Linux CLI может возвращать таблицу даже при --output json. */ }
+  const lines = output.split('\n')
+  const jsonLine = lines.find(line => line.trim().startsWith('{'))
+  if (jsonLine) { try { return JSON.parse(jsonLine) } catch { throw new Error('Неизвестный формат истории') } }
+  if (!lines.some(line => /Local\s*\|\s*Remote\s*\|/i.test(line))) throw new Error('Нет заголовка истории')
+  const migrations = []
+  for (const line of lines) {
+    const match = line.match(/^\s*(\d{14})?\s*\|\s*(\d{14})?\s*\|[^|]*$/)
+    if (match && (match[1] || match[2])) migrations.push({ local: match[1] || '', remote: match[2] || '' })
+    else if (/\d/.test(line) && line.includes('|')) throw new Error('Неизвестная строка истории')
+  }
+  if (!migrations.length) throw new Error('Пустая история')
+  return { migrations }
 }
