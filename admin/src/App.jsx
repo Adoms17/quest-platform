@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Login from './Login'
 import Mfa from './Mfa'
 import Organizations from './Organizations'
+import Tariffs from './Tariffs'
 
 export default function App({ client }) {
   const [session, setSession] = useState(undefined)
@@ -35,6 +36,7 @@ export default function App({ client }) {
 
 function SessionGate({ client }) {
   const [state, setState] = useState('loading')
+  const [section, setSection] = useState('organizations')
   useEffect(() => {
     let active = true
     client.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data, error }) => {
@@ -45,5 +47,5 @@ function SessionGate({ client }) {
   if (state === 'loading') return <p role="status">Проверяем подтверждение входа…</p>
   if (state === 'error') return <p role="alert">Не удалось проверить сессию. Выйдите и повторите вход.</p>
   if (state === 'mfa') return <Mfa auth={client.auth} />
-  return <Organizations client={client} />
+  return <><nav aria-label="Разделы администрирования"><button aria-pressed={section === 'organizations'} onClick={() => setSection('organizations')}>Организации</button> <button aria-pressed={section === 'tariffs'} onClick={() => setSection('tariffs')}>Тарифы</button></nav>{section === 'organizations' ? <Organizations client={client} /> : <Tariffs client={client} />}</>
 }

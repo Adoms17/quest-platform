@@ -6,6 +6,7 @@ export function createAdminApi(client) {
     return data
   }
   return {
+    tariffs: (cursor = null, id = null) => rpc('read_platform_tariff_catalog', { p_after: cursor, p_id: id }),
     search: (query = '', cursor = null) => rpc('search_platform_organizations', {
       p_search: query.trim(), p_after: cursor, p_limit: 25,
     }),
