@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util'
 import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 
@@ -30,13 +31,13 @@ export function parseMigrationHistory(output) {
     const parsed = JSON.parse(output)
     return Array.isArray(parsed) ? { migrations: parsed } : parsed
   } catch { /* Linux CLI может возвращать таблицу даже при --output json. */ }
-  const lines = output.split('\n')
+  const lines = stripVTControlCharacters(output).split('\n')
   const jsonLine = lines.find(line => line.trim().startsWith('{'))
   if (jsonLine) { try { return JSON.parse(jsonLine) } catch { throw new Error('Неизвестный формат истории') } }
   if (!lines.some(line => /Local\s*\|\s*Remote\s*\|/i.test(line))) throw new Error('Нет заголовка истории')
   const migrations = []
   for (const line of lines) {
-    const match = line.match(/^\s*(\d{14})?\s*\|\s*(\d{14})?\s*\|[^|]*$/)
+    const match = line.match(/^\s*(\d{14})?\s*\|\s*(\d{14})?\s*\|[^|]*\|?\s*$/)
     if (match && (match[1] || match[2])) migrations.push({ local: match[1] || '', remote: match[2] || '' })
     else if (/\d/.test(line) && line.includes('|')) throw new Error('Неизвестная строка истории')
   }
