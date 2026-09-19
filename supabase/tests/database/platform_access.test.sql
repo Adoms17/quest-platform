@@ -1,0 +1,68 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) select md5('platform-'||n)::uuid,'platform-'||n||'@example.test' from generate_series(0,6)n;
+select set_config('test.platform_org',(select id::text from public.organizations where personal_owner_id=md5('platform-0')::uuid),true);
+select set_config('test.platform_other',(select id::text from public.organizations where personal_owner_id=md5('platform-1')::uuid),true);
+insert into public.platform_support_cases(id,organization_id,created_by) values(md5('platform-case')::uuid,current_setting('test.platform_org')::uuid,md5('platform-2')::uuid);
+insert into public.platform_access_assignments(user_id,role_key,scope_kind,organization_id,support_case_id,expires_at)
+values
+ (md5('platform-2')::uuid,'owner','platform',null,null,null),
+ (md5('platform-3')::uuid,'operations','organization',current_setting('test.platform_org')::uuid,null,null),
+ (md5('platform-4')::uuid,'sales','organization',current_setting('test.platform_org')::uuid,null,null),
+ (md5('platform-5')::uuid,'support','support_case',current_setting('test.platform_org')::uuid,md5('platform-case')::uuid,now()+interval '1 hour');
+create function pg_temp.summary() returns jsonb language sql as $$select public.get_platform_organization_summary(current_setting('test.platform_org')::uuid)$$;
+select set_config('request.jwt.claim.sub',md5('platform-0')::uuid::text,true);
+select set_config('request.jwt.claims','{"aal":"aal2"}',true);
+set local role authenticated;
+select throws_ok('select pg_temp.summary()','42501','platform access denied','владелец организации не оператор платформы');
+select throws_ok('select * from public.platform_access_assignments','42501',null,'назначения закрыты от клиента');
+select throws_ok('select * from public.platform_audit_events','42501',null,'аудит закрыт от клиента');
+select throws_ok($$select public.require_platform_permission('organization.summary.read',null)$$,'42501',null,'внутренний resolver недоступен');
+reset role;
+select set_config('request.jwt.claim.sub',md5('platform-2')::uuid::text,true);
+select set_config('request.jwt.claims','{"aal":"aal1"}',true);
+set local role authenticated;
+select throws_ok('select pg_temp.summary()','42501','platform access denied','владелец платформы без MFA закрыт');
+reset role;
+select set_config('request.jwt.claims','{"aal":"aal2"}',true);
+set local role authenticated;
+select is(pg_temp.summary()->>'id',current_setting('test.platform_org'),'владелец с MFA читает');
+select is((select count(*)::int from jsonb_object_keys(pg_temp.summary())),3,'минимальная проекция без контактов и приватных данных');
+reset role;
+select set_config('request.jwt.claim.sub',md5('platform-3')::uuid::text,true);
+set local role authenticated;
+select lives_ok('select pg_temp.summary()','операционный менеджер в области');
+select throws_ok($$select public.get_platform_organization_summary(current_setting('test.platform_other')::uuid)$$,'42501','platform access denied','чужая организация закрыта');
+select throws_ok('select public.get_platform_organization_summary(null)','42501','platform access denied','null не расширяет область');
+reset role;
+select set_config('request.jwt.claim.sub',md5('platform-4')::uuid::text,true);
+set local role authenticated;
+select lives_ok('select pg_temp.summary()','менеджер продаж читает минимальную карточку');
+reset role;
+select set_config('request.jwt.claim.sub',md5('platform-5')::uuid::text,true);
+set local role authenticated;
+select lives_ok('select pg_temp.summary()','поддержка по временному обращению');
+reset role;
+update public.platform_access_assignments set valid_from=now()-interval '2 hours',expires_at=now()-interval '1 hour' where user_id=md5('platform-5')::uuid;
+set local role authenticated;
+select throws_ok('select pg_temp.summary()','42501','platform access denied','истёкший допуск сразу закрыт');
+reset role;
+select set_config('request.jwt.claim.sub',md5('platform-3')::uuid::text,true);
+update public.platform_access_assignments set revoked_at=now() where user_id=auth.uid();
+set local role authenticated;
+select throws_ok('select pg_temp.summary()','42501','platform access denied','отзыв действует без нового JWT');
+reset role;
+select throws_ok($$insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('platform-6')::uuid,'regional','platform')$$,'23514',null,'региональная роль пока не активируется');
+select throws_ok($$insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('platform-6')::uuid,'support','platform')$$,'23514',null,'поддержке нельзя выдать всю платформу');
+select is((select count(*)::int from public.platform_roles),5,'все пять ролей сохранены');
+select is((select count(*)::int from public.platform_audit_events where action='assignment.created'),4,'bootstrap назначений журналируется');
+select ok((select count(*) from public.platform_audit_events where action='organization.summary.read')>=5,'успешные чтения журналируются');
+select ok((select bool_and(relrowsecurity) from pg_class where oid in ('public.platform_roles'::regclass,'public.platform_role_permissions'::regclass,'public.platform_access_assignments'::regclass,'public.platform_audit_events'::regclass)),'все таблицы имеют RLS');
+set local role anon;
+select throws_ok('select pg_temp.summary()','42501',null,'anon не вызывает RPC');
+reset role;
+set local role service_role;
+select throws_ok('select pg_temp.summary()','42501',null,'service role не обходит вход административного клиента');
+reset role;
+select * from finish();
+rollback;

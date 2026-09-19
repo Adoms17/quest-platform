@@ -1,0 +1,75 @@
+name: Admin CI
+
+on:
+  pull_request:
+    branches: [main, staging]
+    paths:
+      - 'admin/**'
+      - 'supabase/migrations/*platform*.sql'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vitest.config.js'
+      - 'src/test/**'
+      - '.github/workflows/admin-ci.yml'
+  push:
+    branches: [main, staging]
+    paths:
+      - 'admin/**'
+      - 'supabase/migrations/*platform*.sql'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vitest.config.js'
+      - 'src/test/**'
+      - '.github/workflows/admin-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admin-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Lint admin
+        run: npm run lint -- admin
+      - name: Unit and component tests
+        run: npm run test -- admin/src/admin.test.jsx admin/buildEnvironment.test.js admin/securityHeaders.test.js admin/hosting.test.js
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Build and browser tests with synthetic API
+        run: npm run test:e2e -- --config admin/playwright.config.mjs
+      # Тестовая сборка не публикуется и не сохраняется как release artifact.
+
+  admin-auth-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Prepare isolated service images
+        run: |
+          docker pull supabase/postgres:17.6.1.165
+          docker pull supabase/gotrue:v2.196.0
+          docker pull public.ecr.aws/supabase/postgrest:v16.1
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Real Auth, TOTP, administrative RPC and browser flow
+        env:
+          RUN_LOCAL_ADMIN_AUTH: '1'
+          RUN_LOCAL_ADMIN_BROWSER: '1'
+        run: npm run test -- admin/integration/auth.integration.test.js
