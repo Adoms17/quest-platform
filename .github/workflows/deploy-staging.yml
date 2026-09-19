@@ -166,5 +166,9 @@ jobs:
         if: inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-deploy'
         run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
       - name: Verify administrative RLS and RPC
-        if: inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-deploy'
+        if: inputs.operation == 'admin-deploy'
         run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform*.test.sql
+
+      - name: Verify tariff catalog RLS without re-running owner bootstrap
+        if: inputs.operation == 'admin-catalog-deploy'
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_tariff_catalog.test.sql
