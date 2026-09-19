@@ -37,7 +37,7 @@ export function parseMigrationHistory(output) {
   if (!lines.some(line => /Local\s*\|\s*Remote\s*\|/i.test(line))) throw new Error('Нет заголовка истории')
   const migrations = []
   for (const line of lines) {
-    const normalized = line.replace(/[​‌‍﻿"']/g, '')
+    const normalized = line.replaceAll(String.fromCharCode(96), "").replace(/[​‌‍﻿"']/g, '')
     const match = normalized.match(/^\s*(\d{14})?\s*\|\s*(\d{14})?\s*\|[^|]*\|?\s*$/)
     if (match && (match[1] || match[2])) migrations.push({ local: match[1] || '', remote: match[2] || '' })
     else if (/\d/.test(line) && line.includes('|')) throw new Error('Неизвестная строка истории: ' + line.replace(/[^0-9| -]/g, '?').slice(0, 180))
