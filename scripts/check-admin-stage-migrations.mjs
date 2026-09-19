@@ -39,7 +39,7 @@ export function parseMigrationHistory(output) {
   for (const line of lines) {
     const match = line.match(/^\s*(\d{14})?\s*\|\s*(\d{14})?\s*\|[^|]*\|?\s*$/)
     if (match && (match[1] || match[2])) migrations.push({ local: match[1] || '', remote: match[2] || '' })
-    else if (/\d/.test(line) && line.includes('|')) throw new Error('Неизвестная строка истории')
+    else if (/\d/.test(line) && line.includes('|')) throw new Error('Неизвестная строка истории: ' + line.replace(/[^0-9| -]/g, '?').slice(0, 180))
   }
   if (!migrations.length) throw new Error('Пустая история')
   return { migrations }
