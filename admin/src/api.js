@@ -6,7 +6,20 @@ export function createAdminApi(client) {
     return data
   }
   return {
-    tariffs: (cursor = null, id = null) => rpc('read_platform_tariff_catalog', { p_after: cursor, p_id: id }),
+    scheduleSupportEnd: (id, endsAt, count, command) => rpc('schedule_tariff_support_end', {p_version_id:id,p_ends_at:endsAt,p_expected_count:count,p_command_id:command}),
+    previewSupportEnd: id => rpc('preview_tariff_support_end', { p_version_id: id }),
+    publishDraft: (id, revision, effectiveAt, command) => rpc('publish_tariff_draft', { p_draft_id: id, p_expected_revision: revision, p_effective_at: effectiveAt, p_command_id: command }),
+    revokePublication: (id, command) => rpc('revoke_tariff_publication', { p_version_id: id, p_command_id: command }),
+    timeline: (sourceId, cursor = null) => rpc('read_platform_tariff_timeline', { p_source_id: sourceId, p_after: cursor }),
+    drafts: (sourceId, cursor = null) => rpc('read_platform_tariff_drafts', { p_source_version_id: sourceId, p_after: cursor }),
+    previewDraft: (id, revision) => rpc('preview_platform_tariff_draft', { p_id: id, p_expected_revision: revision }),
+    fixedVersions: (source, draft = null, cursor = null) => rpc('list_fixed_tariff_versions', { p_source_id: source, p_draft_id: draft, p_after: cursor }),
+    fixedDraft: (id, revision) => rpc('read_fixed_tariff_draft_version', { p_draft_id: id, p_revision: revision }),
+    previewActivation: id => rpc('preview_fixed_tariff_activation', { p_id: id }),
+    enableVersion: (id, previous, command) => rpc('enable_fixed_tariff_version', { p_id: id, p_expected_previous_id: previous, p_command_id: command }),
+    fixDraft: (id, revision, command) => rpc('fix_platform_tariff_version', { p_draft_id: id, p_expected_revision: revision, p_command_id: command }),
+    saveDraft: parameters => rpc('save_platform_tariff_draft', parameters),
+    tariffs: (cursor = null, id = null, planKey = 'free') => id ? rpc('read_platform_tariff_catalog', { p_after: null, p_id: id }) : rpc('read_platform_tariff_versions', { p_plan_key: planKey, p_after: cursor }),
     search: (query = '', cursor = null) => rpc('search_platform_organizations', {
       p_search: query.trim(), p_after: cursor, p_limit: 25,
     }),

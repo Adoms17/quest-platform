@@ -108,3 +108,17 @@ describe('административный контур', () => {
     expect(screen.queryByText('Закрытая команда')).not.toBeInTheDocument()
   })
 })
+
+it('preserves tariff screen on token refresh but resets on account change', async () => {
+ const client = authClient('aal2')
+ const session = (sub, suffix) => ({ access_token: `header.${btoa(JSON.stringify({ sub, session_id: 'session', aal: 'aal2' }))}.${suffix}` })
+ client.auth.getSession.mockResolvedValue({ data: { session: session('owner', 'old') } })
+ render(<App client={client} />)
+ fireEvent.click(await screen.findByRole('button', { name: 'Тарифы' }))
+ expect(screen.getByRole('heading', { name: 'Тарифы' })).toBeInTheDocument()
+ await act(async () => client.notify('TOKEN_REFRESHED', session('owner', 'new')))
+ expect(screen.getByRole('heading', { name: 'Тарифы' })).toBeInTheDocument()
+ await act(async () => client.notify('SIGNED_IN', session('other', 'new')))
+ await screen.findByRole('heading', { name: 'Организации' })
+ expect(screen.queryByRole('heading', { name: 'Тарифы' })).not.toBeInTheDocument()
+})

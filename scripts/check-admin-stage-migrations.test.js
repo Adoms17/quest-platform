@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, it } from 'vitest'
-import { validateAdminMigrationHistory, parseMigrationHistory } from './check-admin-stage-migrations.mjs'
+import { validateAdminMigrationHistory, parseMigrationHistory, tariffReleaseMigrations } from './check-admin-stage-migrations.mjs'
 const rows = () => Array.from({ length: 8 }, (_, i) => ({ local: `20260918${String(i + 1).padStart(2, '0')}0000`, remote: '' }))
 it('разрешает только восемь admin-версий', () => expect(validateAdminMigrationHistory({ migrations: rows() })).toHaveLength(8))
 it('разрешает продолжение после частичного применения', () => {
@@ -30,4 +30,14 @@ it('catalog release requires applied foundation and allows only catalog', () => 
  expect(()=>validateAdminMigrationHistory({migrations:applied},true)).toThrow()
  expect(()=>validateAdminMigrationHistory({migrations:[...applied,catalog,{local:'20260920010000',remote:''}]},true)).toThrow()
  expect(()=>validateAdminMigrationHistory({migrations:[...applied,catalog]})).toThrow()
+})
+
+it('тарифный релиз допускает ровно 40 миграций после применённого каталога',()=>{
+ const base=[...rows().map(r=>({...r,remote:r.local})),{local:'20260919010000',remote:'20260919010000'}];
+ const pending=tariffReleaseMigrations.map(local=>({local,remote:''}));
+ expect(validateAdminMigrationHistory({migrations:[...base,...pending]},'tariff-release')).toHaveLength(40);
+ expect(()=>validateAdminMigrationHistory({migrations:[...base,...pending.slice(1)]},'tariff-release')).toThrow();
+ expect(()=>validateAdminMigrationHistory({migrations:[...base,...pending,{local:'20260920350000',remote:''}]},'tariff-release')).toThrow();
+ expect(()=>validateAdminMigrationHistory({migrations:[...base.slice(0,-1),{local:'20260919010000',remote:''},...pending]},'tariff-release')).toThrow();
+ expect(validateAdminMigrationHistory({migrations:[...base,...pending.map(r=>({...r,remote:r.local}))]},'tariff-release')).toEqual([]);
 })

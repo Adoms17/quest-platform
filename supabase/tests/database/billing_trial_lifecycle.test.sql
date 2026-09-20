@@ -1,5 +1,12 @@
 begin;
 select no_plan();
+-- Историческая Free существовала до моделируемого окончания trial.
+-- На чистой БД миграции создают исходную версию только в момент запуска теста.
+insert into public.billing_plan_versions(id,plan_key,version,display_name,active_quests_limit,team_members_limit)
+select md5('trial-life-historical-free')::uuid,'free',99001,'Historical Free',active_quests_limit,team_members_limit
+from public.billing_plan_versions where plan_key='free' and version=1;
+insert into public.billing_tariff_timeline(version_id,catalog_version_id,plan_key,effective_at)
+values(md5('trial-life-historical-free')::uuid,md5('trial-life-historical-free')::uuid,'free',now()-interval '30 days');
 insert into auth.users(id,email) select md5('trial-life-'||n)::uuid,'trial-life-'||n||'@example.test' from generate_series(1,6)n;
 create function pg_temp.org(n integer) returns uuid language sql as $$select id from public.organizations where personal_owner_id=md5('trial-life-'||n)::uuid$$;
 create function pg_temp.plan(k text) returns uuid language sql as $$select id from public.billing_plan_versions where plan_key=k and version=1$$;
@@ -28,7 +35,7 @@ select is((select status from public.organization_subscriptions where organizati
 -- Точные границы вычисляются без ожидания cron и без клиентского времени.
 select is((select (public.resolve_subscription_quota_phase(s,s.period_end-interval '1 microsecond'))->>'phase' from public.organization_subscriptions s where organization_id=pg_temp.org(1)),'trial','до конца действует trial');
 select is((select (public.resolve_subscription_quota_phase(s,s.period_end))->>'phase' from public.organization_subscriptions s where organization_id=pg_temp.org(1)),'free','на границе действует Free без grace');
-select is((select (public.resolve_subscription_quota_phase(s,s.period_end))->>'effective_plan_version_id' from public.organization_subscriptions s where organization_id=pg_temp.org(1)),pg_temp.plan('free')::text,'на границе квоты Free');
+select is((select (public.resolve_subscription_quota_phase(s,s.period_end))->>'effective_plan_version_id' from public.organization_subscriptions s where organization_id=pg_temp.org(1)),(select platform_private.current_tariff_version('free',period_end)::text from public.organization_subscriptions where organization_id=pg_temp.org(1)),'на границе квоты актуальной Free');
 
 -- Смещаем тестовый период в прошлое согласованно: моделируем задержанный runner.
 update public.billing_trial_access set starts_at=now()-interval '15 days',ends_at=now()-interval '1 day' where organization_id=pg_temp.org(1);
@@ -36,13 +43,16 @@ update public.organization_subscriptions s set period_start=g.starts_at,period_e
 select set_config('request.jwt.claim.sub',md5('trial-life-1')::text,true);
 select is(public.get_organization_billing_state(pg_temp.org(1))->>'status','free','кабинет видит Free до runner');
 select is(public.get_organization_billing_state(pg_temp.org(1))->>'stored_status','trial','сохранённый статус отличается от эффективного до runner');
-select is(public.get_organization_billing_state(pg_temp.org(1))->'effective_entitlements'->>'active_quests','1','кабинет не оставляет платные квоты');
+create function pg_temp.free_limit() returns integer language sql as $$
+select p.active_quests_limit from public.organization_subscriptions s join public.billing_plan_versions p
+on p.id=case when s.status='free' then s.plan_version_id else platform_private.current_tariff_version('free',s.period_end) end where s.organization_id=pg_temp.org(1)$$;
+select is(public.get_organization_billing_state(pg_temp.org(1))->'effective_entitlements'->>'active_quests',pg_temp.free_limit()::text,'кабинет использует лимит актуальной Free');
 update public.organization_subscriptions set active_quest_quota_enabled=true where organization_id=pg_temp.org(1);
-select lives_ok($$insert into public.quests(creator_id,organization_id,title,is_open,is_public) values(md5('trial-life-1')::uuid,pg_temp.org(1),'First',true,true)$$,'первый слот Free до runner');
+select lives_ok($$insert into public.quests(creator_id,organization_id,title,is_open,is_public) select md5('trial-life-1')::uuid,pg_temp.org(1),'Slot '||n,true,true from generate_series(1,pg_temp.free_limit())n$$,'доступные слоты актуальной Free до runner');
 select throws_ok($$insert into public.quests(creator_id,organization_id,title,is_open,is_public) values(md5('trial-life-1')::uuid,pg_temp.org(1),'Second',true,true)$$,'P0001','active quest quota exceeded','квоты Free до runner');
 select is(public.advance_organization_trial(pg_temp.org(1))->>'outcome','finished','runner фиксирует Free');
 select is(public.advance_organization_trial(pg_temp.org(1))->>'changed','false','повтор окончания безопасен');
-select is((select count(*) from public.quests where organization_id=pg_temp.org(1)),1::bigint,'квесты сохранены');
+select is((select count(*) from public.quests where organization_id=pg_temp.org(1)),pg_temp.free_limit()::bigint,'квесты сохранены');
 select is(pg_temp.request(1),current_setting('test.trial.receipt')::jsonb,'старый retry после окончания не перезапускает trial');
 select is((select status from public.organization_subscriptions where organization_id=pg_temp.org(1)),'free','старый receipt не возобновляет trial');
 select throws_ok($$select pg_temp.request(1,'pro',2,1,(select revision from public.organization_subscriptions where organization_id=pg_temp.org(1)))$$,'P0001','trial already used','новая команда не повторяет использованный тариф');

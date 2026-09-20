@@ -103,3 +103,10 @@ it('показывает серверный grace и прежние лимиты
   expect(screen.getByText('из 5 по тарифу')).toBeTruthy()
   expect(screen.queryByText('Подписка активна')).toBeNull()
 })
+
+it.each([false,true])('показывает серверное предупреждение о поддержке, ended=%s',async ended=>{
+ mocks.load.mockResolvedValue({...data('Pro'),support_notice:{ends_at:'2099-01-01T00:00:00Z',ended}})
+ render(<OrganizationBilling session={session}/>);
+ await screen.findByText(ended?'Поддержка версии тарифа завершена':'Поддержка версии тарифа заканчивается');
+ expect(screen.getByText(/Уже оплаченный период сохраняется до конца/)).toBeTruthy()
+})

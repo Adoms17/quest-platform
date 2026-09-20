@@ -95,3 +95,14 @@ test('success stays available for recovery without a redirect', async () => {
   expect(await checkSandboxCheckout(actor, org)).toMatchObject({ status: 'succeeded', confirmationUrl: null })
   expect(readSandboxCheckout(actor, org)).toBe(orderId)
 })
+
+test.each([
+ { discount: { base_amount_minor: 200, discount_amount_minor: 100, discount_bps: 5000 } },
+ { discount: { base_amount_minor: 200, discount_amount_minor: 99, discount_bps: 5000 } },
+ { discount: null }, { period_scheduled: 'true' }, { period_starts_on_confirmation: null }
+])('проверяет серверную расшифровку скидки %j', async patch => {
+ const data = { organization_id: org, order_id: orderId, environment: 'sandbox', plan_version_id: other, plan_name: 'Pro', amount_minor: 100, currency: 'RUB', period_start: '2026-09-16', period_end: '2026-10-16', state: 'reserved', ...patch }
+ rpc.mockResolvedValue({ data })
+ if (patch.discount?.discount_amount_minor === 100) await expect(loadSandboxOffer(org, orderId)).resolves.toEqual(data)
+ else await expect(loadSandboxOffer(org, orderId)).rejects.toThrow()
+})
