@@ -55,4 +55,3 @@ test('trial: предпросмотр, потеря ответа, восстан
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await panel.screenshot({ path: testInfo.outputPath('free-access.png') })
 })
-
