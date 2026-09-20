@@ -1,0 +1,20 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('publish-owner')::uuid,'publish-owner@example.test');
+insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('publish-owner')::uuid,'owner','platform');
+select set_config('request.jwt.claim.sub',md5('publish-owner')::uuid::text,true);
+select set_config('request.jwt.claims',jsonb_build_object('aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from clock_timestamp())))))::text,true);
+select set_config('test.source',(select id::text from public.billing_plan_versions where plan_key='pro' and version=1),true);
+select set_config('test.future',(now()+interval '2 days')::text,true);
+set local role authenticated;
+select public.save_platform_tariff_draft(md5('publish-save')::uuid,md5('publish-draft')::uuid,current_setting('test.source')::uuid,0,'Draft',5,3,14);
+select throws_ok($t$select public.publish_tariff_draft(md5('bad-date')::uuid,md5('publish-draft')::uuid,1,now())$t$,'22023','publication must be in future','past rejected');
+select throws_ok($t$select public.publish_tariff_draft(md5('bad-revision')::uuid,md5('publish-draft')::uuid,2,now()+interval '2 days')$t$,'40001','draft revision conflict','stale revision rejected');
+select set_config('test.published',public.publish_tariff_draft(md5('publish')::uuid,md5('publish-draft')::uuid,1,current_setting('test.future')::timestamptz)::text,true);
+
+select is(public.read_platform_tariff_catalog(null,(current_setting('test.published')::jsonb->>'version_id')::uuid)#>>'{items,0,source_version,id}',current_setting('test.source'),'базовая версия связана с опубликованной');
+select is(public.read_platform_tariff_catalog(null,current_setting('test.source')::uuid)#>>'{items,0,source_version,id}',null::text,'исходная версия без выдуманной основы');
+select set_config('request.jwt.claims','{"aal":"aal1"}',true);
+select throws_ok($t$select public.read_platform_tariff_catalog(null,current_setting('test.source')::uuid)$t$,'42501',null,'связь защищена MFA');
+reset role; select ok(not has_table_privilege('authenticated','public.platform_tariff_publication_commands','select'),'журнал команд закрыт');
+select * from finish(); rollback;

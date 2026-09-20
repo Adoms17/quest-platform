@@ -180,11 +180,11 @@ test('CSP блокирует встраивание admin даже с того �
 test('каталог тарифов: карточка, отказ после отзыва, без переполнения', async ({ page }) => {
  await mockApi(page, 'aal2')
  let denied = false
- await page.route('**/rest/v1/rpc/read_platform_tariff_catalog', route => route.fulfill({ status: denied ? 403 : 200, contentType: 'application/json', body: JSON.stringify(denied ? {code:'42501'} : {items:[{id:'00000000-0000-4000-8000-000000000012',plan_key:'free',version:1,display_name:'Free',active_quests_limit:0,team_members_limit:1,trial_duration_days:14,created_at:'2026-09-19T00:00:00Z'}],next_cursor:null}) }))
+ await page.route(/\/rest\/v1\/rpc\/read_platform_tariff_(catalog|versions)$/, route => route.fulfill({ status: denied ? 403 : 200, contentType: 'application/json', body: JSON.stringify(denied ? {code:'42501'} : {items:[{id:'00000000-0000-4000-8000-000000000012',plan_key:'free',version:1,timeline_number:1,timeline_state:'current',display_name:'Free',active_quests_limit:0,team_members_limit:1,trial_duration_days:14,created_at:'2026-09-19T00:00:00Z'}],next_cursor:null}) }))
  await page.goto('/')
  await page.getByRole('button',{name:'Тарифы',exact:true}).click()
  await page.getByText('Загрузить каталог').click()
- await page.getByRole('button',{name:'Free · версия 1'}).click()
+ await page.getByRole('button',{name:'Free · Версия №1'}).click()
  await expect(page.getByRole('article')).toBeFocused()
  await expect(page.getByText('Не применяется')).toBeVisible()
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width)

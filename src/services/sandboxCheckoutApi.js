@@ -86,6 +86,12 @@ export async function loadSandboxOffer(org, orderId) {
     || (data.fulfillment_state !== undefined && !['none','not_paid','applied','deferred','review'].includes(data.fulfillment_state))
     || (data.payment_status != null && !['pending','waiting_for_capture','succeeded','canceled'].includes(data.payment_status))
     || (data.payment_requires_review !== undefined && typeof data.payment_requires_review !== 'boolean')
+    || ['period_scheduled','period_starts_on_confirmation'].some(field => data[field] !== undefined && typeof data[field] !== 'boolean')
+    || (data.discount !== undefined && (!data.discount
+      || !Number.isSafeInteger(data.discount.base_amount_minor) || data.discount.base_amount_minor < data.amount_minor
+      || !Number.isSafeInteger(data.discount.discount_amount_minor) || data.discount.discount_amount_minor < 0
+      || data.discount.base_amount_minor - data.discount.discount_amount_minor !== data.amount_minor
+      || !Number.isInteger(data.discount.discount_bps) || data.discount.discount_bps < 1 || data.discount.discount_bps > 10000))
     || (data.refund_requires_review !== undefined && typeof data.refund_requires_review !== 'boolean')
     || ['refunded_minor','refund_pending_minor'].some(field => data[field] !== undefined && (!Number.isSafeInteger(data[field]) || data[field] < 0 || data[field] > data.amount_minor))) throw uncertain()
   return data

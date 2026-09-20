@@ -1,3 +1,4 @@
+vi.mock('../supabaseClient', () => ({ supabase: {} }))
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ readSandboxCheckout: vi.fn(), recoverSandboxCheckout: vi.fn(), loadSandboxOffer: vi.fn(), checkSandboxCheckout: vi.fn() }))
@@ -61,4 +62,19 @@ test('смена сохранённого заказа после просмот
   fireEvent.click(screen.getByRole('button', { name: 'Подтвердить тестовую оплату' }))
   await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
   expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
+})
+
+test('купленный после trial период показан отложенным, скидка восстановлена с сервера', async () => {
+ mocks.loadSandboxOffer.mockResolvedValue({ order_id: 'order', plan_name: 'Pro', amount_minor: 6172, period_start: '2026-10-16', period_end: '2026-11-16', state: 'finished', fulfillment_state: 'applied', period_scheduled: true, discount: { base_amount_minor: 12345, discount_amount_minor: 6173, discount_bps: 5000 } })
+ render(<SandboxCheckout actorId="a" organizationId="o" />)
+ await screen.findByText('Оплата подтверждена. Оплаченный период начнётся после trial в указанную дату.')
+ expect(screen.queryByText('Оплаченный тестовый период применён.')).toBeNull()
+ expect(screen.getByText(/Без скидки:.*123,45.*Скидка:.*50%.*61,73/)).toBeTruthy()
+ expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
+})
+test('смена тарифа в trial не показывает предварительные даты как окончательные', async () => {
+ mocks.loadSandboxOffer.mockResolvedValue({ order_id: 'order', plan_name: 'Pro', amount_minor: 100, period_start: '2026-09-16', period_end: '2026-10-16', state: 'reserved', period_starts_on_confirmation: true })
+ render(<SandboxCheckout actorId="a" organizationId="o" />)
+ await screen.findByText('Период начнётся после подтверждения оплаты. Точные даты появятся после применения платежа.')
+ expect(screen.queryByText(/^Период:/)).toBeNull()
 })

@@ -2,3 +2,9 @@
 
 /* Крупный пользовательский шрифт не должен расширять мобильный viewport. */
 main{overflow-wrap:anywhere}header{flex-wrap:wrap}header strong{min-width:0}
+
+.tariff-group{margin-top:28px}.tariff-group h2{margin-bottom:12px}.tariff-versions{list-style:none;margin:0;padding:0;border-left:2px solid #d0d8e5;padding-left:16px}.tariff-version{margin:10px 0;padding:14px 18px}.tariff-version-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.tariff-version-heading button{font-weight:600}.tariff-version--current{border:2px solid #287447;background:#f0faf3}.tariff-version--scheduled{border-left:5px solid #3558b5;background:#f2f6ff}.tariff-version--revoked{border-style:dashed;background:#f5f5f6;color:#535b68}.tariff-badge{display:inline-block;border-radius:999px;padding:4px 10px;font-size:.85rem;background:#e9edf3;color:#394558;font-weight:600}.tariff-badge--current{background:#d9f0df;color:#18512d}.tariff-badge--scheduled{background:#dfe9ff;color:#233f88}.tariff-badge--revoked{background:#e7e7eb;color:#4b4b58}.tariff-date{margin:6px 0;color:#4b5870;font-size:.9rem}@media(max-width:540px){.tariff-versions{padding-left:8px}.tariff-version{padding:12px}.tariff-version-heading{align-items:flex-start}}
+
+.tariff-switch{display:flex;gap:6px;margin:20px 0 16px;padding:5px;background:#e6ebf5;border-radius:12px;width:fit-content;max-width:100%;overflow-x:auto}.tariff-switch button{background:transparent;color:#233f75;border:0;white-space:nowrap;padding:10px 22px}.tariff-switch button[aria-pressed=true]{background:#233f9b;color:white;box-shadow:0 1px 4px #17233d30}
+
+button.tariff-link{background:transparent;border:0;color:#233f9b;text-decoration:underline;padding:4px 0;text-align:left}
