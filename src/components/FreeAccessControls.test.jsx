@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => Object.fromEntries(['getTrialBrowserHash', 'loadFreeAccessControls', 'previewPromotion', 'readFreeAccessCommand', 'prepareFreeAccessCommand', 'sendFreeAccessCommand'].map(k => [k, vi.fn()])))
+const mocks = vi.hoisted(() => Object.fromEntries(['getTrialBrowserHash', 'loadFreeAccessControls', 'readFreeAccessCommand', 'prepareFreeAccessCommand', 'sendFreeAccessCommand'].map(k => [k, vi.fn()])))
 vi.mock('../services/freeAccessApi', () => mocks)
 import FreeAccessControls from './FreeAccessControls'
 const data = { revision: 1, available: true, targets: [{ id: 'pro', name: 'Pro', days: 14, eligible: true, active_quests: 5, team_members: 3 }] }
@@ -17,22 +17,24 @@ it('выбор и просмотр не активируют trial, требуе
   expect(mocks.sendFreeAccessCommand).not.toHaveBeenCalled()
   fireEvent.click(screen.getByText('Подтвердить бесплатный доступ'))
   await waitFor(() => expect(mocks.sendFreeAccessCommand).toHaveBeenCalledTimes(1))
-  expect(mocks.prepareFreeAccessCommand).toHaveBeenCalledWith('a', 'o', 1, 'trial', { target: 'pro', browserHash: 'a'.repeat(64), code: '' })
+  expect(mocks.prepareFreeAccessCommand).toHaveBeenCalledWith('a', 'o', 1, 'trial', { target: 'pro', browserHash: 'a'.repeat(64) })
 })
-it('промокод проходит предпросмотр до активации', async () => {
-  mocks.previewPromotion.mockResolvedValue({ name: 'Business', days: 21, revision: 2, id: 'promo' })
+it('старой формы активации промокода нет', async () => {
   render(<FreeAccessControls actorId="a" organizationId="o" />)
-  fireEvent.change(await screen.findByLabelText('Промокод'), { target: { value: 'CODE' } })
-  fireEvent.click(screen.getByText('Проверить промокод'))
-  await screen.findByText('Подтверждение: Business, 21 суток бесплатно')
-  expect(mocks.sendFreeAccessCommand).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByText('Подтвердить бесплатный доступ'))
-  await waitFor(() => expect(mocks.sendFreeAccessCommand).toHaveBeenCalledWith('a', 'o', 'CODE'))
+  await screen.findByLabelText('Тариф для пробного доступа')
+  expect(screen.queryByLabelText('Промокод')).not.toBeInTheDocument()
 })
 it('pending блокирует новую активацию и восстанавливает старую команду', async () => {
-  mocks.readFreeAccessCommand.mockReturnValue({ kind: 'promotion' })
+  mocks.readFreeAccessCommand.mockReturnValue({ kind: 'trial' })
   render(<FreeAccessControls actorId="a" organizationId="o" />)
   fireEvent.click(await screen.findByText('Проверить и повторить запрос'))
-  await waitFor(() => expect(mocks.sendFreeAccessCommand).toHaveBeenCalledWith('a', 'o', ''))
+  await waitFor(() => expect(mocks.sendFreeAccessCommand).toHaveBeenCalledWith('a', 'o'))
   expect(mocks.prepareFreeAccessCommand).not.toHaveBeenCalled()
+})
+it('старый промозапрос показан без кнопки повторной активации', async () => {
+  mocks.readFreeAccessCommand.mockReturnValue({ kind: 'retired_promotion' })
+  render(<FreeAccessControls actorId="a" organizationId="o" />)
+  await screen.findByText(/Старый запрос промодоступа сохранён/)
+  expect(screen.queryByText('Проверить и повторить запрос')).not.toBeInTheDocument()
+  expect(mocks.sendFreeAccessCommand).not.toHaveBeenCalled()
 })

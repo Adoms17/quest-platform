@@ -16,8 +16,8 @@ it('повреждённая метка не заменяется новой', a
   await expect(getTrialBrowserHash()).rejects.toThrow('метку')
   expect(localStorage.getItem('qvesta:trial-browser:v1')).toBe('invalid')
 })
-it('восстанавливает подтверждённый промокод без сырого кода и повторной активации', async () => {
-  await prepareFreeAccessCommand('a', 'o', 1, 'promotion', { code: 'SECRET-CODE' })
+it('восстанавливает подтверждённый trial без повторной активации', async () => {
+  await prepareFreeAccessCommand('a', 'o', 1, 'trial', { target: 'p', browserHash: 'a'.repeat(64) })
   expect(sessionStorage.getItem('free-access-command:a:o')).not.toContain('SECRET-CODE')
   mocks.rpc.mockResolvedValue({ data: { organization_id: 'o', found: true, receipt } })
   expect(await sendFreeAccessCommand('a', 'o')).toEqual(receipt)
@@ -34,21 +34,27 @@ it('после сетевой ошибки сохраняет команду и 
   expect(mocks.rpc.mock.calls[3][1].p_command_id).toBe(command.id)
 })
 it('чужой receipt не снимает pending и другой аккаунт его не видит', async () => {
-  await prepareFreeAccessCommand('a', 'o', 1, 'promotion', { code: 'code' })
+  await prepareFreeAccessCommand('a', 'o', 1, 'trial', { target: 'p', browserHash: 'a'.repeat(64) })
   expect(readFreeAccessCommand('b', 'o')).toBeNull()
   mocks.rpc.mockResolvedValue({ data: { organization_id: 'o', found: true, receipt: { ...receipt, organization_id: 'other' } } })
   await expect(sendFreeAccessCommand('a', 'o')).rejects.toThrow('не подтверждён')
   expect(readFreeAccessCommand('a', 'o')).not.toBeNull()
 })
-it('для неподтверждённого промокода требует тот же код, не отправляет другой', async () => {
-  await prepareFreeAccessCommand('a', 'o', 1, 'promotion', { code: 'code' })
-  mocks.rpc.mockResolvedValue({ data: { organization_id: 'o', found: false } })
-  await expect(sendFreeAccessCommand('a', 'o', 'different')).rejects.toThrow('тот же')
-  expect(mocks.rpc).toHaveBeenCalledTimes(1)
+it('старый сохранённый промозапрос не отправляется и не удаляется', async () => {
+  const old = JSON.stringify({ org: 'o', kind: 'promotion', id: 'old' })
+  sessionStorage.setItem('free-access-command:a:o', old)
+  await expect(sendFreeAccessCommand('a', 'o')).rejects.toThrow('отключена')
+  expect(mocks.rpc).not.toHaveBeenCalled()
+  expect(sessionStorage.getItem('free-access-command:a:o')).toBe(old)
 })
 it('определённый отказ очищает команду, позволяя новое подтверждение', async () => {
-  await prepareFreeAccessCommand('a', 'o', 1, 'promotion', { code: 'code' })
+  await prepareFreeAccessCommand('a', 'o', 1, 'trial', { target: 'p', browserHash: 'a'.repeat(64) })
   mocks.rpc.mockResolvedValueOnce({ data: { organization_id: 'o', found: false } }).mockResolvedValueOnce({ data: { ok: false, reason: 'revision_conflict' } })
   await expect(sendFreeAccessCommand('a', 'o', 'code')).rejects.toThrow('изменилась')
   expect(readFreeAccessCommand('a', 'o')).toBeNull()
+})
+it('новую команду старого промодоступа нельзя подготовить', async () => {
+  await expect(prepareFreeAccessCommand('a', 'o', 1, 'promotion', {})).rejects.toThrow('больше не поддерживается')
+  expect(sessionStorage.getItem('free-access-command:a:o')).toBeNull()
+  expect(mocks.rpc).not.toHaveBeenCalled()
 })
