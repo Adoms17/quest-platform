@@ -47,11 +47,11 @@ export default function SandboxCheckout({ actorId, organizationId }) {
     catch { setError(true) }
     finally { running.current = false; setBusy(false) }
   }
-  if (state.loading) return null
+  if (state.loading) return <p role="status">Загружаем условия заказа…</p>
   if (!state.offer && !state.failed) return <SandboxOfferPicker actorId={actorId} organizationId={organizationId} offers={state.offers} onCreated={reload} />
   return <section aria-label="Тестовая оплата" className="space-y-3 rounded-xl border bg-white p-4">
     <h2 className="text-lg font-semibold">Тестовая оплата</h2>
-    {state.failed ? <><p role="alert">Не удалось загрузить условия заказа.</p><button type="button" className="px-4 py-3 text-blue-700" onClick={() => setRetry(n => n + 1)}>Повторить загрузку</button></> : <>
+    {state.failed ? <><p role="alert">Не удалось загрузить условия заказа.</p><button type="button" className="rounded-lg border px-4 py-3 text-blue-700" onClick={reload}>Повторить загрузку</button></> : <>
       <p>{state.offer.plan_name}</p>
       <p>{(state.offer.amount_minor / 100).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}</p>
       {state.offer.discount && <p>Без скидки: {(state.offer.discount.base_amount_minor / 100).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}. Скидка: {(state.offer.discount.discount_bps / 100).toLocaleString('ru-RU')}% — {(state.offer.discount.discount_amount_minor / 100).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}.</p>}

@@ -78,3 +78,17 @@ test('смена тарифа в trial не показывает предвар�
  await screen.findByText('Период начнётся после подтверждения оплаты. Точные даты появятся после применения платежа.')
  expect(screen.queryByText(/^Период:/)).toBeNull()
 })
+
+test('повтор загрузки показывает ожидание и восстанавливает тот же заказ без оплаты', async () => {
+ mocks.loadSandboxOffer.mockRejectedValueOnce(new Error('network'))
+ render(<SandboxCheckout actorId="a" organizationId="o" />)
+ const retry = await screen.findByRole('button', { name: 'Повторить загрузку' })
+ let resolve
+ mocks.loadSandboxOffer.mockReturnValueOnce(new Promise(done => { resolve = done }))
+ fireEvent.click(retry)
+ expect(screen.getByText('Загружаем условия заказа…')).toBeTruthy()
+ await waitFor(() => expect(mocks.loadSandboxOffer).toHaveBeenCalledTimes(2))
+ resolve({ order_id: 'order', plan_name: 'Pro', amount_minor: 100, period_start: '2026-10-05', period_end: '2026-11-05', state: 'reserved' })
+ await screen.findByRole('button', { name: 'Подтвердить тестовую оплату' })
+ expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
+})
