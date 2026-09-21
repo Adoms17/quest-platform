@@ -32,10 +32,10 @@ it('catalog release requires applied foundation and allows only catalog', () => 
  expect(()=>validateAdminMigrationHistory({migrations:[...applied,catalog]})).toThrow()
 })
 
-it('тарифный релиз допускает ровно 40 миграций после применённого каталога',()=>{
+it('тарифный релиз допускает ровно 41 миграцию после применённого каталога',()=>{
  const base=[...rows().map(r=>({...r,remote:r.local})),{local:'20260919010000',remote:'20260919010000'}];
  const pending=tariffReleaseMigrations.map(local=>({local,remote:''}));
- expect(validateAdminMigrationHistory({migrations:[...base,...pending]},'tariff-release')).toHaveLength(40);
+ expect(validateAdminMigrationHistory({migrations:[...base,...pending]},'tariff-release')).toHaveLength(41);
  expect(()=>validateAdminMigrationHistory({migrations:[...base,...pending.slice(1)]},'tariff-release')).toThrow();
  expect(()=>validateAdminMigrationHistory({migrations:[...base,...pending,{local:'20260920350000',remote:''}]},'tariff-release')).toThrow();
  expect(()=>validateAdminMigrationHistory({migrations:[...base.slice(0,-1),{local:'20260919010000',remote:''},...pending]},'tariff-release')).toThrow();

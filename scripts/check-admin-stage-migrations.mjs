@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 
 const expected = new Set(Array.from({ length: 8 }, (_, i) => `20260918${String(i + 1).padStart(2, '0')}0000`))
 export const tariffReleaseMigrations = [
+ '20260921010000',
  ...Array.from({length:6},(_,i)=>'20260919'+String(i+2).padStart(2,'0')+'0000'),
  ...Array.from({length:34},(_,i)=>'20260920'+String(i+1).padStart(2,'0')+'0000'),
 ]

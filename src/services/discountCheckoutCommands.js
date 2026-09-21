@@ -39,7 +39,7 @@ export async function recoverDiscountCheckout(actor, org) {
 }
 export async function acceptDiscountCheckout(actor, org, offerId, code, quote) {
  if (!uuid.test(offerId) || !quote || quote.organization_id !== org || quote.offer_id !== offerId
-  || typeof code !== 'string' || !code.trim() || code.length > 128) throw uncertain()
+  || typeof code !== 'string' || code.length > 128) throw uncertain()
  let commandId = readDiscountCommand(actor, org)
  if (commandId) {
   const restored = await recoverDiscountCheckout(actor, org)
