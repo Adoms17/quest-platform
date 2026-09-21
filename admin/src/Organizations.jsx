@@ -1,4 +1,6 @@
+import OrganizationCampaigns from './OrganizationCampaigns'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import OrganizationDiscounts from './OrganizationDiscounts'
 import { adminError, createAdminApi } from './api'
 
 export default function Organizations({ client }) {
@@ -40,6 +42,6 @@ export default function Organizations({ client }) {
     <ul>{page.items.map(item => <li key={item.id}><button disabled={busy} onClick={event => { cardTrigger.current = event.currentTarget; run(() => api.organization(item.id), setCard) }}>{item.name}</button><small>{item.id}</small></li>)}</ul>
     {!busy && !error && page.items.length === 0 && <p>Список пуст. Выполните поиск; пустой запрос покажет все доступные организации.</p>}
     {page.next_cursor && <button disabled={busy} onClick={() => run(() => api.search(query, page.next_cursor), setPage)}>Следующая страница</button>}
-    {card && <article ref={cardElement} tabIndex={-1} aria-label="Карточка организации"><h2>{card.name}</h2><dl><dt>ID</dt><dd>{card.id}</dd><dt>Создана</dt><dd>{new Date(card.created_at).toLocaleString('ru-RU')}</dd></dl><button onClick={closeCard}>Закрыть карточку</button></article>}
+    {card && <article ref={cardElement} tabIndex={-1} aria-label="Карточка организации"><h2>{card.name}</h2><dl><dt>ID</dt><dd>{card.id}</dd><dt>Создана</dt><dd>{new Date(card.created_at).toLocaleString('ru-RU')}</dd></dl><OrganizationDiscounts key={card.id} api={api} organizationId={card.id} /><OrganizationCampaigns client={client} key={`campaigns-${card.id}`} api={api} organizationId={card.id} /><button onClick={closeCard}>Закрыть карточку</button></article>}
   </section>
 }

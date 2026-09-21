@@ -1,0 +1,25 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('campaign-chain-admin')::uuid,'chain-admin@example.test'),(md5('campaign-chain-buyer')::uuid,'chain-buyer@example.test');
+select set_config('request.jwt.claim.sub',md5('campaign-chain-admin')::uuid::text,true);
+select set_config('request.jwt.claims',jsonb_build_object('aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from clock_timestamp())))))::text,true);
+insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(auth.uid(),'owner','platform');
+select set_config('test.org',(select id::text from public.organizations where personal_owner_id=md5('campaign-chain-buyer')::uuid),true);
+select public.save_platform_discount_campaign(md5('chain-save')::uuid,md5('chain-campaign')::uuid,current_setting('test.org')::uuid,0,'Проверка цепочки','pro',2500,2,1,now()+interval '1 day');
+select public.approve_platform_discount_campaign(md5('chain-approve')::uuid,md5('chain-campaign')::uuid,1);
+select set_config('test.issued',public.issue_platform_campaign_discount(current_setting('test.org')::uuid,md5('chain-campaign')::uuid,1,md5('chain-issue')::uuid)::text,true);
+select set_config('test.code',current_setting('test.issued')::jsonb->>'code',true);
+insert into public.billing_sandbox_offers(id,organization_id,plan_version_id,expected_revision,amount_minor,shop_id,return_url,period_start,period_end,valid_until,period_months)
+values(md5('chain-offer')::uuid,current_setting('test.org')::uuid,(select id from public.billing_plan_versions where plan_key='pro' and version=1),0,12000,'123','https://stage.qvesta.ru',now(),((now() at time zone 'Europe/Moscow')+interval '1 month') at time zone 'Europe/Moscow',now()+interval '1 hour',1);
+select set_config('request.jwt.claim.sub',md5('campaign-chain-buyer')::uuid::text,true);
+select set_config('test.quote',public.preview_sandbox_discount_offer(current_setting('test.org')::uuid,md5('chain-offer')::uuid,current_setting('test.code'))::text,true);
+select is(current_setting('test.quote')::jsonb->>'amount_minor','9000','скидка 25% оставляет 9000 из 12000 к оплате');
+select set_config('test.accepted',platform_private.accept_reviewed_discount_checkout(current_setting('test.org')::uuid,md5('chain-offer')::uuid,md5('chain-checkout')::uuid,current_setting('test.code'),current_setting('test.quote')::jsonb)::text,true);
+select is(current_setting('test.accepted')::jsonb->>'reserved','true','код принят в покупку');
+select set_config('test.order',current_setting('test.accepted')::jsonb->>'order_id',true);
+select is(platform_private.accept_reviewed_discount_checkout(current_setting('test.org')::uuid,md5('chain-offer')::uuid,md5('chain-checkout')::uuid,current_setting('test.code'),current_setting('test.quote')::jsonb),current_setting('test.accepted')::jsonb,'повтор сохраняет заказ с частичной скидкой');
+select is((select count(*) from public.billing_discount_checkouts where organization_id=current_setting('test.org')::uuid),1::bigint,'один заказ с частичной скидкой');
+select is((select state from public.billing_discount_reservations where order_id=current_setting('test.order')::uuid),'reserved','до оплаты льгота только резервируется');
+select throws_ok($t$select platform_private.fulfill_zero_discount_checkout(current_setting('test.order')::uuid)$t$,'55000',null,'частичная скидка не выдаёт бесплатный период');
+select * from finish();
+rollback;
