@@ -91,7 +91,8 @@ export async function loadSandboxOffer(org, orderId) {
       || !Number.isSafeInteger(data.discount.base_amount_minor) || data.discount.base_amount_minor < data.amount_minor
       || !Number.isSafeInteger(data.discount.discount_amount_minor) || data.discount.discount_amount_minor < 0
       || data.discount.base_amount_minor - data.discount.discount_amount_minor !== data.amount_minor
-      || !Number.isInteger(data.discount.discount_bps) || data.discount.discount_bps < 1 || data.discount.discount_bps > 10000))
+      || !Number.isInteger(data.discount.discount_bps) || data.discount.discount_bps < 0 || data.discount.discount_bps > 10000
+      || (data.discount.discount_bps === 0 && data.discount.discount_amount_minor !== 0)))
     || (data.refund_requires_review !== undefined && typeof data.refund_requires_review !== 'boolean')
     || ['refunded_minor','refund_pending_minor'].some(field => data[field] !== undefined && (!Number.isSafeInteger(data[field]) || data[field] < 0 || data[field] > data.amount_minor))) throw uncertain()
   return data

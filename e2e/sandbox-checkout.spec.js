@@ -19,7 +19,7 @@ test('sandbox checkout: catalog, lost reservation, reload, payment retry and saf
     if (path.endsWith('/get_organization_billing_overview')) data = { organization_id: org, status: 'unconfigured', configured_plan: null, can_manage: true, usage: { active_quests: 0, team_members: 1 }, enforcement: { active_quests: false, team_members: false }, effective_entitlements: null, measured_at: '2026-09-16T00:00:00Z' }
     if (path.endsWith('/find_pending_sandbox_order')) data = executing ? id : null
     if (path.endsWith('/list_sandbox_checkout_offers')) data = [offer]
-    if (path.endsWith('/get_sandbox_order_offer')) data = { ...offer, order_id: id, state: paid ? 'finished' : 'reserved', fulfillment_state: paid ? 'applied' : 'none' }
+    if (path.endsWith('/get_sandbox_order_offer')) data = { ...offer, discount: { base_amount_minor: 100, discount_amount_minor: 0, discount_bps: 0 }, order_id: id, state: paid ? 'finished' : 'reserved', fulfillment_state: paid ? 'applied' : 'none' }
         if (path.endsWith('/preview_sandbox_discount_offer')) data = { ...offer, ok: true, discount_id: null, base_amount_minor: 100, discount_amount_minor: 0, discount_bps: 0, remaining_periods: 0, period_months: 1, requires_payment: true, reserved: false }
     if (path.endsWith('/execute_sandbox_discount_checkout')) { executing = true; data = { ok: true } }
     if (path.endsWith('/recover_sandbox_discount_checkout')) data = reserved ? { ...offer, order_id: id, state: executing ? 'executing' : 'ready', reservation_state: 'reserved', payment_requires_review: false, payment_order_id: executing ? id : null, payment_status: null, base_amount_minor: 100, discount_amount_minor: 0, requires_payment: true } : null
