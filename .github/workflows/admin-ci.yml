@@ -5,7 +5,8 @@ on:
     branches: [main, staging]
     paths:
       - 'admin/**'
-      - 'supabase/migrations/*platform*.sql'
+      - 'supabase/migrations/**'
+      - 'supabase/tests/database/platform*.test.sql'
       - 'package.json'
       - 'package-lock.json'
       - 'vitest.config.js'
@@ -15,7 +16,8 @@ on:
     branches: [main, staging]
     paths:
       - 'admin/**'
-      - 'supabase/migrations/*platform*.sql'
+      - 'supabase/migrations/**'
+      - 'supabase/tests/database/platform*.test.sql'
       - 'package.json'
       - 'package-lock.json'
       - 'vitest.config.js'
@@ -44,7 +46,7 @@ jobs:
       - name: Lint admin
         run: npm run lint -- admin
       - name: Unit and component tests
-        run: npm run test -- admin/src/admin.test.jsx admin/src/tariffs.test.jsx admin/buildEnvironment.test.js admin/securityHeaders.test.js admin/hosting.test.js
+        run: npm run test -- admin
       - name: Install browser
         run: npx playwright install --with-deps chromium
       - name: Build and browser tests with synthetic API

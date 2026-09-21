@@ -32,12 +32,19 @@ it('catalog release requires applied foundation and allows only catalog', () => 
  expect(()=>validateAdminMigrationHistory({migrations:[...applied,catalog]})).toThrow()
 })
 
-it('тарифный релиз допускает ровно 41 миграцию после применённого каталога',()=>{
+it('тарифный релиз допускает ровно 47 миграций после применённого каталога',()=>{
  const base=[...rows().map(r=>({...r,remote:r.local})),{local:'20260919010000',remote:'20260919010000'}];
  const pending=tariffReleaseMigrations.map(local=>({local,remote:''}));
- expect(validateAdminMigrationHistory({migrations:[...base,...pending]},'tariff-release')).toHaveLength(41);
+ expect(validateAdminMigrationHistory({migrations:[...base,...pending]},'tariff-release')).toHaveLength(47);
  expect(()=>validateAdminMigrationHistory({migrations:[...base,...pending.slice(1)]},'tariff-release')).toThrow();
  expect(()=>validateAdminMigrationHistory({migrations:[...base,...pending,{local:'20260920350000',remote:''}]},'tariff-release')).toThrow();
  expect(()=>validateAdminMigrationHistory({migrations:[...base.slice(0,-1),{local:'20260919010000',remote:''},...pending]},'tariff-release')).toThrow();
  expect(validateAdminMigrationHistory({migrations:[...base,...pending.map(r=>({...r,remote:r.local}))]},'tariff-release')).toEqual([]);
+})
+
+it('после прошлого выпуска ожидает только шесть миграций акций',()=>{
+ const base=[...rows().map(r=>({...r,remote:r.local})),{local:'20260919010000',remote:'20260919010000'}]
+ const history=tariffReleaseMigrations.map(local=>({local,remote:local>='20260921020000'?'':local}))
+ expect(validateAdminMigrationHistory({migrations:[...base,...history]},'tariff-release').sort()).toEqual(['20260921020000','20260921030000','20260921040000','20260921050000','20260921060000','20260921070000'])
+ expect(()=>validateAdminMigrationHistory({migrations:[...base,...history,{local:'20260921080000',remote:''}]},'tariff-release')).toThrow()
 })

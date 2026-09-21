@@ -113,6 +113,8 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     }
     // Минимальная организация — синтетическая фикстура, миграции admin настоящие.
     await sql(`
+      create schema extensions;
+      create extension pgcrypto with schema extensions;
       create role anon nologin;
       create role authenticated nologin;
       create role service_role nologin;
@@ -138,6 +140,16 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       '20260918060000_search_platform_organizations.sql',
       '20260918070000_log_platform_access_denials.sql',
       '20260918080000_require_platform_command_reasons.sql',
+      '20260915010000_add_billing_plan_versions.sql',
+      '20260920060000_add_discount_code_foundation.sql',
+      '20260920070000_issue_and_preview_discount_codes.sql',
+      '20260920090000_reserve_discount_periods.sql',
+      '20260921020000_read_platform_discounts.sql',
+      '20260921030000_platform_discount_campaigns.sql',
+      '20260921040000_read_discount_campaigns.sql',
+      '20260921050000_issue_campaign_discount.sql',
+      '20260921060000_global_campaign_catalog.sql',
+      '20260921070000_campaign_activation_windows.sql',
     ]) await sql(readFileSync(new URL(`../../supabase/migrations/${migration}`, import.meta.url), 'utf8'))
     const rest = `${prefix}-rest`
     const restEnvironment = {
@@ -173,6 +185,45 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     expect(page.items.map(item => item.id)).toEqual([org])
     const card = successful(await rpc('get_platform_organization_summary', { p_organization_id: org }))
     expect(Object.keys(card).sort()).toEqual(['created_at', 'id', 'name'])
+    // Реальные миграции и RPC; checkout и переходы подписок проверяются отдельно.
+    const campaign = randomUUID()
+    const saveCampaign = {
+      p_command_id: randomUUID(), p_id: campaign, p_organization_id: null,
+      p_expected_revision: 0, p_title: 'Auth integration campaign', p_plan_key: 'pro',
+      p_discount_bps: 2500, p_eligible_periods: 2, p_period_months: 1,
+      p_starts_at: new Date(Date.now() - 60000).toISOString(),
+      p_activate_before: new Date(Date.now() + 86400000 * 7).toISOString(),
+    }
+    const campaignQuery = { p_organization_id: null, p_id: campaign }
+    const approveCampaign = { p_command_id: randomUUID(), p_id: campaign, p_expected_revision: 1 }
+    const issueCampaign = {
+      p_organization_id: org, p_campaign_id: campaign, p_expected_revision: 1,
+      p_command_id: randomUUID(), p_activate_before: new Date(Date.now() + 86400000).toISOString(),
+    }
+    for (const [name, body] of [
+      ['save_platform_discount_campaign', saveCampaign],
+      ['approve_platform_discount_campaign', approveCampaign],
+      ['issue_platform_campaign_discount', issueCampaign],
+      ['read_platform_discount_campaigns', campaignQuery],
+    ]) {
+      expect((await rpc(name, body, login.access_token)).status, name + ' requires MFA').toBe(403)
+      expect((await rpc(name, body, null)).status, name + ' rejects anonymous').toBe(401)
+    }
+    expect(successful(await rpc('save_platform_discount_campaign', saveCampaign))).toMatchObject({ id: campaign, revision: 1, state: 'draft', organization_id: null })
+    expect(successful(await rpc('save_platform_discount_campaign', saveCampaign))).toMatchObject({ id: campaign, revision: 1 })
+    expect((await rpc('issue_platform_campaign_discount', issueCampaign)).data.code).toBe('55000')
+    expect((await rpc('save_platform_discount_campaign', { ...saveCampaign, p_command_id: randomUUID() })).data.code).toBe('40001')
+    expect(successful(await rpc('approve_platform_discount_campaign', approveCampaign))).toMatchObject({ state: 'approved' })
+    const issued = successful(await rpc('issue_platform_campaign_discount', issueCampaign))
+    expect(issued.already_issued).toBe(false)
+    expect(typeof issued.code === 'string' && /^[A-F0-9]{32}$/.test(issued.code)).toBe(true)
+    expect(successful(await rpc('issue_platform_campaign_discount', issueCampaign))).toEqual({ discount_id: issued.discount_id, already_issued: true, code: null })
+    expect(successful(await rpc('read_platform_discount_campaigns', campaignQuery)).items).toMatchObject([{ id: campaign, has_issued_codes: true }])
+    expect((await rpc('save_platform_discount_campaign', { ...saveCampaign, p_command_id: randomUUID(), p_expected_revision: 1 })).data.code).toBe('55000')
+    const stored = JSON.parse(await sql(`select jsonb_build_object('count',count(*),'hashed',bool_and(code_hash ~ '^[0-9a-f]{64}$'),'deadline',min(activate_before)) from public.billing_discount_codes where campaign_id='${campaign}';`))
+    expect(stored.count).toBe(1)
+    expect(stored.hashed).toBe(true)
+    expect(new Date(stored.deadline).toISOString()).toBe(issueCampaign.p_activate_before)
     const parts = verified.access_token.split('.')
     parts[1] = Buffer.from(JSON.stringify({ ...claims, sub: randomUUID() })).toString('base64url')
     expect((await rpc('search_platform_organizations', {}, parts.join('.'))).status).toBe(401)
@@ -184,12 +235,54 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
         return totp(enrolled.totp.secret)
       } })
     }
+    // Отдельный настоящий аккаунт продаж: сначала платформа, затем одна организация.
+    const salesCredentials = { email: 'sales@example.test', password: randomBytes(24).toString('hex') }
+    const sales = successful(await request('/signup', salesCredentials))
+    const salesFactor = successful(await request('/factors', { factor_type: 'totp' }, sales.access_token))
+    const salesChallenge = successful(await request(`/factors/${salesFactor.id}/challenge`, {}, sales.access_token))
+    const salesMfa = successful(await request(`/factors/${salesFactor.id}/verify`, { challenge_id: salesChallenge.id, code: totp(salesFactor.totp.secret) }, sales.access_token))
+    expect(level(salesMfa.access_token)).toBe('aal2')
+    const grantSales = organizationId => rpc('grant_platform_assignment', {
+      p_command_id: randomUUID(), p_user_id: sales.user.id, p_role: 'sales',
+      p_organization_id: organizationId, p_reason_code: 'role_change',
+    })
+    const globalSales = successful(await grantSales(null))
+    const salesDraft = { ...saveCampaign, p_command_id: randomUUID(), p_id: randomUUID() }
+    expect((await rpc('save_platform_discount_campaign', salesDraft, sales.access_token)).status).toBe(403)
+    expect(successful(await rpc('save_platform_discount_campaign', salesDraft, salesMfa.access_token))).toMatchObject({ id: salesDraft.p_id, state: 'draft' })
+    expect(successful(await rpc('read_platform_discount_campaigns', { p_organization_id: null, p_id: salesDraft.p_id }, salesMfa.access_token)).items).toMatchObject([{ id: salesDraft.p_id }])
+    const salesApproval = { p_command_id: randomUUID(), p_id: salesDraft.p_id, p_expected_revision: 1 }
+    expect((await rpc('approve_platform_discount_campaign', salesApproval, salesMfa.access_token)).status).toBe(403)
+    successful(await rpc('approve_platform_discount_campaign', salesApproval))
+    successful(await rpc('revoke_platform_assignment', { p_command_id: randomUUID(), p_assignment_id: globalSales, p_reason_code: 'role_change' }))
+    const scopedSales = successful(await grantSales(org))
+    const otherOrg = randomUUID()
+    await sql(`insert into public.organizations(id,name) values('${otherOrg}','Other synthetic organization');`)
+    const scopedQuery = { p_organization_id: org, p_id: salesDraft.p_id }
+    expect(successful(await rpc('read_platform_discount_campaigns', scopedQuery, salesMfa.access_token)).items).toMatchObject([{ id: salesDraft.p_id }])
+    expect((await rpc('read_platform_discount_campaigns', { ...scopedQuery, p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_discount_campaigns', { p_organization_id: null }, salesMfa.access_token)).status).toBe(403)
+    expect((await rpc('save_platform_discount_campaign', { ...salesDraft, p_command_id: randomUUID(), p_expected_revision: 1 }, salesMfa.access_token)).status).toBe(403)
+    const salesIssue = { ...issueCampaign, p_campaign_id: salesDraft.p_id, p_command_id: randomUUID() }
+    expect((await rpc('issue_platform_campaign_discount', salesIssue, sales.access_token)).status).toBe(403)
+    expect((await rpc('issue_platform_campaign_discount', { ...salesIssue, p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
+    const salesCode = successful(await rpc('issue_platform_campaign_discount', salesIssue, salesMfa.access_token))
+    expect(salesCode.already_issued).toBe(false)
+    expect(typeof salesCode.code === 'string' && /^[A-F0-9]{32}$/.test(salesCode.code)).toBe(true)
+    expect(successful(await rpc('issue_platform_campaign_discount', salesIssue, salesMfa.access_token))).toEqual({ discount_id: salesCode.discount_id, already_issued: true, code: null })
+    successful(await rpc('revoke_platform_assignment', { p_command_id: randomUUID(), p_assignment_id: scopedSales, p_reason_code: 'role_change' }))
+    expect((await rpc('read_platform_discount_campaigns', scopedQuery, salesMfa.access_token)).status).toBe(403)
+    expect((await rpc('issue_platform_campaign_discount', salesIssue, salesMfa.access_token)).status).toBe(403)
+    expect(await sql(`select count(*) from public.billing_discount_codes where campaign_id='${salesDraft.p_id}';`)).toBe('1')
     const second = successful(await request('/signup', { email: 'second@example.test', password: randomBytes(24).toString('hex') }))
     // Настоящий AMR totp допускает чувствительную команду с окном свежести.
     successful(await rpc('grant_platform_assignment', { p_command_id: randomUUID(), p_user_id: second.user.id, p_role: 'owner', p_reason_code: 'role_change' }))
     successful(await rpc('revoke_platform_assignment', { p_command_id: randomUUID(), p_assignment_id: assignment, p_reason_code: 'role_change' }))
     { const denied = await rpc('search_platform_organizations', {}); expect({ status: denied.status, code: denied.data.code }).toEqual({ status: 403, code: '42501' }) }
-    expect((await sql("select count(*) from public.platform_audit_events where action='assignment.revoke';")).trim()).toBe('1')
+    expect((await rpc('read_platform_discount_campaigns', campaignQuery)).status).toBe(403)
+    expect((await rpc('issue_platform_campaign_discount', issueCampaign)).status).toBe(403)
+    expect((await rpc('save_platform_discount_campaign', saveCampaign)).status).toBe(403)
+    expect((await sql("select count(*) from public.platform_audit_events where action='assignment.revoke';")).trim()).toBe('3')
     // Отказы уже завершились rollback, но структурированные события остались в журнале БД.
     const databaseLogs = await command(['logs', database])
     const events = databaseLogs.split('\n').filter(line => line.includes('QVESTA_ADMIN_DENIAL '))
@@ -200,11 +293,13 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     expect(new Set(events.map(event => event.event_id)).size).toBe(events.length)
     for (const event of events) {
       expect(Object.keys(event).sort()).toEqual(['action','actor_id','event_id','occurred_at','sqlstate','version'])
-      expect(event.actor_id).toBe(actor)
+      expect([actor, sales.user.id]).toContain(event.actor_id)
       expect(event.sqlstate).toBe('42501')
     }
     expect(JSON.stringify(events).includes(verified.access_token)).toBe(false)
     expect(JSON.stringify(events).includes(credentials.password)).toBe(false)
+    expect(JSON.stringify(events).includes(salesMfa.access_token)).toBe(false)
+    expect(JSON.stringify(events).includes(salesCredentials.password)).toBe(false)
     expect((await sql("select has_function_privilege('authenticated','platform_private.search_platform_organizations(text,uuid,integer)','execute');")).trim()).toBe('f')
   } catch (error) {
     failure = error
