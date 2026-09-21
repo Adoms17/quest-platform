@@ -11,7 +11,7 @@ test('подтверждение блокирует выбор, затем во�
  let resolve;mocks.acceptDiscountCheckout.mockReturnValue(new Promise(r=>{resolve=r}))
  render(<SandboxOfferPicker actorId="a" organizationId="o" offers={offers} onCreated={vi.fn()} />)
  fireEvent.change(screen.getByRole('combobox'),{target:{value:'first'}})
- fireEvent.click(screen.getByRole('button',{name:'Использовать промокод'}))
+
  fireEvent.click(await screen.findByRole('button',{name:'Подтвердить расчёт'}))
  expect(screen.getByRole('combobox').disabled).toBe(true)
  expect(screen.queryByRole('button',{name:'Подготовить тестовый заказ'})).toBeNull()

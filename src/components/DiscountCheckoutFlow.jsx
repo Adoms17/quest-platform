@@ -22,7 +22,7 @@ export default function DiscountCheckoutFlow({ actorId, organizationId, offer, o
  }
  const order = state.order
  if (state.loading) return <p role="status">Восстанавливаем заказ…</p>
- return <section aria-label="Заказ с промокодом" className="space-y-3">
+ return <section aria-label="Заказ подписки" className="space-y-3">
   {error && <p role="alert">Не удалось подтвердить состояние заказа. Восстановите его перед продолжением.</p>}
   <button type="button" disabled={busy} onClick={() => run(() => recoverDiscountCheckout(actorId, organizationId))}>Восстановить заказ</button>
   {!order && !error && <>
@@ -35,11 +35,11 @@ export default function DiscountCheckoutFlow({ actorId, organizationId, offer, o
    <p>Заказ: {order.order_id}</p>
    <p>К оплате: {(order.amount_minor / 100).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}.</p>
    {error ? null : order.payment_requires_review ? <p role="status">Платёж требует сверки. Повторную покупку не создавайте.</p> : <>
-    {order.state === 'ready' && <button disabled={busy} type="button" onClick={() => run(() => executeDiscountCheckout(actorId, organizationId, order.order_id))}>{order.requires_payment ? 'Подготовить платёж со скидкой' : 'Получить доступ без доплаты'}</button>}
+    {order.state === 'ready' && <button disabled={busy} type="button" onClick={() => run(() => executeDiscountCheckout(actorId, organizationId, order.order_id))}>{order.requires_payment ? 'Подготовить тестовый платёж' : 'Получить доступ без доплаты'}</button>}
     {order.payment_order_id && order.state === 'executing' && <button disabled={busy} type="button" onClick={() => run(async () => { rememberSandboxCheckout(actorId, organizationId, order.payment_order_id); onPayment() })}>Перейти к тестовой оплате</button>}
     {['ready','executing'].includes(order.state) && <button disabled={busy} type="button" onClick={() => run(() => cancelDiscountCheckout(actorId, organizationId, order.order_id))}>Отменить до отправки платежа</button>}
     {order.state === 'completed' && <p role="status">Заказ исполнен. {order.fulfillment?.access_state === 'scheduled' ? 'Купленный период начинается после trial.' : 'Период доступа подтверждён.'}</p>}
-    {order.state === 'cancelled' && <p role="status">Заказ отменён, резерв скидки освобождён.</p>}
+    {order.state === 'cancelled' && <p role="status">Заказ отменён, резерв заказа освобождён.</p>}
     {['completed','cancelled'].includes(order.state) && <button disabled={busy} type="button" onClick={() => run(async () => { await dismissDiscountCheckout(actorId, organizationId); onClosed() })}>Закрыть заказ</button>}
    </>}
   </>}

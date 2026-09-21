@@ -6,7 +6,7 @@ import DiscountCheckoutPreview from './DiscountCheckoutPreview'
 const offer = { offer_id: 'offer', amount_minor: 10000 }
 const quote = { ok: true, base_amount_minor: 10000, discount_amount_minor: 10000, amount_minor: 0, discount_bps: 10000, requires_payment: false, remaining_periods: 2, period_months: 1 }
 beforeEach(() => preview.mockReset())
-function enter() { fireEvent.change(screen.getByRole('textbox', { name: 'Промокод' }), { target: { value: 'CODE' } }); fireEvent.click(screen.getByRole('button', { name: 'Рассчитать скидку' })) }
+function enter() { fireEvent.change(screen.getByRole('textbox', { name: 'Промокод (необязательно)' }), { target: { value: 'CODE' } }); fireEvent.click(screen.getByRole('button', { name: 'Рассчитать стоимость' })) }
 test('проверка только по нажатию, 100% не обещает уже выданный доступ', async () => {
  preview.mockResolvedValue(quote)
  render(<DiscountCheckoutPreview organizationId="org" offer={offer} />)
@@ -48,4 +48,17 @@ test.each([
  preview.mockResolvedValue({ ...quote, trial_purchase: { transition, trial_ends_at: '2026-10-01T00:00:00Z' } })
  render(<DiscountCheckoutPreview organizationId="org" offer={offer} />)
  enter(); await screen.findByText(text)
+})
+
+test('покупка без кода показывает полную стоимость и требует подтверждения', async () => {
+ const confirm = vi.fn()
+ preview.mockResolvedValue({ ...quote, discount_id: null, discount_bps: 0, discount_amount_minor: 0, amount_minor: 10000, requires_payment: true, remaining_periods: 0 })
+ render(<DiscountCheckoutPreview organizationId="org" offer={offer} onConfirm={confirm} />)
+ fireEvent.click(screen.getByRole('button', { name: 'Рассчитать стоимость' }))
+ await screen.findByText(/К оплате за выбранный период/)
+ expect(preview).toHaveBeenCalledWith('org', offer, '')
+ expect(confirm).not.toHaveBeenCalled()
+ expect(screen.queryByText(/Доступно льготных периодов/)).toBeNull()
+ fireEvent.click(screen.getByRole('button', { name: 'Подтвердить расчёт и создать заказ' }))
+ expect(confirm).toHaveBeenCalledWith('', expect.objectContaining({ amount_minor: 10000 }))
 })

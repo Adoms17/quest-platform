@@ -32,3 +32,11 @@ test.each(['after_trial','replace_trial_on_payment'])('проверяет усл
  rpc.mockResolvedValue({ data: { ...quote, trial_purchase: { ...trial, trial_remaining_preserved: !trial.trial_remaining_preserved } } })
  await expect(previewDiscountCheckout(org, offer, 'CODE')).rejects.toThrow()
 })
+
+test('пустой код допускает только расчёт без скидки', async () => {
+ const full = { ...quote, discount_id: null, discount_bps: 0, discount_amount_minor: 0, amount_minor: 10000, requires_payment: true, remaining_periods: 0 }
+ rpc.mockResolvedValue({ data: full })
+ await expect(previewDiscountCheckout(org, offer, '')).resolves.toEqual(full)
+ rpc.mockResolvedValue({ data: quote })
+ await expect(previewDiscountCheckout(org, offer, '')).rejects.toThrow()
+})
