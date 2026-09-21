@@ -180,3 +180,7 @@ jobs:
       - name: Verify tariff release RPC and permissions
         if: inputs.operation == 'tariff-release-deploy'
         run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/billing_discount*.test.sql supabase/tests/database/billing_trial_full_price*.test.sql supabase/tests/database/billing_trial_timeline.test.sql supabase/tests/database/platform_tariff_support_end.test.sql supabase/tests/database/platform_tariff_source_version.test.sql
+
+      - name: Verify campaign catalog and personal codes with scoped fixtures
+        if: inputs.operation == 'tariff-release-deploy'
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_discount*.test.sql

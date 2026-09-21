@@ -1,3 +1,4 @@
+import OrganizationCampaigns from './OrganizationCampaigns'
 import { useEffect, useState } from 'react'
 import Login from './Login'
 import Mfa from './Mfa'
@@ -47,7 +48,7 @@ function SessionGate({ client }) {
   if (state === 'loading') return <p role="status">Проверяем подтверждение входа…</p>
   if (state === 'error') return <p role="alert">Не удалось проверить сессию. Выйдите и повторите вход.</p>
   if (state === 'mfa') return <Mfa auth={client.auth} />
-  return <><nav aria-label="Разделы администрирования"><button aria-pressed={section === 'organizations'} onClick={() => setSection('organizations')}>Организации</button> <button aria-pressed={section === 'tariffs'} onClick={() => setSection('tariffs')}>Тарифы</button></nav>{section === 'organizations' ? <Organizations client={client} /> : <Tariffs client={client} />}</>
+  return <><nav aria-label="Разделы администрирования"><button aria-pressed={section === 'organizations'} onClick={() => setSection('organizations')}>Организации</button> <button aria-pressed={section === 'tariffs'} onClick={() => setSection('tariffs')}>Тарифы</button><button aria-pressed={section === 'campaigns'} onClick={() => setSection('campaigns')}>Акции</button></nav>{section === 'organizations' ? <Organizations client={client} /> : section === 'campaigns' ? <OrganizationCampaigns client={client} /> : <Tariffs client={client} />}</>
 }
 
 // Ключ только для состояния UI: права и свежесть MFA по-прежнему проверяет сервер.
