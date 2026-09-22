@@ -32,3 +32,35 @@ Prod, коммерческие цены, роли и ограничения ор
 Повторный запуск после добавления роли продаж: 2 теста прошли (TOTP-вектор и интеграционный сценарий), lint/build/git diff --check успешны с прежними предупреждениями. Пункт 2 локальной подготовки выполнен. Алексей разрешил локальный commit пакета подготовки без push и публикации. Следующий шаг после сохранения — проверка автоматических публикаций перед согласованием push/PR. Stage dry-run и stage-приёмка остаются невыполненными.
 
 Точный текущий пакет подготовки: .github/workflows/admin-ci.yml, .github/workflows/deploy-staging.yml, scripts/check-admin-stage-migrations.mjs и его тест, scripts/tariff-release-migrations.test.js, admin/integration/auth.integration.test.js, supabase/tests/database/platform_discount_campaigns.test.sql, этот документ. Пакет сохраняется отдельным локальным коммитом по разрешению Алексея. Разрешение не распространяется на push, merge и публикацию.
+
+## Проверка триггеров перед отправкой ветки
+
+Пакет подготовки сохранён локально коммитом d06af3a. GitHub API подтвердил: staging = a9ecf9f4ac4709d0e8f11e871ac12caa6fbf92d7, main = 706473db55d51b9f83ac547572f35b419e3130ba; обе ветки защищены, PR текущей ветки отсутствует.
+
+По workflow-файлам push codex/admin-discount-catalog не запускает GitHub Actions. PR в staging запускает CI и Admin CI; Website CI не ожидается, поскольку website и его workflow в diff отсутствуют. Оба Supabase deployment workflow имеют только workflow_dispatch. Environment staging допускает защищённые ветки; production дополнительно требует reviewer. Это не защита от независимых Git-сборок Cloudflare.
+
+Конфигурация admin/wrangler.stage.jsonc указывает qvesta-admin-stage и stage-admin.qvesta.ru, отключает workers_dev и preview_urls. Эти флаги не отключают Git Builds. Актуальные Production branch, Builds for non-production branches, команды deploy/version и watch paths в Cloudflare не подтверждены: браузерный инструмент завершился ошибкой Windows sandbox до получения состояния.
+
+Перед push проверить Cloudflare Git Builds всех подключённых к репозиторию приложений: рабочая ветка не должна исполнять deploy на активный stage/prod. Перед merge обеспечить порядок backend → frontend. Если stage admin автоматически публикуется при merge staging, сначала временно приостановить его автопубликацию по согласованию, затем merge, ручной tariff-release-dry-run/deploy на точном commit и лишь после успешных миграций выпустить admin frontend. Не считать запуск workflow с рабочей ветки доступным без проверки environment branch policy. Никакие настройки, удалённые ветки и окружения при аудите не изменены.
+
+## PR №76 и подтверждение Cloudflare — 22.09.2026
+
+По разрешению Алексея ветка отправлена и открыт draft PR https://github.com/Adoms17/quest-platform/pull/76 в staging, head d06af3a71afb40200c53c22157506e12ab73ad34. Merge и deploy не выполнялись. Заметки аудита после d06af3a пока остаются локальными.
+
+Для qvesta-admin-stage Алексей подтвердил скриншотом ветку staging, отключённые сборки non-production branches, watch paths admin/*, package.json, package-lock.json и root directory /. Текстом подтверждены build: npm run build -- --config admin/vite.config.mjs --mode staging; deploy: npx wrangler@4.134.0 deploy --config admin/wrangler.stage.jsonc. Предыдущая неопределённость по этим настройкам admin снята; это не проверка остальных приложений Cloudflare.
+
+GitHub Admin CI успешно завершил frontend и настоящий Auth/TOTP/PostgREST с браузером; CodeQL успешен. Общий CI прошёл аудит зависимостей, lint, unit-тесты и сборку; на момент записи ещё выполняются end-to-end тесты. Для рабочей ветки фактически запустился также CodeQL (помимо workflow, описанных в локальном аудите). До merge остаётся обеспечить backend → frontend, как описано выше.
+
+## Итог CI и подготовка публикации
+
+22.09.2026: все проверки PR №76 успешны, включая validate (9m46s), admin-frontend, admin-auth-integration и CodeQL. Проверенный head d06af3a71afb40200c53c22157506e12ab73ad34. Защита staging реализована ruleset: squash PR, обязательный validate, актуальность ветки, CodeQL и разрешение обсуждений.
+
+Для раздельного выпуска предложено временно заменить только Deploy command у qvesta-admin-stage на `npx wrangler@4.134.0 versions upload --config admin/wrangler.stage.jsonc`. Согласно https://developers.cloudflare.com/workers/ci-cd/builds/ это сохраняет сборку как версию без перевода активного deployment. Команда сборки и staging-подключение сохраняются. Изменение пользователем ещё не подтверждено. После согласованного merge и успешных миграций stage активировать проверенную версию и восстановить исходный deploy command. Это предложение не является фактом изменения Cloudflare или разрешением на merge/deploy.
+
+## Применение stage и обнаруженная ошибка теста — 22.09.2026
+
+PR №76 squash-merged по разрешению Алексея: staging 8158c38bf0726cbd35181484a54e20f5d1aa4788. Dry-run https://github.com/Adoms17/quest-platform/actions/runs/35656576136 подтвердил ровно шесть миграций. Разрешённое применение https://github.com/Adoms17/quest-platform/actions/runs/35656869475 успешно применило их, но workflow завершился ошибкой последующего теста: billing_discount_full_price.test.sql, проверка 12, глобальное количество checkout 3 вместо 1. Проверка quote_changed прошла; ошибочный подсчёт включал два ранее существовавших заказа. Остальные 310 проверок тарифного шага прошли; отдельный шаг platform_discount не запускался.
+
+Локально подсчёты checkout и проверок кода ограничены тестовой организацией/актором. Данные stage не удалялись, новых миграций для исправления не требуется. SQL replay 47 миграций прошёл за 76 секунд, lint/build/git diff --check успешны с прежними предупреждениями. Алексей разрешил отдельный commit и PR исправления теста и статуса выпуска без merge; ветка codex/fix-stage-checkout-test от staging 8158c38.
+
+Повторная сверка https://github.com/Adoms17/quest-platform/actions/runs/35657365262 успешна: ожидающих миграций нет, Remote database is up to date. Перед публикацией admin frontend требуется доставить исправление теста через PR и повторить серверные проверки, включая platform_discount. Frontend вручную не активирован, production не изменялся.
