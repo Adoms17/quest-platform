@@ -38,8 +38,10 @@ export default function RefundPreview({ api, client, organizationId, orderId }) 
   <label>Сумма возврата, ₽ (пусто — весь доступный остаток)
    <input inputMode="decimal" value={amount} disabled={busy} onChange={event => { setAmount(event.target.value); setResult(null); setError('') }} />
   </label>
-  <button disabled={busy}>Рассчитать сумму</button>
-  <button type="button" disabled={busy} onClick={() => { setOpened(false); setResult(null); setError(''); setAmount('') }}>Закрыть расчёт</button>
+  <div className="refund-actions">
+  <button type="submit" disabled={busy}>Рассчитать сумму</button>
+  <button className="refund-close" type="button" disabled={busy} onClick={() => { setOpened(false); setResult(null); setError(''); setAmount('') }}>Закрыть расчёт</button>
+  </div>
   {busy && <p role="status">Рассчитываем…</p>}
   {error && <p role="alert">{error}</p>}
   {result && <div role="status">

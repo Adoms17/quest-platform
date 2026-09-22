@@ -10,3 +10,5 @@ main{overflow-wrap:anywhere}header{flex-wrap:wrap}header strong{min-width:0}
 button.tariff-link{background:transparent;border:0;color:#233f9b;text-decoration:underline;padding:4px 0;text-align:left}
 
 .organization-sections{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0}.organization-sections button{background:#e6ebf5;color:#233f75;border-color:transparent}.organization-sections button[aria-pressed=true]{background:#233f9b;color:white}
+
+.refund-actions{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}.refund-actions button{background:#233f9b;color:white;border:1px solid #8290a7;padding:12px 16px;text-align:center}.refund-actions .refund-close{background:white;color:#233f9b}
