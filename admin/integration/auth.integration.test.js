@@ -164,6 +164,7 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       '20260922030000_confirm_platform_refund.sql',
       '20260922040000_authorize_platform_refund_execution.sql',
       '20260922050000_platform_refund_gateway.sql',
+      '20260922070000_validate_platform_refund_amount.sql',
     ]) await sql(readFileSync(new URL(`../../supabase/migrations/${migration}`, import.meta.url), 'utf8'))
     // Только DDL inbox: команды жизненного цикла подписок не входят в этот стенд.
     // Полный файл отдельно проверяет replay всех миграций.
@@ -246,11 +247,11 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     expect(new Date(stored.deadline).toISOString()).toBe(issueCampaign.p_activate_before)
     const paymentOrder = randomUUID()
     await sql(`insert into public.billing_sandbox_orders(id,organization_id,actor_id,command_id,plan_version_id,expected_revision,amount_minor,currency,shop_id,return_url,period_start,period_end,state)
-      values('${paymentOrder}','${org}','${actor}',gen_random_uuid(),(select id from public.billing_plan_versions where plan_key='pro'),0,100,'RUB','123','https://stage.qvesta.ru',now(),now()+interval '1 month','finished');`)
+      values('${paymentOrder}','${org}','${actor}',gen_random_uuid(),(select id from public.billing_plan_versions where plan_key='pro'),0,1000,'RUB','123','https://stage.qvesta.ru',now(),now()+interval '1 month','finished');`)
     const paymentQuery = { p_organization_id: org }
     const payments = successful(await rpc('read_platform_organization_payments', paymentQuery))
     expect(payments.items).toHaveLength(1)
-    expect(payments.items[0]).toMatchObject({ id: paymentOrder, environment: 'sandbox', payment_status: 'not_created', amount_minor: 100, refunded_minor: 0 })
+    expect(payments.items[0]).toMatchObject({ id: paymentOrder, environment: 'sandbox', payment_status: 'not_created', amount_minor: 1000, refunded_minor: 0 })
     expect(payments.items[0]).not.toHaveProperty('shop_id')
     expect(payments.items[0]).not.toHaveProperty('actor_id')
     expect((await rpc('read_platform_organization_payments', paymentQuery, login.access_token)).status).toBe(403)
@@ -259,13 +260,13 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     await sql(`insert into public.billing_sandbox_application_scope(organization_id) values('${org}') on conflict do nothing;
       insert into public.billing_sandbox_payment_results(order_id,shop_id,payment_id,status,paid,requires_review)
       values('${paymentOrder}','123',gen_random_uuid(),'succeeded',true,false);`)
-    expect(successful(await rpc('preview_platform_sandbox_refund', refundQuery))).toMatchObject({ available_minor: 100, requested_minor: 100, access_effect: 'unchanged' })
-    expect(successful(await rpc('preview_platform_sandbox_refund', { ...refundQuery, p_amount_minor: 25 }))).toMatchObject({ requested_minor: 25 })
-    expect((await rpc('preview_platform_sandbox_refund', { ...refundQuery, p_amount_minor: 101 })).data.code).toBe('22023')
+    expect(successful(await rpc('preview_platform_sandbox_refund', refundQuery))).toMatchObject({ available_minor: 1000, requested_minor: 1000, access_effect: 'unchanged' })
+    expect(successful(await rpc('preview_platform_sandbox_refund', { ...refundQuery, p_amount_minor: 250 }))).toMatchObject({ requested_minor: 250 })
+    expect((await rpc('preview_platform_sandbox_refund', { ...refundQuery, p_amount_minor: 1001 })).data.code).toBe('22023')
     expect((await rpc('preview_platform_sandbox_refund', refundQuery, login.access_token)).status).toBe(403)
     expect((await rpc('preview_platform_sandbox_refund', refundQuery, null)).status).toBe(401)
     expect(await sql(`select count(*) from public.billing_sandbox_refunds where order_id='${paymentOrder}';`)).toBe('0')
-    const refundCommand = { ...refundQuery, p_amount_minor: 25, p_reason_code: 'customer_request', p_command_id: randomUUID() }
+    const refundCommand = { ...refundQuery, p_amount_minor: 250, p_reason_code: 'customer_request', p_command_id: randomUUID() }
     const parts = verified.access_token.split('.')
     parts[1] = Buffer.from(JSON.stringify({ ...claims, sub: randomUUID() })).toString('base64url')
     expect((await rpc('search_platform_organizations', {}, parts.join('.'))).status).toBe(401)
@@ -302,7 +303,7 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     await sql(`insert into public.organizations(id,name) values('${otherOrg}','Other synthetic organization');`)
     expect(successful(await rpc('read_platform_organization_payments', paymentQuery, salesMfa.access_token)).items).toHaveLength(1)
     expect((await rpc('read_platform_organization_payments', { p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
-    expect(successful(await rpc('preview_platform_sandbox_refund', refundQuery, salesMfa.access_token))).toMatchObject({ available_minor: 100 })
+    expect(successful(await rpc('preview_platform_sandbox_refund', refundQuery, salesMfa.access_token))).toMatchObject({ available_minor: 1000 })
     expect((await rpc('preview_platform_sandbox_refund', { ...refundQuery, p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
     await sql(`update public.platform_access_assignments set valid_from=now()-interval '2 days',expires_at=now()-interval '1 day' where id='${scopedSales}';`)
     expect((await rpc('preview_platform_sandbox_refund', refundQuery, salesMfa.access_token)).status).toBe(403)
@@ -350,12 +351,12 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     const providerRefund = randomUUID()
     const providerFetch = async (url, options) => {
       if (url.endsWith('/me')) return Response.json({account_id:'123',test:true,status:'enabled'})
-      if (url.endsWith('/payments/'+paymentInfo.payment)) return Response.json({id:paymentInfo.payment,test:true,status:'succeeded',paid:true,recipient:{account_id:'123'},amount:{value:'1.00',currency:'RUB'},metadata:{order_id:paymentOrder,organization_id:org,plan_version_id:paymentInfo.plan,environment:'sandbox'}})
+      if (url.endsWith('/payments/'+paymentInfo.payment)) return Response.json({id:paymentInfo.payment,test:true,status:'succeeded',paid:true,recipient:{account_id:'123'},amount:{value:'10.00',currency:'RUB'},metadata:{order_id:paymentOrder,organization_id:org,plan_version_id:paymentInfo.plan,environment:'sandbox'}})
       if (url.endsWith('/refunds') && options.method==='POST') {
         refundPosts++
         expect(options.headers['Idempotence-Key']).toBe(confirmedRefund.refund_id)
-        expect(JSON.parse(options.body).amount).toEqual({value:'0.25',currency:'RUB'})
-        return Response.json({id:providerRefund,payment_id:paymentInfo.payment,status:'succeeded',amount:{value:'0.25',currency:'RUB'}})
+        expect(JSON.parse(options.body).amount).toEqual({value:'2.50',currency:'RUB'})
+        return Response.json({id:providerRefund,payment_id:paymentInfo.payment,status:'succeeded',amount:{value:'2.50',currency:'RUB'}})
       }
       throw new Error('unexpected provider request')
     }

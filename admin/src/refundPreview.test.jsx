@@ -31,3 +31,14 @@ test('неверный ввод не вызывает сервер; отказ �
  expect(screen.queryByText('private')).toBeNull()
  expect(screen.queryByText(/Сумма расчёта/)).toBeNull()
 })
+
+
+test('объясняет ограничения суммы ЮKassa без выдачи результата расчёта', async () => {
+ const api = { previewRefund: vi.fn().mockRejectedValue({ code: '22023', message: 'refund provider amount limits' }) }
+ render(<RefundPreview api={api} organizationId="org" orderId="order" />)
+ fireEvent.click(screen.getByText('Рассчитать возврат'))
+ fireEvent.change(screen.getByRole('textbox'), { target: { value: '0,50' } })
+ fireEvent.click(screen.getByText('Рассчитать сумму'))
+ expect(await screen.findByRole('alert')).toHaveTextContent('Частичный возврат — от 1 ₽')
+ expect(screen.queryByText(/Сумма расчёта/)).toBeNull()
+})

@@ -28,7 +28,7 @@ export default function RefundPreview({ api, client, organizationId, orderId }) 
    const data = await api.previewRefund(organizationId, orderId, minor)
    if (request === generation.current) setResult(data)
   } catch (failure) {
-   if (request === generation.current) setError(failure?.code === '22023' ? 'Возврат на эту сумму недоступен. Проверьте сумму и состояние платежа.' : adminError(failure))
+   if (request === generation.current) setError(failure?.code === '22023' && failure.message === 'refund provider amount limits' ? 'Частичный возврат — от 1 ₽. После возврата должно остаться не менее 1 ₽ либо 0 ₽. Измените сумму или выберите весь остаток.' : failure?.code === '22023' ? 'Возврат на эту сумму недоступен. Проверьте сумму и состояние платежа.' : adminError(failure))
   } finally { running.current = false; if (request === generation.current) setBusy(false) }
  }
  if (!opened) return <button type="button" onClick={() => setOpened(true)}>Рассчитать возврат</button>

@@ -6,7 +6,7 @@ import {randomUUID} from 'node:crypto'
 import {verifyPlatformRefundConcurrency} from './platform-refund-concurrency.mjs'
 const enabled=process.env.QVESTA_TEST_TARIFF_RELEASE==='1'
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
-test.skipIf(!enabled)('чистая схема staging → 53 миграции тарифного релиза',async()=>{
+test.skipIf(!enabled)('чистая схема staging → 54 миграции тарифного релиза',async()=>{
  const name='qvesta-release-test-'+randomUUID().replaceAll('-','');let created=false
  try{
   docker(['run','-d','--name',name,'--tmpfs','/tmp','--entrypoint','sh','supabase/postgres:17.6.1.165','-c','mkdir /tmp/test-pg; chown postgres:postgres /tmp/test-pg; gosu postgres initdb -D /tmp/test-pg -A trust >/dev/null && exec gosu postgres postgres -D /tmp/test-pg -c shared_preload_libraries=pg_cron -c cron.database_name=postgres']);created=true
@@ -46,7 +46,7 @@ select set_config('test.promo',public.issue_organization_promotion(current_setti
 select public.redeem_organization_promotion(current_setting('test.org')::uuid,current_setting('test.promo')::jsonb->>'code',gen_random_uuid(),0);
 ${removal}`)).toThrow('legacy promotion access must be resolved before removal')
   sql(release.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
-  expect(release).toHaveLength(53)
+  expect(release).toHaveLength(54)
   await verifyPlatformRefundConcurrency(name,sql)
   bridgeContract()
   sql('create extension pgtap with schema extensions; grant usage on schema extensions to authenticated,anon,service_role;')

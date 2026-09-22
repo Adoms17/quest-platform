@@ -67,6 +67,9 @@ reset role;
 insert into public.billing_sandbox_application_scope(organization_id) values(current_setting('test.org')::uuid) on conflict do nothing;
 set local role authenticated;
 select is(public.preview_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid)->>'available_minor','950','остаток удерживает успешные, ожидающие и review возвраты');
+select throws_ok($t$select public.preview_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid,50)$t$,'22023','refund provider amount limits','invalid partial boundary 50');
+select throws_ok($t$select public.preview_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid,99)$t$,'22023','refund provider amount limits','invalid partial boundary 99');
+select throws_ok($t$select public.preview_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid,851)$t$,'22023','refund provider amount limits','invalid partial boundary 851');
 select is(public.preview_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid,250)->>'requested_minor','250','частичный расчёт');
 select is(public.preview_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid)->>'access_effect','unchanged','доступ сохраняется');
 select throws_ok($t$select public.preview_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid,951)$t$,'22023','invalid refund amount','нельзя превысить остаток');
@@ -89,6 +92,7 @@ select throws_ok($t$select public.confirm_platform_sandbox_refund(current_settin
 reset role;
 select set_config('request.jwt.claims',jsonb_build_object('aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from clock_timestamp())))))::text,true);
 set local role authenticated;
+select throws_ok($t$select public.confirm_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid,50,'customer_request',gen_random_uuid())$t$,'22023','refund provider amount limits','confirmation rechecks provider limits');
 select set_config('test.confirmed',public.confirm_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid,100,'customer_request',current_setting('test.refund_command')::uuid)::text,true);
 select is(current_setting('test.confirmed')::jsonb->>'already_confirmed','false','новый резерв');
 select is(public.confirm_platform_sandbox_refund(current_setting('test.org')::uuid,md5('payment-page-1')::uuid,100,'customer_request',current_setting('test.refund_command')::uuid)->>'refund_id',current_setting('test.confirmed')::jsonb->>'refund_id','повтор возвращает тот же резерв');
