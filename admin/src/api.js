@@ -6,6 +6,16 @@ export function createAdminApi(client) {
     return data
   }
   return {
+    refunds: (organizationId, orderId, cursor = null) => rpc('read_platform_order_refunds', { p_organization_id: organizationId, p_order_id: orderId, p_after: cursor }),
+    confirmRefund: (organizationId, orderId, amount, reason, command) => rpc('confirm_platform_sandbox_refund', { p_organization_id: organizationId, p_order_id: orderId, p_amount_minor: amount, p_reason_code: reason, p_command_id: command }),
+    executeRefund: async refundId => {
+      const {data,error}=await client.functions.invoke('admin-sandbox-refund',{body:{refundId}})
+      if(error)throw error
+      if(data?.refundId!==refundId||!['reserved','sending','pending','succeeded','canceled','rejected','review'].includes(data.state))throw Error('invalid_refund_result')
+      return data
+    },
+    previewRefund: (organizationId, orderId, amount = null) => rpc('preview_platform_sandbox_refund', { p_organization_id: organizationId, p_order_id: orderId, p_amount_minor: amount }),
+    payments: (organizationId, cursor = null) => rpc('read_platform_organization_payments', { p_organization_id: organizationId, p_after: cursor }),
     issueCampaign: (organizationId, id, revision, command, deadline = null) => rpc('issue_platform_campaign_discount', { p_organization_id:organizationId, p_campaign_id:id, p_expected_revision:revision, p_command_id:command, p_activate_before:deadline }),
     saveCampaign: parameters => rpc('save_platform_discount_campaign', parameters),
     approveCampaign: (id, revision, command) => rpc('approve_platform_discount_campaign', { p_id:id, p_expected_revision:revision, p_command_id:command }),

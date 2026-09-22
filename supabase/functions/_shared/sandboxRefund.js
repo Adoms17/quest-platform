@@ -7,7 +7,8 @@ export async function runSandboxRefund(refundId, { rpc, provider }) {
   }
   let snapshot = await call('read_sandbox_refund', { p_refund_id: refundId })
   if (snapshot?.refund?.id !== refundId) throw new Error('invalid_refund')
-  if (snapshot.refund.state === 'rejected') return snapshot.refund
+  if (['succeeded', 'canceled', 'rejected'].includes(snapshot.refund.state)) return snapshot.refund
+  if (snapshot.refund.state === 'review') throw new Error('refund_reconciliation_required')
   let result
   if (snapshot.refund.provider_refund_id) result = await provider.readRefund(snapshot)
   else {

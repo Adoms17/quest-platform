@@ -3,6 +3,8 @@ import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { expect, test } from 'vitest'
+import { createClient } from '@supabase/supabase-js'
+import { createPlatformRefundEndpoint } from '../../supabase/functions/_shared/platformRefundEndpoint.js'
 
 const enabled = process.env.RUN_LOCAL_ADMIN_AUTH === '1'
 function command(args, env = {}, input) {
@@ -119,7 +121,7 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       create role authenticated nologin;
       create role service_role nologin;
       create role authenticator login noinherit;
-      grant anon,authenticated to authenticator;
+      grant anon,authenticated,service_role to authenticator;
       grant usage on schema public,auth to anon,authenticated;
       create or replace function auth.jwt() returns jsonb language sql stable as $$
         select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb;
@@ -127,6 +129,10 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       create or replace function auth.uid() returns uuid language sql stable as $$
         select (auth.jwt()->>'sub')::uuid;
       $$;
+      -- Минимальная зависимость rowtype; команды подписок в этом стенде не вызываются.
+      create table public.organization_subscriptions(organization_id uuid primary key);
+      alter table public.organization_subscriptions enable row level security;
+      revoke all on public.organization_subscriptions from public,anon,authenticated,service_role;
       create table public.organizations(id uuid primary key,name text not null,created_at timestamptz default now());
       alter table public.organizations enable row level security;
       revoke all on public.organizations from public,anon,authenticated;
@@ -150,7 +156,21 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       '20260921050000_issue_campaign_discount.sql',
       '20260921060000_global_campaign_catalog.sql',
       '20260921070000_campaign_activation_windows.sql',
+      '20260916024000_reserve_sandbox_payment_orders.sql',
+      '20260916025000_record_sandbox_payment_results.sql',
+      '20260916034000_add_manual_sandbox_refunds.sql',
+      '20260922010000_read_platform_payments.sql',
+      '20260922020000_preview_platform_refund.sql',
+      '20260922030000_confirm_platform_refund.sql',
+      '20260922040000_authorize_platform_refund_execution.sql',
+      '20260922050000_platform_refund_gateway.sql',
     ]) await sql(readFileSync(new URL(`../../supabase/migrations/${migration}`, import.meta.url), 'utf8'))
+    // Только DDL inbox: команды жизненного цикла подписок не входят в этот стенд.
+    // Полный файл отдельно проверяет replay всех миграций.
+    const inboxDdl = readFileSync(new URL('../../supabase/migrations/20260916031000_add_sandbox_payment_inbox.sql', import.meta.url), 'utf8').split('-- Разделить доверенную запись')[0]
+    await sql(inboxDdl + '\ncommit;')
+    const inboxSource = readFileSync(new URL('../../supabase/migrations/20260916031000_add_sandbox_payment_inbox.sql', import.meta.url), 'utf8')
+    await sql(inboxSource.slice(inboxSource.indexOf('create function public.read_sandbox_reconciliation_order'), inboxSource.indexOf('create function public.enqueue_sandbox_payment_event')))
     const rest = `${prefix}-rest`
     const restEnvironment = {
       PGRST_DB_URI: 'postgres://authenticator@test-db:5432/postgres',
@@ -224,6 +244,28 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     expect(stored.count).toBe(1)
     expect(stored.hashed).toBe(true)
     expect(new Date(stored.deadline).toISOString()).toBe(issueCampaign.p_activate_before)
+    const paymentOrder = randomUUID()
+    await sql(`insert into public.billing_sandbox_orders(id,organization_id,actor_id,command_id,plan_version_id,expected_revision,amount_minor,currency,shop_id,return_url,period_start,period_end,state)
+      values('${paymentOrder}','${org}','${actor}',gen_random_uuid(),(select id from public.billing_plan_versions where plan_key='pro'),0,100,'RUB','123','https://stage.qvesta.ru',now(),now()+interval '1 month','finished');`)
+    const paymentQuery = { p_organization_id: org }
+    const payments = successful(await rpc('read_platform_organization_payments', paymentQuery))
+    expect(payments.items).toHaveLength(1)
+    expect(payments.items[0]).toMatchObject({ id: paymentOrder, environment: 'sandbox', payment_status: 'not_created', amount_minor: 100, refunded_minor: 0 })
+    expect(payments.items[0]).not.toHaveProperty('shop_id')
+    expect(payments.items[0]).not.toHaveProperty('actor_id')
+    expect((await rpc('read_platform_organization_payments', paymentQuery, login.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_organization_payments', paymentQuery, null)).status).toBe(401)
+    const refundQuery = { p_organization_id: org, p_order_id: paymentOrder, p_amount_minor: null }
+    await sql(`insert into public.billing_sandbox_application_scope(organization_id) values('${org}') on conflict do nothing;
+      insert into public.billing_sandbox_payment_results(order_id,shop_id,payment_id,status,paid,requires_review)
+      values('${paymentOrder}','123',gen_random_uuid(),'succeeded',true,false);`)
+    expect(successful(await rpc('preview_platform_sandbox_refund', refundQuery))).toMatchObject({ available_minor: 100, requested_minor: 100, access_effect: 'unchanged' })
+    expect(successful(await rpc('preview_platform_sandbox_refund', { ...refundQuery, p_amount_minor: 25 }))).toMatchObject({ requested_minor: 25 })
+    expect((await rpc('preview_platform_sandbox_refund', { ...refundQuery, p_amount_minor: 101 })).data.code).toBe('22023')
+    expect((await rpc('preview_platform_sandbox_refund', refundQuery, login.access_token)).status).toBe(403)
+    expect((await rpc('preview_platform_sandbox_refund', refundQuery, null)).status).toBe(401)
+    expect(await sql(`select count(*) from public.billing_sandbox_refunds where order_id='${paymentOrder}';`)).toBe('0')
+    const refundCommand = { ...refundQuery, p_amount_minor: 25, p_reason_code: 'customer_request', p_command_id: randomUUID() }
     const parts = verified.access_token.split('.')
     parts[1] = Buffer.from(JSON.stringify({ ...claims, sub: randomUUID() })).toString('base64url')
     expect((await rpc('search_platform_organizations', {}, parts.join('.'))).status).toBe(401)
@@ -258,6 +300,14 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     const scopedSales = successful(await grantSales(org))
     const otherOrg = randomUUID()
     await sql(`insert into public.organizations(id,name) values('${otherOrg}','Other synthetic organization');`)
+    expect(successful(await rpc('read_platform_organization_payments', paymentQuery, salesMfa.access_token)).items).toHaveLength(1)
+    expect((await rpc('read_platform_organization_payments', { p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
+    expect(successful(await rpc('preview_platform_sandbox_refund', refundQuery, salesMfa.access_token))).toMatchObject({ available_minor: 100 })
+    expect((await rpc('preview_platform_sandbox_refund', { ...refundQuery, p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
+    await sql(`update public.platform_access_assignments set valid_from=now()-interval '2 days',expires_at=now()-interval '1 day' where id='${scopedSales}';`)
+    expect((await rpc('preview_platform_sandbox_refund', refundQuery, salesMfa.access_token)).status).toBe(403)
+    await sql(`update public.platform_access_assignments set expires_at=null where id='${scopedSales}';`)
+    expect((await rpc('confirm_platform_sandbox_refund', refundCommand, salesMfa.access_token)).status).toBe(403)
     const scopedQuery = { p_organization_id: org, p_id: salesDraft.p_id }
     expect(successful(await rpc('read_platform_discount_campaigns', scopedQuery, salesMfa.access_token)).items).toMatchObject([{ id: salesDraft.p_id }])
     expect((await rpc('read_platform_discount_campaigns', { ...scopedQuery, p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
@@ -271,14 +321,56 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     expect(typeof salesCode.code === 'string' && /^[A-F0-9]{32}$/.test(salesCode.code)).toBe(true)
     expect(successful(await rpc('issue_platform_campaign_discount', salesIssue, salesMfa.access_token))).toEqual({ discount_id: salesCode.discount_id, already_issued: true, code: null })
     successful(await rpc('revoke_platform_assignment', { p_command_id: randomUUID(), p_assignment_id: scopedSales, p_reason_code: 'role_change' }))
+    expect((await rpc('preview_platform_sandbox_refund', refundQuery, salesMfa.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_organization_payments', paymentQuery, salesMfa.access_token)).status).toBe(403)
     expect((await rpc('read_platform_discount_campaigns', scopedQuery, salesMfa.access_token)).status).toBe(403)
     expect((await rpc('issue_platform_campaign_discount', salesIssue, salesMfa.access_token)).status).toBe(403)
     expect(await sql(`select count(*) from public.billing_discount_codes where campaign_id='${salesDraft.p_id}';`)).toBe('1')
+    expect((await rpc('confirm_platform_sandbox_refund', refundCommand, login.access_token)).status).toBe(403)
+    const confirmedRefund = successful(await rpc('confirm_platform_sandbox_refund', refundCommand))
+    expect(confirmedRefund).toMatchObject({ already_confirmed: false, access_effect: 'unchanged' })
+    expect(successful(await rpc('confirm_platform_sandbox_refund', refundCommand))).toMatchObject({ refund_id: confirmedRefund.refund_id, already_confirmed: true })
+    expect((await rpc('confirm_platform_sandbox_refund', { ...refundCommand, p_amount_minor: 26 })).data.code).toBe('22023')
+    expect(await sql(`select count(*) from public.billing_sandbox_refunds where order_id='${paymentOrder}';`)).toBe('1')
+    const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url')
+    const unsigned = encode({alg:'HS256',typ:'JWT'})+'.'+encode({role:'service_role',exp:Math.floor(Date.now()/1000)+3600})
+    const serviceToken = unsigned+'.'+createHmac('sha256',environment.GOTRUE_JWT_SECRET).update(unsigned).digest('base64url')
+    const sdkFetch = (url, options) => {
+      const target = String(url)
+      if (target.startsWith('http://synthetic.test/auth/v1/')) return fetch(target.replace('http://synthetic.test/auth/v1',base),options)
+      if (target.startsWith('http://synthetic.test/rest/v1/')) return fetch(target.replace('http://synthetic.test/rest/v1',restBase),options)
+      throw new Error('unexpected SDK destination')
+    }
+    const sdkOptions = {auth:{persistSession:false,autoRefreshToken:false},global:{fetch:sdkFetch}}
+    const sdkAuth = createClient('http://synthetic.test','synthetic-anon',sdkOptions).auth
+    const sdkService = createClient('http://synthetic.test',serviceToken,sdkOptions)
+    await sql(`update public.billing_sandbox_orders set first_sent_at=now() where id='${paymentOrder}';`)
+    const paymentInfo = JSON.parse(await sql(`select jsonb_build_object('payment',r.payment_id,'plan',o.plan_version_id) from public.billing_sandbox_orders o join public.billing_sandbox_payment_results r on r.order_id=o.id where o.id='${paymentOrder}';`))
+    let refundPosts = 0
+    const providerRefund = randomUUID()
+    const providerFetch = async (url, options) => {
+      if (url.endsWith('/me')) return Response.json({account_id:'123',test:true,status:'enabled'})
+      if (url.endsWith('/payments/'+paymentInfo.payment)) return Response.json({id:paymentInfo.payment,test:true,status:'succeeded',paid:true,recipient:{account_id:'123'},amount:{value:'1.00',currency:'RUB'},metadata:{order_id:paymentOrder,organization_id:org,plan_version_id:paymentInfo.plan,environment:'sandbox'}})
+      if (url.endsWith('/refunds') && options.method==='POST') {
+        refundPosts++
+        expect(options.headers['Idempotence-Key']).toBe(confirmedRefund.refund_id)
+        expect(JSON.parse(options.body).amount).toEqual({value:'0.25',currency:'RUB'})
+        return Response.json({id:providerRefund,payment_id:paymentInfo.payment,status:'succeeded',amount:{value:'0.25',currency:'RUB'}})
+      }
+      throw new Error('unexpected provider request')
+    }
+    const endpoint=createPlatformRefundEndpoint({enabled:true,allowedOrigins:[],auth:sdkAuth,service:sdkService,providerConfig:{enabled:true,shopId:'123',secretKey:'synthetic'},transport:{fetchImpl:providerFetch}})
+    const refundRequest=()=>new Request('http://synthetic.test/refund',{method:'POST',headers:{authorization:'Bearer '+verified.access_token},body:JSON.stringify({refundId:confirmedRefund.refund_id})})
+    const sent=await endpoint(refundRequest())
+    expect({status:sent.status,body:await sent.json()}).toEqual({status:200,body:{refundId:confirmedRefund.refund_id,state:'succeeded',environment:'sandbox',accessEffect:'unchanged'}})
+    expect((await endpoint(refundRequest())).status).toBe(200)
+    expect(refundPosts).toBe(1)
     const second = successful(await request('/signup', { email: 'second@example.test', password: randomBytes(24).toString('hex') }))
     // Настоящий AMR totp допускает чувствительную команду с окном свежести.
     successful(await rpc('grant_platform_assignment', { p_command_id: randomUUID(), p_user_id: second.user.id, p_role: 'owner', p_reason_code: 'role_change' }))
     successful(await rpc('revoke_platform_assignment', { p_command_id: randomUUID(), p_assignment_id: assignment, p_reason_code: 'role_change' }))
     { const denied = await rpc('search_platform_organizations', {}); expect({ status: denied.status, code: denied.data.code }).toEqual({ status: 403, code: '42501' }) }
+    expect((await rpc('confirm_platform_sandbox_refund', refundCommand)).status).toBe(403)
     expect((await rpc('read_platform_discount_campaigns', campaignQuery)).status).toBe(403)
     expect((await rpc('issue_platform_campaign_discount', issueCampaign)).status).toBe(403)
     expect((await rpc('save_platform_discount_campaign', saveCampaign)).status).toBe(403)

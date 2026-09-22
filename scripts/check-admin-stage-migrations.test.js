@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, it } from 'vitest'
-import { validateAdminMigrationHistory, parseMigrationHistory, tariffReleaseMigrations } from './check-admin-stage-migrations.mjs'
+import { validateAdminMigrationHistory, parseMigrationHistory, tariffReleaseMigrations, paymentReleaseMigrations } from './check-admin-stage-migrations.mjs'
 const rows = () => Array.from({ length: 8 }, (_, i) => ({ local: `20260918${String(i + 1).padStart(2, '0')}0000`, remote: '' }))
 it('разрешает только восемь admin-версий', () => expect(validateAdminMigrationHistory({ migrations: rows() })).toHaveLength(8))
 it('разрешает продолжение после частичного применения', () => {
@@ -47,4 +47,18 @@ it('после прошлого выпуска ожидает только ше�
  const history=tariffReleaseMigrations.map(local=>({local,remote:local>='20260921020000'?'':local}))
  expect(validateAdminMigrationHistory({migrations:[...base,...history]},'tariff-release').sort()).toEqual(['20260921020000','20260921030000','20260921040000','20260921050000','20260921060000','20260921070000'])
  expect(()=>validateAdminMigrationHistory({migrations:[...base,...history,{local:'20260921080000',remote:''}]},'tariff-release')).toThrow()
+})
+
+it('платёжный релиз разрешает только шесть новых миграций после применённого основания', () => {
+ const base = [...rows(), {local:'20260919010000'}, ...tariffReleaseMigrations.map(local=>({local}))].map(row=>({...row,remote:row.local}))
+ const pending = paymentReleaseMigrations.map(local=>({local,remote:''}))
+ const check = migrations => validateAdminMigrationHistory({migrations}, 'payments-release')
+ expect(check([...base,...pending])).toEqual(paymentReleaseMigrations)
+ expect(check([...base,...pending.map(row=>({...row,remote:row.local}))])).toEqual([])
+ expect(check([...base,{...pending[0],remote:pending[0].local},...pending.slice(1)])).toHaveLength(5)
+ expect(()=>check([...base,...pending.slice(1)])).toThrow()
+ expect(()=>check([...base.map((row,i)=>i===base.length-1?{...row,remote:''}:row),...pending])).toThrow()
+ expect(()=>check([...base,...pending,{local:'20260922070000',remote:''}])).toThrow()
+ expect(()=>check([...base,...pending,{local:'',remote:'20260922070000'}])).toThrow()
+ expect(()=>check([...base,...pending,pending[0]])).toThrow()
 })

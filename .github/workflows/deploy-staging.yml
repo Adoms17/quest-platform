@@ -18,6 +18,8 @@ on:
           - admin-catalog-deploy
           - tariff-release-dry-run
           - tariff-release-deploy
+          - payments-release-dry-run
+          - payments-release-deploy
       deploy_sandbox:
         description: Publish test billing Edge Functions (staging only)
         type: boolean
@@ -132,7 +134,7 @@ jobs:
         run: node scripts/run-stage-billing-worker.mjs
 
   admin-migrate:
-    if: inputs.operation == 'tariff-release-dry-run' || inputs.operation == 'tariff-release-deploy' || inputs.operation == 'admin-dry-run' || inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-dry-run' || inputs.operation == 'admin-catalog-deploy'
+    if: inputs.operation == 'payments-release-dry-run' || inputs.operation == 'payments-release-deploy' || inputs.operation == 'tariff-release-dry-run' || inputs.operation == 'tariff-release-deploy' || inputs.operation == 'admin-dry-run' || inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-dry-run' || inputs.operation == 'admin-catalog-deploy'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: staging
@@ -157,7 +159,9 @@ jobs:
         env:
           ADMIN_OPERATION: ${{ inputs.operation }}
         run: |
-          if [[ "$ADMIN_OPERATION" == tariff-release-* ]]; then
+          if [[ "$ADMIN_OPERATION" == payments-release-* ]]; then
+            node scripts/check-admin-stage-migrations.mjs --payments-release
+          elif [[ "$ADMIN_OPERATION" == tariff-release-* ]]; then
             node scripts/check-admin-stage-migrations.mjs --tariff-release
           elif [[ "$ADMIN_OPERATION" == admin-catalog-* ]]; then
             node scripts/check-admin-stage-migrations.mjs --catalog
@@ -167,7 +171,7 @@ jobs:
       - name: Preview admin migrations
         run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
       - name: Apply only admin migrations
-        if: inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-deploy' || inputs.operation == 'tariff-release-deploy'
+        if: inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-deploy' || inputs.operation == 'tariff-release-deploy' || inputs.operation == 'payments-release-deploy'
         run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
       - name: Verify administrative RLS and RPC
         if: inputs.operation == 'admin-deploy'
@@ -184,3 +188,7 @@ jobs:
       - name: Verify campaign catalog and personal codes with scoped fixtures
         if: inputs.operation == 'tariff-release-deploy'
         run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_discount*.test.sql
+
+      - name: Verify payment catalog and refund permissions
+        if: inputs.operation == 'payments-release-deploy'
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_payment_catalog.test.sql
