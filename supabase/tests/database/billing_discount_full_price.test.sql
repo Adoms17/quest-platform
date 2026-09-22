@@ -17,14 +17,14 @@ select set_config('test.order',current_setting('test.accepted')::jsonb->>'order_
 select is(public.recover_sandbox_discount_checkout(current_setting('test.org')::uuid,md5('public-command')::uuid)->>'order_id',current_setting('test.order'),'публичное подтверждение восстанавливается');
 select is(current_setting('test.accepted')::jsonb->>'amount_minor','12345','без кода полная цена');
 select is((select discount_id from public.billing_discount_reservations where order_id=current_setting('test.order')::uuid),null::uuid,'без привязки к скидке');
-select is((select count(*) from public.billing_discount_checks),0::bigint,'пустой код не расходует проверки промокодов');
+select is((select count(*) from public.billing_discount_checks where actor_id=md5('discount-checkout-owner')::uuid),0::bigint,'пустой код не расходует проверки промокодов');
 select is(public.accept_sandbox_discount_checkout(current_setting('test.org')::uuid,md5('discounted-offer')::uuid,md5('public-command')::uuid,'',current_setting('test.quote')::jsonb)->>'order_id',current_setting('test.order'),'повтор возвращает тот же заказ');
 select throws_ok($t$select public.accept_sandbox_discount_checkout(current_setting('test.org')::uuid,md5('discounted-offer')::uuid,md5('public-command')::uuid,'TEST-CODE',current_setting('test.quote')::jsonb)$t$,'22023','discount checkout conflict','код нельзя добавить к уже принятой команде');
 select is(public.accept_sandbox_discount_checkout(current_setting('test.org')::uuid,md5('discounted-offer')::uuid,md5('second-command')::uuid,'',current_setting('test.quote')::jsonb)->>'reason','checkout_pending','второй ожидающий заказ запрещён');
 select is(public.cancel_sandbox_discount_checkout(current_setting('test.org')::uuid,current_setting('test.order')::uuid),'cancelled','отмена до исполнения');
 select is(public.cancel_sandbox_discount_checkout(current_setting('test.org')::uuid,current_setting('test.order')::uuid),'cancelled','повтор отмены безопасен');
 select is(public.accept_sandbox_discount_checkout(current_setting('test.org')::uuid,md5('discounted-offer')::uuid,md5('tampered-command')::uuid,'',current_setting('test.quote')::jsonb||jsonb_build_object('amount_minor',1))->>'reason','quote_changed','клиент не снижает цену');
-select is((select count(*) from public.billing_discount_checkouts),1::bigint,'изменённый расчёт не создаёт заказ');
+select is((select count(*) from public.billing_discount_checkouts where organization_id=current_setting('test.org')::uuid),1::bigint,'изменённый расчёт не создаёт заказ');
 select set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
 select throws_ok($t$select public.preview_sandbox_discount_offer(current_setting('test.org')::uuid,md5('discounted-offer')::uuid,'')$t$,'42501','billing management denied','чужая организация недоступна');
 set local role authenticated;
