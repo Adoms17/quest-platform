@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { adminError } from './api'
 
-export default function ConfirmRefund({ client, api, organizationId, orderId, amount, onNewPreview, recovered = null }) {
+export default function ConfirmRefund({ client, api, organizationId, orderId, amount, onNewPreview, onOperationStarted, recovered = null }) {
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[reason,setReason]=useState('customer_request'),[operation,setOperation]=useState(null),[outcome,setOutcome]=useState(null)
  const storageKey=useRef(null),factor=useRef(null),running=useRef(false),alive=useRef(false)
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
@@ -28,6 +28,7 @@ export default function ConfirmRefund({ client, api, organizationId, orderId, am
   event.preventDefault();if(running.current)return
   const code=new FormData(event.currentTarget).get('code');event.currentTarget.reset()
   running.current=true;setBusy(true);setError('')
+  onOperationStarted?.()
   try{
    const verified=await client.auth.mfa.challengeAndVerify({factorId:factor.current,code})
    if(verified.error){setError('Код не принят. Введите новый код MFA.');return}

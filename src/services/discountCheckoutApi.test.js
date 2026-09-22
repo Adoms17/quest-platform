@@ -16,7 +16,7 @@ test.each([{ organization_id: offer.offer_id }, { plan_version_id: org }, { amou
  rpc.mockResolvedValue({ data: { ...quote, ...patch } })
  await expect(previewDiscountCheckout(org, offer, 'CODE')).rejects.toThrow('Не удалось проверить')
 })
-test.each(['invalid_code', 'rate_limited', 'offer_unavailable', 'discount_exhausted'])('возвращает безопасную причину %s', async reason => {
+test.each(['invalid_code', 'rate_limited', 'offer_unavailable','trial_period_already_paid', 'discount_exhausted'])('возвращает безопасную причину %s', async reason => {
  rpc.mockResolvedValue({ data: { ok: false, reason } })
  expect(await previewDiscountCheckout(org, offer, 'CODE')).toEqual({ ok: false, reason })
 })

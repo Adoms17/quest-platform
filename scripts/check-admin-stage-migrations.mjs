@@ -8,7 +8,7 @@ export const tariffReleaseMigrations = [
  ...Array.from({length:6},(_,i)=>'20260919'+String(i+2).padStart(2,'0')+'0000'),
  ...Array.from({length:34},(_,i)=>'20260920'+String(i+1).padStart(2,'0')+'0000'),
 ]
-export const paymentReleaseMigrations = Array.from({ length: 7 }, (_, i) => `20260922${String(i + 1).padStart(2, '0')}0000`)
+export const paymentReleaseMigrations = Array.from({ length: 8 }, (_, i) => `20260922${String(i + 1).padStart(2, '0')}0000`)
 export function validateAdminMigrationHistory(data, catalog = false) {
   const payments = catalog === 'payments-release'
   const release = catalog === 'tariff-release' || payments

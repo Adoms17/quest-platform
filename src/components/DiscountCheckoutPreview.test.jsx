@@ -62,3 +62,10 @@ test('покупка без кода показывает полную стои�
  fireEvent.click(screen.getByRole('button', { name: 'Подтвердить расчёт и создать заказ' }))
  expect(confirm).toHaveBeenCalledWith('', expect.objectContaining({ amount_minor: 10000 }))
 })
+test('оплаченный период объясняется без предложения создать заказ', async () => {
+ preview.mockResolvedValue({ok:false,reason:'trial_period_already_paid'})
+ render(<DiscountCheckoutPreview organizationId="org" offer={offer} />)
+ enter()
+ expect(await screen.findByRole('alert')).toHaveTextContent('Период после пробного доступа уже оплачен')
+ expect(screen.queryByText('Подтвердить расчёт и создать заказ')).toBeNull()
+})
