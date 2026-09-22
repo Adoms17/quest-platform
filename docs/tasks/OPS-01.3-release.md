@@ -96,3 +96,30 @@ Workflow для отдельного выпуска ещё не изменён. 
 - `supabase/migrations/20260922050000_platform_refund_gateway.sql`
 - `supabase/migrations/20260922060000_read_platform_refund_history.sql`
 - `supabase/tests/database/platform_payment_catalog.test.sql`
+
+## Stage: миграции применены — 22.09.2026
+
+По разрешению Алексея выполнен payments-release-deploy на staging d6c891c9f84c7c58b11156d7029b187cb2f7591a. Run: https://github.com/Adoms17/quest-platform/actions/runs/35715435421 — success.
+
+Применены ровно шесть миграций 20260922010000–20260922060000. platform_payment_catalog.test.sql: 70 проверок, PASS. Функция admin-sandbox-refund этим workflow не публиковалась, флаги возвратов не включались, ручная активация frontend не выполнялась. Production не изменён.
+
+Следующий шаг: публикация выключенной функции, проверка HTTP/JWT на stage, затем отдельная согласованная активация admin и sandbox-приёмка. Этот статус пока сохранён локально, без нового коммита.
+## Stage: выключенная Edge Function опубликована — 22.09.2026
+
+После продолжения по плану ADMIN_SANDBOX_REFUNDS_ENABLED установлен в false; глобальный YOOKASSA_SANDBOX_ENABLED не изменялся. Опубликована только admin-sandbox-refund на jeugfyaqzfgdvfhdxfht, версия 1, verify_jwt=true, id b7ba739f-4991-4bc3-bea6-f6d7fee08513. Исходники соответствуют коммиту cccd63b / squash d6c891c; незакоммиченные изменения относятся только к этому журналу.
+
+HTTP: OPTIONS от https://stage-admin.qvesta.ru → 204 с точным allow-origin; POST без Authorization → 401 UNAUTHORIZED_NO_AUTH_HEADER; POST с некорректным JWT → 401 UNAUTHORIZED_INVALID_JWT_FORMAT. Это проверка gateway/preflight, а не полного сценария с действующей MFA-сессией. Ответ sandbox_disabled через авторизованный запрос пока не проверен. Возвраты провайдеру не отправлялись, frontend вручную не активировался, production не изменён.
+
+Следующий шаг: определить загруженную Cloudflare-версию admin для d6c891c и согласовать её активацию с выключенной формой исполнения; затем проверить действующую owner/MFA-сессию и отдельно согласованный sandbox-возврат. Статус записан локально, без нового commit/push.
+## Stage: admin frontend активирован — 22.09.2026
+
+По отдельному разрешению Алексея активирована на 100% версия qvesta-admin-stage f1afc8fa-48f9-4cbb-800b-32e3764cf308. Связь с commit d6c891c подтверждена GitHub check Workers Builds, build c12f281c-eedc-4b12-bfba-c1be4ac89b43. Предыдущая версия для отката: 08190ea9-dec9-4956-a45a-1a2fc6cd5d01.
+
+HTTP https://stage-admin.qvesta.ru/ и основной JS asset: 200. В asset присутствуют разделы карточки организации. CSP разрешает connect-src только stage Supabase; X-Robots-Tag: noindex, nofollow, noarchive. Это проверка доставки, не авторизованная пользовательская приёмка. Серверный флаг ADMIN_SANDBOX_REFUNDS_ENABLED оставлен false, production не изменён.
+
+Далее: владелец входит с MFA, открывает организацию из поиска, проверяет переключение разделов, загрузку платежей и предварительный расчёт. Отправка возвратов до отдельной sandbox-приёмки не включается. Запись локальная, без нового commit/push.
+## Пользовательская проверка preview и оформление — 22.09.2026
+
+Скриншот Алексея со stage подтверждает загрузку оплаченного платежа на 1 ₽ и предварительный расчёт возврата 0,50 ₽ при доступном остатке 1 ₽. Это подтверждение preview, не исполнения возврата.
+
+Локально исправлено слияние кнопок «Рассчитать сумму» и «Закрыть расчёт»: RefundPreview.jsx группирует действия, style.css задаёт flex-wrap/gap и основное/вторичное оформление поверх общего li button. Денежная логика не менялась. Проверки: 2 unit-теста preview, 4 браузерных сценария возвратов desktop/mobile, lint, сборки приложения/admin, diff check успешны. Lint сохраняет прежние предупреждения. Исправление пока не закоммичено и не опубликовано; серверные возвраты остаются выключенными.
