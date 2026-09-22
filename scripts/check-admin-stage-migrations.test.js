@@ -49,16 +49,16 @@ it('после прошлого выпуска ожидает только ше�
  expect(()=>validateAdminMigrationHistory({migrations:[...base,...history,{local:'20260921080000',remote:''}]},'tariff-release')).toThrow()
 })
 
-it('платёжный релиз разрешает только восемь новых миграций после применённого основания', () => {
+it('платёжный релиз разрешает только девять новых миграций после применённого основания', () => {
  const base = [...rows(), {local:'20260919010000'}, ...tariffReleaseMigrations.map(local=>({local}))].map(row=>({...row,remote:row.local}))
  const pending = paymentReleaseMigrations.map(local=>({local,remote:''}))
  const check = migrations => validateAdminMigrationHistory({migrations}, 'payments-release')
  expect(check([...base,...pending])).toEqual(paymentReleaseMigrations)
  expect(check([...base,...pending.map(row=>({...row,remote:row.local}))])).toEqual([])
- expect(check([...base,{...pending[0],remote:pending[0].local},...pending.slice(1)])).toHaveLength(7)
+ expect(check([...base,{...pending[0],remote:pending[0].local},...pending.slice(1)])).toHaveLength(8)
  expect(()=>check([...base,...pending.slice(1)])).toThrow()
  expect(()=>check([...base.map((row,i)=>i===base.length-1?{...row,remote:''}:row),...pending])).toThrow()
- expect(()=>check([...base,...pending,{local:'20260922090000',remote:''}])).toThrow()
- expect(()=>check([...base,...pending,{local:'',remote:'20260922090000'}])).toThrow()
+ expect(()=>check([...base,...pending,{local:'20260922100000',remote:''}])).toThrow()
+ expect(()=>check([...base,...pending,{local:'',remote:'20260922100000'}])).toThrow()
  expect(()=>check([...base,...pending,pending[0]])).toThrow()
 })

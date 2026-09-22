@@ -45,3 +45,26 @@ test('reconciliation finds missing ID using GET path and persists retry failure'
  expect(result).toMatchObject({checked:1,failed:1})
  expect(rpc).toHaveBeenLastCalledWith('finish_sandbox_reconciliation',{p_order_id:id,p_lease_token:paymentId,p_error:'payment_not_found'})
 })
+
+
+test.each(['storage','provider','verification'])('batch classifies %s failures without leaking payloads', async phase => {
+ const log=vi.spyOn(console,'error').mockImplementation(()=>{})
+ try {
+  const rpc=vi.fn(async name=>{
+   if(name==='claim_sandbox_reconciliation')return {data:[{orderId:id,leaseToken:paymentId}]}
+   if(name==='read_sandbox_reconciliation_order')return {data:{id}}
+   if(name==='enqueue_sandbox_payment_event')return {data:id}
+   if(name==='apply_sandbox_payment_event')return {error:{code:'23505',message:'private-record'}}
+   return {data:null}
+  })
+  const findPayment=vi.fn(async()=>{
+   if(phase==='provider')throw Error('private-provider-response')
+   if(phase==='verification')throw Error('payment_order_mismatch')
+   return {paymentId,status:'succeeded',paid:true,test:true}
+  })
+  expect(await createSandboxReconciler({rpc,provider:{findPayment},shopId:'123'}).batch()).toMatchObject({checked:1,failed:1,applied:0})
+  expect(rpc).toHaveBeenLastCalledWith('finish_sandbox_reconciliation',{p_order_id:id,p_lease_token:paymentId,p_error:phase==='provider'?'provider_unavailable':'verification_failed'})
+  expect(log).toHaveBeenCalledWith('sandbox_reconciliation_failed',phase==='storage'?'storage_failure':phase==='verification'?'payment_verification_failed':'provider_unavailable')
+  expect(JSON.stringify(log.mock.calls)).not.toContain('private-')
+ } finally {log.mockRestore()}
+})

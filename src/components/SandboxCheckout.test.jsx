@@ -92,3 +92,12 @@ test('повтор загрузки показывает ожидание и в�
  await screen.findByRole('button', { name: 'Подтвердить тестовую оплату' })
  expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
 })
+
+test('полностью возвращённый закрытый заказ не обещает новый доступ', async () => {
+ mocks.loadSandboxOffer.mockResolvedValue({order_id:'order',plan_name:'Pro',amount_minor:200,period_start:'2026-10-05',period_end:'2026-11-05',state:'finished',payment_status:'succeeded',fulfillment_state:'not_paid',refunded_minor:200,refund_pending_minor:0,payment_requires_review:false})
+ render(<SandboxCheckout actorId="a" organizationId="o" />)
+ await screen.findByText('Заказ закрыт после полного возврата. Новый период по этому заказу не предоставлен; действующая подписка сохранена.')
+ expect(screen.queryByText('Оплаченный тестовый период применён.')).toBeNull()
+ expect(screen.getByRole('button',{name:'Закрыть завершённый заказ'})).toBeTruthy()
+ expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
+})
