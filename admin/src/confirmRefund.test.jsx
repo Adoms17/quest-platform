@@ -41,7 +41,7 @@ test('восстановленный серверный резерв не тре
  expect(api.executeRefund).toHaveBeenCalledWith('existing')
 })
 
-test.each(['invalid refund amount','refund command conflict','network'])('отказ резервирования: %s',async message=>{
+test.each(['invalid refund amount','refund provider amount limits','refund command conflict','network'])('отказ резервирования: %s',async message=>{
  sessionStorage.clear()
  const client={auth:{getUser:vi.fn().mockResolvedValue({data:{user:{id:'owner'}}}),mfa:{listFactors:vi.fn().mockResolvedValue({data:{totp:[{id:'factor',status:'verified'}]}}),challengeAndVerify:vi.fn().mockResolvedValue({})}}}
  const api={confirmRefund:vi.fn().mockRejectedValue({code:message==='network'?undefined:'22023',message}),executeRefund:vi.fn()}
@@ -53,7 +53,7 @@ test.each(['invalid refund amount','refund command conflict','network'])('отк
  fireEvent.submit(screen.getByLabelText('Новый код MFA').closest('form'))
  await screen.findByRole('alert')
  expect(api.executeRefund).not.toHaveBeenCalled()
- if(message==='invalid refund amount'){
+ if(['invalid refund amount','refund provider amount limits'].includes(message)){
   fireEvent.click(screen.getByText('Перейти к новому расчёту'))
   expect(onNewPreview).toHaveBeenCalledTimes(1)
   expect(sessionStorage.length).toBe(0)

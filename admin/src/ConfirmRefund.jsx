@@ -38,7 +38,7 @@ export default function ConfirmRefund({ client, api, organizationId, orderId, am
     let reserved
     try{reserved=await api.confirmRefund(organizationId,orderId,current.amount,current.reason,current.command)}
     catch(failure){
-     if(failure?.code==='22023'&&['invalid refund amount','sandbox payment not refundable'].includes(failure.message)){
+     if(failure?.code==='22023'&&['invalid refund amount','sandbox payment not refundable','refund provider amount limits'].includes(failure.message)){
       if(alive.current){setOutcome('confirmation_rejected');setError('Резерв не создан: сумма или состояние платежа изменились. Выполните новый расчёт.')}
       return
      }

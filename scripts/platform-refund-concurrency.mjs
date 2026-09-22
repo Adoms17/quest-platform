@@ -19,13 +19,13 @@ export async function verifyPlatformRefundConcurrency(container, sql) {
    insert into public.platform_access_assignments(user_id,role_key,scope_kind) values('${actor}','owner','platform');
    insert into public.billing_sandbox_application_scope select ${org};
    insert into public.billing_sandbox_orders(id,organization_id,actor_id,command_id,plan_version_id,expected_revision,amount_minor,currency,shop_id,return_url,period_start,period_end,state)
-   select '${order}',${org},'${actor}',gen_random_uuid(),id,0,100,'RUB','123','https://stage.qvesta.ru',now(),now()+interval '1 day','finished' from public.billing_plan_versions where plan_key='pro' and version=1;
+   select '${order}',${org},'${actor}',gen_random_uuid(),id,0,1000,'RUB','123','https://stage.qvesta.ru',now(),now()+interval '1 day','finished' from public.billing_plan_versions where plan_key='pro' and version=1;
    insert into public.billing_sandbox_payment_results(order_id,shop_id,payment_id,status,paid) values('${order}','123','${payment}','succeeded',true);`)
   const organization=sql(`select id from public.organizations where personal_owner_id='${actor}';`).trim()
   const auth=`select set_config('request.jwt.claim.sub','${actor}',true);
    select set_config('request.jwt.claims',jsonb_build_object('sub','${actor}','aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from clock_timestamp())))))::text,true);
    set local role authenticated;`
-  const confirm=command=>`select public.confirm_platform_sandbox_refund('${organization}','${order}',60,'customer_request','${command}');`
+  const confirm=command=>`select public.confirm_platform_sandbox_refund('${organization}','${order}',600,'customer_request','${command}');`
   let first,second
   try {
    first=asyncSql(`set application_name='first_${actor}';begin;${auth}${confirm(one)}select pg_sleep(3);${mode==='rollback'?'rollback':'commit'};`)
@@ -46,7 +46,7 @@ export async function verifyPlatformRefundConcurrency(container, sql) {
    expect(a.code,a.error).toBe(0)
    if(mode==='commit'){expect(b.code).not.toBe(0);expect(b.error).toContain('invalid refund amount')}
    else expect(b.code,b.error).toBe(0)
-   expect(sql(`select count(*)||':'||sum(amount_minor) from public.billing_sandbox_refunds where order_id='${order}';`).trim()).toBe('1:60')
+   expect(sql(`select count(*)||':'||sum(amount_minor) from public.billing_sandbox_refunds where order_id='${order}';`).trim()).toBe('1:600')
    expect(sql(`select count(*) from public.platform_refund_commands where order_id='${order}';`).trim()).toBe('1')
   } finally { await Promise.allSettled([first,second].filter(Boolean)) }
  }
