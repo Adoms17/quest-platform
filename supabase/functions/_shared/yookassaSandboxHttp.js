@@ -2,7 +2,7 @@ import { buildSandboxPaymentRequest, validateSandboxPayment, validateOrder, Sand
 
 // Только для серверного вызывающего слоя с заказом, загруженным из БД.
 // Ответ нужно сохранить до передачи confirmationUrl клиенту. Здесь нет выдачи прав.
-export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000 } = {}) {
+export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000, beforeRefundSend } = {}) {
   if (enabled !== true || typeof shopId !== 'string' || !/^\d+$/.test(shopId)
     || typeof secretKey !== 'string' || !/^[\x21-\x7e]+$/.test(secretKey)
     || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30000) throw new SandboxPaymentError('sandbox_configuration_unavailable')
@@ -71,6 +71,7 @@ export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, 
       if (r.provider_refund_id) throw new SandboxPaymentError('refund_already_identified')
       const payment = await this.readPayment(saved.order)
       if (payment.status !== 'succeeded' || !payment.paid) throw new SandboxPaymentError('payment_not_refundable')
+      if (beforeRefundSend) await beforeRefundSend(structuredClone(saved))
       const age = now() - Date.parse(r.first_sent_at)
       if (!Number.isFinite(age) || age < 0 || age >= 23 * 3600000) throw new SandboxPaymentError('refund_reconciliation_required')
       const body = { payment_id: r.payment_id, amount: { value: `${Math.floor(r.amount_minor / 100)}.${String(r.amount_minor % 100).padStart(2, '0')}`, currency: 'RUB' } }

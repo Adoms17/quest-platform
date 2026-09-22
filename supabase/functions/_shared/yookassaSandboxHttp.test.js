@@ -91,3 +91,11 @@ it('известный ID перечитывает после 24 часов бе
   expect(network.mock.calls[1][0]).toBe(`https://api.yookassa.ru/v3/payments/${id}`)
   expect(network.mock.calls[1][1].method).toBe('GET')
 })
+
+it('повторный отказ авторизации после GET блокирует POST',async()=>{
+ const network=vi.fn().mockResolvedValueOnce(response(info)).mockResolvedValueOnce(response({...payment,status:'succeeded',paid:true}))
+ const beforeRefundSend=vi.fn().mockRejectedValue(Error('revoked'))
+ await expect(client(network,{beforeRefundSend}).createRefund(refundSnapshot)).rejects.toThrow('revoked')
+ expect(beforeRefundSend).toHaveBeenCalledWith(refundSnapshot)
+ expect(network.mock.calls.every(([,options])=>options.method==='GET')).toBe(true)
+})
