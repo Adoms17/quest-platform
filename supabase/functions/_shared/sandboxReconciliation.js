@@ -28,16 +28,26 @@ export function createSandboxReconciler({ rpc, provider, shopId }) {
       const summary = { checked: 0, applied: 0, review: 0, deferred: 0, failed: 0 }
       for (const { orderId: id, leaseToken } of ids) {
         let reason = null
+        let phase = 'storage'
         try {
           const order = await call('read_sandbox_reconciliation_order', { p_shop_id: shopId, p_order_id: id, p_payment_id: null })
           if (!order) throw new Error('missing_order')
+          phase = 'provider'
           const payment = await provider.findPayment(order)
           if (!payment) { reason = 'payment_not_found'; summary.failed++ }
           else {
+            phase = 'storage'
             const result = await apply(order, payment, 'reconciliation')
             if (['applied', 'review', 'deferred'].includes(result.fulfillmentState)) summary[result.fulfillmentState]++
           }
-        } catch { reason = 'provider_unavailable'; summary.failed++ }
+        } catch (failure) {
+          const verificationErrors = ['payment_order_mismatch', 'sandbox_shop_mismatch', 'verification_failed']
+          const category = phase === 'storage' ? 'storage_failure' : verificationErrors.includes(failure?.message) ? 'payment_verification_failed' : 'provider_unavailable'
+          // Fixed machine codes only; never log provider payloads or raw exceptions.
+          console.error('sandbox_reconciliation_failed', category)
+          reason = category === 'provider_unavailable' ? 'provider_unavailable' : 'verification_failed'
+          summary.failed++
+        }
         await call('finish_sandbox_reconciliation', { p_order_id: id, p_lease_token: leaseToken, p_error: reason })
         summary.checked++
       }

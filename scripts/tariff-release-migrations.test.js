@@ -7,7 +7,7 @@ import {verifyTrialCheckoutConcurrency} from './trial-checkout-concurrency.mjs'
 import {verifyPlatformRefundConcurrency} from './platform-refund-concurrency.mjs'
 const enabled=process.env.QVESTA_TEST_TARIFF_RELEASE==='1'
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
-test.skipIf(!enabled)('чистая схема staging → 55 миграций тарифного релиза',async()=>{
+test.skipIf(!enabled)('чистая схема staging → 56 миграций тарифного релиза',async()=>{
  const name='qvesta-release-test-'+randomUUID().replaceAll('-','');let created=false
  try{
   docker(['run','-d','--name',name,'--tmpfs','/tmp','--entrypoint','sh','supabase/postgres:17.6.1.165','-c','mkdir /tmp/test-pg; chown postgres:postgres /tmp/test-pg; gosu postgres initdb -D /tmp/test-pg -A trust >/dev/null && exec gosu postgres postgres -D /tmp/test-pg -c shared_preload_libraries=pg_cron -c cron.database_name=postgres']);created=true
@@ -47,11 +47,11 @@ select set_config('test.promo',public.issue_organization_promotion(current_setti
 select public.redeem_organization_promotion(current_setting('test.org')::uuid,current_setting('test.promo')::jsonb->>'code',gen_random_uuid(),0);
 ${removal}`)).toThrow('legacy promotion access must be resolved before removal')
   sql(release.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
-  expect(release).toHaveLength(55)
+  expect(release).toHaveLength(56)
   await verifyPlatformRefundConcurrency(name,sql)
   bridgeContract()
   sql('create extension pgtap with schema extensions; grant usage on schema extensions to authenticated,anon,service_role;')
-  const suites=readdirSync(new URL('../supabase/tests/database/',import.meta.url)).filter(f=>/^(billing_discount.*|billing_trial.*|billing_tariff.*|billing_promotions|billing_free_access_controls|platform_tariff.*|platform_fixed_tariffs|platform_discount_.*|platform_payment_catalog)\.test\.sql$/.test(f))
+  const suites=readdirSync(new URL('../supabase/tests/database/',import.meta.url)).filter(f=>/^(billing_discount.*|billing_refunded_duplicate|billing_trial.*|billing_tariff.*|billing_promotions|billing_free_access_controls|platform_tariff.*|platform_fixed_tariffs|platform_discount_.*|platform_payment_catalog)\.test\.sql$/.test(f))
   const cleanSuites=suites.filter(f=>!f.startsWith('platform_discount_'))
   for(const file of cleanSuites){const result=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/'+file,import.meta.url),'utf8'));expect(result,file).not.toMatch(/^not ok /m);expect(result,file).toMatch(/^1\.\.\d+/m)}
   // Посторонние записи должны пережить каждый транзакционный SQL-набор.

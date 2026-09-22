@@ -191,4 +191,4 @@ jobs:
 
       - name: Verify payment catalog and refund permissions
         if: inputs.operation == 'payments-release-deploy'
-        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_payment_catalog.test.sql
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_payment_catalog.test.sql supabase/tests/database/billing_refunded_duplicate.test.sql
