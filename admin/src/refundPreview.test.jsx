@@ -42,3 +42,27 @@ test('объясняет ограничения суммы ЮKassa без выд
  expect(await screen.findByRole('alert')).toHaveTextContent('Частичный возврат — от 1 ₽')
  expect(screen.queryByText(/Сумма расчёта/)).toBeNull()
 })
+
+
+test('после возврата скрывает старый остаток и получает новый расчёт с сервера', async () => {
+ sessionStorage.clear()
+ try {
+  const client={auth:{getUser:vi.fn().mockResolvedValue({data:{user:{id:'owner'}}}),mfa:{listFactors:vi.fn().mockResolvedValue({data:{totp:[{id:'factor',status:'verified'}]}}),challengeAndVerify:vi.fn().mockResolvedValue({})}}}
+  const api={previewRefund:vi.fn().mockResolvedValueOnce({available_minor:200,requested_minor:100}).mockResolvedValue({available_minor:100,requested_minor:100}),confirmRefund:vi.fn().mockResolvedValue({refund_id:'refund'}),executeRefund:vi.fn().mockResolvedValue({state:'succeeded'})}
+  render(<RefundPreview refundsEnabled api={api} client={client} organizationId="org" orderId="order" />)
+  fireEvent.click(screen.getByText('Рассчитать возврат'))
+  fireEvent.click(screen.getByText('Рассчитать сумму'))
+  await screen.findByText(/Доступно для возврата: 2,00/)
+  fireEvent.click(screen.getByText('Подготовить подтверждение возврата'))
+  await screen.findByLabelText('Новый код MFA')
+  fireEvent.change(screen.getByLabelText('Новый код MFA'),{target:{value:'123456'}})
+  fireEvent.submit(screen.getByLabelText('Новый код MFA').closest('form'))
+  await screen.findByText('Возврат выполнен.')
+  expect(screen.queryByText(/Доступно для возврата: 2,00/)).toBeNull()
+  expect(screen.getByText('Рассчитать сумму')).toBeDisabled()
+  fireEvent.click(screen.getByText('Перейти к новому расчёту'))
+  fireEvent.click(screen.getByText('Рассчитать сумму'))
+  await screen.findByText(/Доступно для возврата: 1,00/)
+  expect(api.confirmRefund).toHaveBeenCalledTimes(1)
+ } finally { sessionStorage.clear() }
+})

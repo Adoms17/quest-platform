@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { previewDiscountCheckout } from '../services/discountCheckoutApi'
 const messages = {
+  trial_period_already_paid: 'Период после пробного доступа уже оплачен. Повторная покупка не требуется.',
   invalid_code: 'Промокод не подходит для этой организации, тарифа или периода либо срок его активации истёк.',
   rate_limited: 'Слишком много проверок. Попробуйте позже.',
   offer_unavailable: 'Предложение изменилось или недоступно. Обновите список предложений.',

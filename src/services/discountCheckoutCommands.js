@@ -51,7 +51,7 @@ export async function acceptDiscountCheckout(actor, org, offerId, code, quote) {
  if (readDiscountCommand(actor, org) !== commandId) throw uncertain()
  const data = await rpc('accept_sandbox_discount_checkout', { p_organization_id: org, p_offer_id: offerId, p_command_id: commandId, p_code: code.trim(), p_reviewed_quote: quote })
  if (readDiscountCommand(actor, org) !== commandId) throw uncertain()
- if (data?.ok === false && ['invalid_code','rate_limited','offer_unavailable','discount_exhausted','checkout_pending','quote_changed'].includes(data.reason)) return { commandId, order: null, reason: data.reason }
+ if (data?.ok === false && ['invalid_code','rate_limited','offer_unavailable','trial_period_already_paid','discount_exhausted','checkout_pending','quote_changed'].includes(data.reason)) return { commandId, order: null, reason: data.reason }
  if (data?.ok !== true || !uuid.test(data.order_id)) throw uncertain()
  const restored = await recoverDiscountCheckout(actor, org)
  if (restored.order?.order_id !== data.order_id) throw uncertain()

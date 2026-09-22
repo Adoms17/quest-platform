@@ -1,7 +1,7 @@
 import { supabase } from '../supabaseClient'
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const failure = () => new Error('Не удалось проверить промокод. Повторите запрос.')
-const reasons = ['invalid_code', 'rate_limited', 'offer_unavailable', 'discount_exhausted']
+const reasons = ['invalid_code', 'rate_limited', 'offer_unavailable','trial_period_already_paid', 'discount_exhausted']
 export async function previewDiscountCheckout(organizationId, offer, code) {
   if (!uuid.test(organizationId) || !uuid.test(offer?.offer_id) || typeof code !== 'string' || code.length > 128) throw failure()
   let response

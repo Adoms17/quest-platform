@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react'
 import { adminError } from './api'
 
 const money = value => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(value / 100)
-export default function RefundPreview({ api, client, organizationId, orderId }) {
+export default function RefundPreview({ api, client, organizationId, orderId, refundsEnabled = import.meta.env.VITE_ADMIN_SANDBOX_REFUNDS === 'true' }) {
  const [opened, setOpened] = useState(false)
  const [amount, setAmount] = useState('')
  const [result, setResult] = useState(null)
+ const [stale, setStale] = useState(false)
  const [error, setError] = useState('')
  const [busy, setBusy] = useState(false)
  const generation = useRef(0)
@@ -14,7 +15,7 @@ export default function RefundPreview({ api, client, organizationId, orderId }) 
  useEffect(() => () => { generation.current++ }, [])
  async function calculate(event) {
   event.preventDefault()
-  if (running.current) return
+  if (running.current || stale) return
   setResult(null); setError('')
   const value = amount.trim().replace(',', '.')
   if (value && !/^\d{1,9}(\.\d{1,2})?$/.test(value)) {
@@ -36,18 +37,19 @@ export default function RefundPreview({ api, client, organizationId, orderId }) 
   <h4>Предварительный расчёт возврата</h4>
   <p>Sandbox. Расчёт не резервирует деньги и не отправляет возврат. Подписка и доступ сохраняются.</p>
   <label>Сумма возврата, ₽ (пусто — весь доступный остаток)
-   <input inputMode="decimal" value={amount} disabled={busy} onChange={event => { setAmount(event.target.value); setResult(null); setError('') }} />
+   <input inputMode="decimal" value={amount} disabled={busy || stale} onChange={event => { setAmount(event.target.value); setResult(null); setError('') }} />
   </label>
   <div className="refund-actions">
-  <button type="submit" disabled={busy}>Рассчитать сумму</button>
-  <button className="refund-close" type="button" disabled={busy} onClick={() => { setOpened(false); setResult(null); setError(''); setAmount('') }}>Закрыть расчёт</button>
+  <button type="submit" disabled={busy || stale}>Рассчитать сумму</button>
+  <button className="refund-close" type="button" disabled={busy || stale} onClick={() => { setOpened(false); setResult(null); setError(''); setAmount('') }}>Закрыть расчёт</button>
   </div>
   {busy && <p role="status">Рассчитываем…</p>}
   {error && <p role="alert">{error}</p>}
-  {result && <div role="status">
+  {stale && <p role="status">Предварительный расчёт устарел. Состояние операции показано ниже; для проверки остатка перейдите к новому расчёту.</p>}
+  {result && !stale && <div role="status">
    <p>Доступно для возврата: {money(result.available_minor)}.</p>
    <p>Сумма расчёта: {money(result.requested_minor)}.</p>
    <p>Возврат не выполнен. Перед отправкой потребуется повторная проверка суммы и подтверждение владельца.</p>
   </div>}
- </form>{result && client && import.meta.env.VITE_ADMIN_SANDBOX_REFUNDS === 'true' && <ConfirmRefund client={client} api={api} organizationId={organizationId} orderId={orderId} amount={result.requested_minor} onNewPreview={() => setResult(null)} />}</>
+ </form>{result && client && refundsEnabled && <ConfirmRefund client={client} api={api} organizationId={organizationId} orderId={orderId} amount={result.requested_minor} onOperationStarted={() => setStale(true)} onNewPreview={() => { setResult(null); setStale(false) }} />}</>
 }
