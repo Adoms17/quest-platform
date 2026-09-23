@@ -11,10 +11,11 @@ export const tariffReleaseMigrations = [
 export const paymentReleaseMigrations = Array.from({ length: 9 }, (_, i) => `20260922${String(i + 1).padStart(2, '0')}0000`)
 export const recurringReleaseMigrations = [...Array.from({ length: 14 }, (_, i) => '20260922' + String(i + 10).padStart(2, '0') + '0000'), '20260922233000', '20260922234500', '20260922235000']
 export function validateAdminMigrationHistory(data, catalog = false) {
-  const recurring = catalog === 'recurring-release'
+  const notice = catalog === 'recurring-notice'
+  const recurring = catalog === 'recurring-release' || notice
   const payments = catalog === 'payments-release' || recurring
   const release = catalog === 'tariff-release' || payments
-  const allowed = recurring ? new Set(recurringReleaseMigrations) : payments ? new Set(paymentReleaseMigrations) : release ? new Set(tariffReleaseMigrations) : catalog ? new Set(['20260919010000']) : expected
+  const allowed = notice ? new Set(['20260923010000']) : recurring ? new Set(recurringReleaseMigrations) : payments ? new Set(paymentReleaseMigrations) : release ? new Set(tariffReleaseMigrations) : catalog ? new Set(['20260919010000']) : expected
   if (!Array.isArray(data?.migrations) || data.migrations.length === 0) throw new Error('Нет истории миграций')
   const local = new Set(data.migrations.map(row => row.local).filter(Boolean))
   if ([...expected].some(version => !local.has(version))) throw new Error('Неполный локальный набор admin')
@@ -22,6 +23,7 @@ export function validateAdminMigrationHistory(data, catalog = false) {
   if (release && tariffReleaseMigrations.some(version => !local.has(version))) throw new Error('Неполный набор тарифного релиза')
   if (payments && paymentReleaseMigrations.some(version => !local.has(version))) throw new Error('Неполный набор платёжного релиза')
   if (recurring && recurringReleaseMigrations.some(version => !local.has(version))) throw new Error('Неполный набор автопродления')
+  if (notice && !local.has('20260923010000')) throw new Error('Нет миграции уведомления')
   const pending = []
   for (const row of data.migrations) {
     if (row.local === row.remote && row.local) continue
@@ -38,7 +40,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     output = execFileSync('npx', ['supabase', 'migration', 'list', '--linked', '--project-ref', process.env.SUPABASE_PROJECT_ID, '--output', 'json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 })
   } catch { throw new Error('Не удалось прочитать историю stage; применение запрещено') }
   const data = parseMigrationHistory(output)
-  const pending = validateAdminMigrationHistory(data, process.argv.includes('--recurring-release') ? 'recurring-release' : process.argv.includes('--payments-release') ? 'payments-release' : process.argv.includes('--tariff-release') ? 'tariff-release' : process.argv.includes('--catalog'))
+  const pending = validateAdminMigrationHistory(data, process.argv.includes('--recurring-notice') ? 'recurring-notice' : process.argv.includes('--recurring-release') ? 'recurring-release' : process.argv.includes('--payments-release') ? 'payments-release' : process.argv.includes('--tariff-release') ? 'tariff-release' : process.argv.includes('--catalog'))
   if (process.argv.includes('--require-applied') && pending.length) throw new Error('Остались неприменённые миграции')
   console.log('Ожидают применения admin:', pending.join(', ') || 'нет')
 }

@@ -24,7 +24,10 @@ export async function verifyRecurringEdge(container,sql,docker,serviceToken){
    'supabase/edge-runtime:v1.74.3','start','--main-service','/fixture']);started=true
   let ready=false
   for(let i=0;i<40;i++){try{if(request('GET').status===405){ready=true;break}}catch{}await new Promise(r=>setTimeout(r,500))}
-  expect(ready).toBe(true)
+  if(!ready){
+   const logs=docker(['logs','--tail','30',name]).replaceAll(serviceToken,'[redacted]').replaceAll(workerToken,'[redacted]')
+   throw new Error('Test Edge Runtime did not become ready: '+logs)
+  }
   expect(request('POST',false).status).toBe(401)
   const result=request();expect(result.status,result.body).toBe(200)
   expect(JSON.parse(result.body)).toEqual({processed:1,failed:0,reconciliationRequired:0,reviewRequired:0})
