@@ -1,8 +1,8 @@
-import { buildSandboxPaymentRequest, validateSandboxPayment, validateOrder, SandboxPaymentError } from './yookassaSandbox.js'
+import { buildSandboxPaymentRequest, buildSandboxRecurringRequest, validateSandboxPayment, validateOrder, SandboxPaymentError } from './yookassaSandbox.js'
 
 // Только для серверного вызывающего слоя с заказом, загруженным из БД.
 // Ответ нужно сохранить до передачи confirmationUrl клиенту. Здесь нет выдачи прав.
-export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000, beforeRefundSend } = {}) {
+export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000, beforeRefundSend, beforeRecurringSend } = {}) {
   if (enabled !== true || typeof shopId !== 'string' || !/^\d+$/.test(shopId)
     || typeof secretKey !== 'string' || !/^[\x21-\x7e]+$/.test(secretKey)
     || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30000) throw new SandboxPaymentError('sandbox_configuration_unavailable')
@@ -107,6 +107,18 @@ export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, 
       }
       // Не применяем частичный результат: на следующей странице может быть конфликт.
       throw new SandboxPaymentError('payment_reconciliation_required')
+    },
+    async createRecurringPayment(order) {
+      const saved = snapshot(order)
+      if (saved.providerPaymentId) throw new SandboxPaymentError('payment_already_identified')
+      if (typeof beforeRecurringSend !== 'function') throw new SandboxPaymentError('recurring_send_not_authorized')
+      buildSandboxRecurringRequest(saved, now())
+      await verifyShop()
+      // Серверный guard обязан проверить согласие и зафиксировать решение отправки.
+      if (await beforeRecurringSend(structuredClone(saved)) !== true) throw new SandboxPaymentError('recurring_send_not_authorized')
+      const prepared = buildSandboxRecurringRequest(saved, now())
+      const payment = await request('payments', 'POST', prepared.body, prepared.headers)
+      return validateSandboxPayment(payment, saved)
     },
     async createPayment(order) {
       const saved = snapshot(order)

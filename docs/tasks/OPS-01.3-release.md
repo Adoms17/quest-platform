@@ -252,3 +252,11 @@ HTTP-проверка app: OrganizationBilling-D0E957KK.js содержит tria
 Миграция 20260922090000 включена в guard платежного релиза (девятая); replay расширен до 56 миграций и включает billing_refunded_duplicate. В workflow после применения добавлен SQL-тест закрытия дубликата. Интерфейс тестового заказа с finished/not_paid и полным возвратом объясняет отсутствие нового доступа и сохранение подписки.
 
 Проверки: 21 UI/guard тест PASS; replay 56 миграций со всеми наборами/конкурентными проверками PASS (88.15 с); дополнительно 16 SQL-проверок resolver PASS, включая повтор события оплаты без повторной выдачи доступа. Lint без ошибок (прежние warnings), build PASS. Исправлена случайная замена числа базовых admin-миграций во время подготовки: база по-прежнему восемь, новые платежные — девять; итоговый guard-тест PASS. Изменения локальные, закрытие реального stage-заказа ещё не выполнялось.
+
+## Выпуск закрытия дубликата на stage — 22.09.2026
+
+По разрешению Алексея PR #82 https://github.com/Adoms17/quest-platform/pull/82 объединён: staging 7255bfcdbb1ec5ee04e5f4ffe8e7f34276d7d8d6. CI validate 35749872842 PASS (9m27s), Admin/Auth и CodeQL PASS. Dry-run 35749911247 подтвердил только 20260922090000; выпуск 35751219372 применил эту миграцию, 90 SQL-проверок PASS.
+
+Опубликованы sandbox-reconcile и yookassa-sandbox-webhook. Штатная сверка 35751467472: checked=1, failed=0, review=0. Проверка БД: дубликат e0f6defe-b7ab-4c2b-801f-e151e8cb91da finished, checkout cancelled; журнал содержит fully_refunded_trial_duplicate, refunded_minor=200, resolved_at=2026-09-22T16:03:07.183858Z. Нового периода нет. Подписка сохранила revision=2, trial, прежнюю версию и даты; billing_trial_paid_periods по-прежнему один.
+
+Cloudflare app build a3a7a5ec-a6b1-4508-ab1b-fa926bd6b214 PASS; публичный OrganizationBilling-BXgfNo1m.js содержит сообщение о закрытии после полного возврата. Админка не менялась, возвраты не включались; новых денежных операций не выполнялось. Production не изменён. Следующий этап: sandbox автопродления, скидок и неуспешного списания.
