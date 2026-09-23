@@ -5,7 +5,7 @@ import TariffDrafts from './TariffDrafts'
 import TariffSupportEnd from './TariffSupportEnd'
 import { createAdminApi, adminError } from './api'
 
-export default function Tariffs({ client }) {
+export default function Tariffs({ client, initialVersionId = null }) {
  const api = useMemo(() => createAdminApi(client), [client])
  const generation = useRef(0)
  const [selectedPlan, setSelectedPlan] = useState('free')
@@ -17,6 +17,21 @@ export default function Tariffs({ client }) {
  const focus = useRef(null)
  useEffect(() => () => { generation.current += 1 }, [])
  useEffect(() => { if (card) focus.current?.focus() }, [card])
+ useEffect(() => {
+  if (!initialVersionId) return
+  let active = true
+  const request = ++generation.current
+  setViewingVersion(true); setBusy(true); setError('')
+  api.tariffs(null, initialVersionId, null).then(result => {
+   if (!active || generation.current !== request) return
+   const version = result.items[0]
+   setCard(version ?? null)
+   if (version) setSelectedPlan(version.plan_key)
+   else setError('Версия не найдена.')
+  }).catch(failure => { if (active && generation.current === request) setError(adminError(failure)) })
+   .finally(() => { if (active && generation.current === request) setBusy(false) })
+  return () => { active = false }
+ }, [api, initialVersionId])
  async function load(cursor = null, id = null, planKey = selectedPlan) {
   const request = ++generation.current
   setSelectedPlan(planKey); setViewingVersion(Boolean(id)); setBusy(true); setError(''); setCard(null); if (!cursor) setPage(null)

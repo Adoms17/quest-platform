@@ -37,6 +37,12 @@ select is(current_setting('test.paid')::jsonb->>'refund_requires_review','true',
 select is(current_setting('test.paid')::jsonb->>'payment_status','succeeded','подтверждённая оплата');
 select is((select count(*) from jsonb_array_elements(current_setting('test.items')::jsonb)x where x->>'payment_status'='not_created'),29::bigint,'заказ без платежа не выдаётся за оплату');
 select ok(not exists(select 1 from jsonb_array_elements(current_setting('test.items')::jsonb)x where x ?| array['shop_id','actor_id','command_id','idempotency_key','confirmation_url','n']),'служебные поля скрыты');
+select is(current_setting('test.paid')::jsonb->>'plan_name','Pro','название сохранённой версии');
+select is(current_setting('test.paid')::jsonb->>'base_amount_minor','1000','исходная цена старого заказа');
+select is(current_setting('test.paid')::jsonb->>'discount_amount_minor','0','старый заказ без скидки');
+select ok(current_setting('test.paid')::jsonb->>'plan_version_id' is not null,'точная версия заказа');
+select ok(current_setting('test.paid')::jsonb->>'period_end' is not null,'конец периода');
+select ok(current_setting('test.paid')::jsonb->>'payment_checked_at' is not null,'время проверки платежа');
 select is(current_setting('test.paid')::jsonb->>'fulfillment_state','deferred','будущий период отделён от проверки');
 select is(current_setting('test.paid')::jsonb->>'fulfillment_reason','future_period','безопасная причина ожидания');
 select ok(current_setting('test.paid')::jsonb->>'period_start' is not null,'дата начала доступна');

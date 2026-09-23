@@ -98,3 +98,19 @@ test.each([['sandbox_scope_disabled', 'Выдача подписки отклю�
  await screen.findByText(new RegExp(text))
  expect(screen.queryByText(/private-diagnostic/)).toBeNull()
 })
+test('открывает точную версию заказа и возвращает сохранённый список', async () => {
+ const detailed = { ...item, plan_version_id: 'version-order', plan_name: 'Pro', plan_number: 2, base_amount_minor: 20000, discount_amount_minor: 7655, discount_bps: 3827, period_start: '2026-10-01', period_end: '2026-11-01', fulfillment_state: 'applied' }
+ const api = { payments: vi.fn().mockResolvedValue({ items: [detailed] }) }
+ const client = { rpc: vi.fn().mockResolvedValue({ data: { items: [{ id: 'version-order', display_name: 'Pro', plan_key: 'pro', timeline_number: 2, timeline_state: 'superseded' }] } }) }
+ render(<OrganizationPayments api={api} client={client} organizationId="org-a" />)
+ clickLoad()
+ const link = await screen.findByRole('button', { name: 'Pro · Версия №2' })
+ expect(screen.getByText(/Исходная стоимость: 200,00/)).toBeTruthy()
+ expect(screen.getByText('Период по заказу выдан.')).toBeTruthy()
+ fireEvent.click(link)
+ await screen.findByRole('article', { name: 'Версия тарифа' })
+ expect(client.rpc).toHaveBeenCalledWith('read_platform_tariff_catalog', { p_after: null, p_id: 'version-order' })
+ fireEvent.click(screen.getByRole('button', { name: 'К платежам' }))
+ expect(screen.getByRole('button', { name: 'Pro · Версия №2' })).toBeTruthy()
+ expect(api.payments).toHaveBeenCalledTimes(1)
+})
