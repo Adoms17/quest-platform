@@ -5,6 +5,7 @@ export async function verifyRecurringEdge(container,sql,docker,serviceToken){
  const name=container+'-edge',workerToken='ab'.repeat(32)
  const fixture=readFileSync(new URL('../supabase/tests/database/billing_recurring_due.test.sql',import.meta.url),'utf8').split("select is(public.prepare_due")[0].replaceAll('recurring-','edge-recurring-').replaceAll('sandbox-edge-recurring-v2','sandbox-recurring-v2').replaceAll("'123'","'987'")
  sql('set search_path=public,extensions;'+fixture+'commit;')
+ const scopedOrg=sql("select organization_id from public.billing_recurring_consents where id=md5('edge-recurring-source-consent')::uuid" ).trim()
  let started=false
  const request=(method='POST',authorized=true)=>{
   const args=['exec',container,'curl','-sS','--max-time','15','-w','\n%{http_code}','-X',method]
@@ -19,6 +20,7 @@ export async function verifyRecurringEdge(container,sql,docker,serviceToken){
    '--mount',`type=bind,source=${fileURLToPath(new URL('./fixtures/recurring-edge',import.meta.url))},target=/fixture,readonly`,
    '-e','SUPABASE_URL=http://127.0.0.1:3000','-e','SUPABASE_SERVICE_ROLE_KEY='+serviceToken,
    '-e','YOOKASSA_SANDBOX_SHOP_ID=987','-e','YOOKASSA_SANDBOX_SECRET_KEY=synthetic-value',
+   '-e','YOOKASSA_SANDBOX_RECURRING_ORGANIZATION_ID='+scopedOrg,
    '-e','YOOKASSA_SANDBOX_ENABLED=true','-e','YOOKASSA_SANDBOX_RECURRING_ENABLED=true',
    '-e','YOOKASSA_SANDBOX_WORKER_TOKEN='+workerToken,
    'supabase/edge-runtime:v1.74.3','start','--main-service','/fixture']);started=true

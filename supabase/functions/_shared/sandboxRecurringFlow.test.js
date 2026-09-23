@@ -13,8 +13,8 @@ function system({lostResponse=false,failedApply=false,zero=false,denied=false}={
  let attempted=false,claimed=false,recorded=null,applied=false,posts=0,applies=0
  const success={...payment,status:'succeeded',paid:true,payment_method:{id:order.providerMethodId,saved:true}}
  const rpc=vi.fn(async(name,args)=>{
-  if(name==='prepare_due_sandbox_recurring')return {data:{prepared:1,skipped:0}}
-  if(name==='list_sandbox_recurring_work')return {data:applied?[]:[order.id]}
+  if(name==='prepare_scoped_sandbox_recurring')return {data:{prepared:1,skipped:0}}
+  if(name==='list_scoped_sandbox_recurring_work')return {data:applied?[]:[order.id]}
   switch(args.p_action){
    case 'begin': {const state=zero?'zero_amount':attempted?'reconciliation_required':'prepared';attempted=true;return {data:{state}}}
    case 'read':return {data:{...order,providerPaymentId:recorded?.paymentId}}
@@ -38,7 +38,7 @@ function system({lostResponse=false,failedApply=false,zero=false,denied=false}={
  })
  const worker=createSandboxRecurringWorker({rpc,config,transport:{fetchImpl,now:()=>Date.parse(order.firstSentAt)+1000}})
  const token='ab'.repeat(32)
- const handler=createSandboxWorkerHandler({token,enabled:true,run:()=>runSandboxRecurringBatch({rpc,worker,shopId:'123'})})
+ const handler=createSandboxWorkerHandler({token,enabled:true,run:()=>runSandboxRecurringBatch({rpc,worker,shopId:'123',organizationId:'22222222-2222-4222-8222-222222222222'})})
  const request=(authorized=true)=>handler(new Request('https://example.test/worker',{method:'POST',headers:authorized?{'x-qvesta-worker-token':token}:{}}))
  return {request,rpc,fetchImpl,state:()=>({posts,applies})}
 }
