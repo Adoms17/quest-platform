@@ -111,3 +111,14 @@ it('future discount allows only its migration after applied scope', () => {
  expect(()=>check([...base.slice(0,-1),{...base.at(-1),remote:''},pending])).toThrow()
  expect(()=>check([...base,pending,{local:'20260923040000',remote:''}])).toThrow()
 })
+it('consent catalog allows only its migration after applied scope', () => {
+ const base=[...rows(),{local:'20260919010000'},...[...tariffReleaseMigrations,...paymentReleaseMigrations,...recurringReleaseMigrations,'20260923010000','20260923020000','20260923030000'].map(local=>({local}))].map(row=>({...row,remote:row.local}))
+ const pending={local:'20260923040000',remote:''}
+ const check=migrations=>validateAdminMigrationHistory({migrations},'recurring-consents')
+ expect(check([...base,pending])).toEqual([pending.local])
+ expect(check([...base,{...pending,remote:pending.local}])).toEqual([])
+ expect(()=>check(base)).toThrow()
+ expect(()=>check([...base.slice(0,-1),pending])).toThrow()
+ expect(()=>check([...base.slice(0,-1),{...base.at(-1),remote:''},pending])).toThrow()
+ expect(()=>check([...base,pending,{local:'20260923050000',remote:''}])).toThrow()
+})

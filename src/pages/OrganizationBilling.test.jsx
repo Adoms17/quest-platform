@@ -1,3 +1,4 @@
+vi.mock('../services/sandboxCheckoutVisibility', () => ({ isSandboxCheckoutVisible: () => true }))
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ context: {}, load: vi.fn() }))
@@ -6,6 +7,7 @@ vi.mock('../services/organizationBillingApi', () => ({ loadOrganizationBilling: 
 vi.mock('../components/MonthlyParticipantUsage', () => ({ default: () => null }))
 vi.mock('../components/BillingIntentControls', () => ({ default: () => null }))
 vi.mock('../components/FreeAccessControls', () => ({ default: () => null }))
+vi.mock('../components/OrganizationRecurringConsent', () => ({ default: () => <div>Управление согласиями</div> }))
 vi.mock('../components/SandboxCheckout', () => ({ default: () => null }))
 vi.mock('../services/recurringFailureNoticeApi', () => ({ readRecurringFailureNotice: async () => null }))
 import OrganizationBilling from './OrganizationBilling'
@@ -110,4 +112,11 @@ it.each([false,true])('показывает серверное предупре�
  render(<OrganizationBilling session={session}/>);
  await screen.findByText(ended?'Поддержка версии тарифа завершена':'Поддержка версии тарифа заканчивается');
  expect(screen.getByText(/Уже оплаченный период сохраняется до конца/)).toBeTruthy()
+})
+
+it.each([true, false])('управление согласиями отдельно от checkout доступно только billing.manage: %s', async canManage => {
+ mocks.load.mockResolvedValue({ ...data('Pro'), can_manage: canManage })
+ render(<OrganizationBilling session={session} />)
+ await screen.findByText('Pro')
+ expect(Boolean(screen.queryByText('Управление согласиями'))).toBe(canManage)
 })
