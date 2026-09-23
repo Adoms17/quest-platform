@@ -19,3 +19,12 @@ export async function revokeRecurringConsent(organizationId, orderId, consentId)
   if (error || data !== 'revoked') throw unavailable()
   return readRecurringConsent(organizationId, orderId)
 }
+
+export async function listRecurringConsents(organizationId) {
+ if (!uuid.test(organizationId)) throw unavailable()
+ const { data, error } = await supabase.rpc('list_sandbox_recurring_consents', { p_organization_id: organizationId })
+ if (error || !Array.isArray(data) || !data.every(item => item && uuid.test(item.consent_id) && uuid.test(item.order_id)
+  && ['pending', 'saved', 'revoked'].includes(item.state) && typeof item.created_at === 'string' && Number.isFinite(Date.parse(item.created_at)))
+  || new Set(data.map(item => item.consent_id)).size !== data.length) throw unavailable()
+ return data.map(item => ({ consentId: item.consent_id, orderId: item.order_id, state: item.state, createdAt: item.created_at }))
+}
