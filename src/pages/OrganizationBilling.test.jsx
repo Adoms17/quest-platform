@@ -7,6 +7,7 @@ vi.mock('../components/MonthlyParticipantUsage', () => ({ default: () => null })
 vi.mock('../components/BillingIntentControls', () => ({ default: () => null }))
 vi.mock('../components/FreeAccessControls', () => ({ default: () => null }))
 vi.mock('../components/SandboxCheckout', () => ({ default: () => null }))
+vi.mock('../services/recurringFailureNoticeApi', () => ({ readRecurringFailureNotice: async () => null }))
 import OrganizationBilling from './OrganizationBilling'
 const session = { user: { id: 'actor' } }
 const data = name => ({ status: 'transition', configured_plan: { name }, can_manage: false, usage: { active_quests: 3, team_members: 2 }, enforcement: { active_quests: false, team_members: false }, effective_entitlements: null, measured_at: '2026-09-15T00:00:00Z' })
