@@ -77,3 +77,13 @@ it('recurring release requires the applied foundation and exact 17 migrations',(
  expect(()=>check([...base,...pending,{local:'',remote:'20260923010000'}])).toThrow()
  expect(()=>check([...base,...pending,pending[0]])).toThrow()
 })
+it('уведомление разрешает только одну миграцию после применённого recurring', () => {
+ const base=[...rows(),{local:'20260919010000'},...[...tariffReleaseMigrations,...paymentReleaseMigrations,...recurringReleaseMigrations].map(local=>({local}))].map(row=>({...row,remote:row.local}))
+ const pending={local:'20260923010000',remote:''}
+ const check=migrations=>validateAdminMigrationHistory({migrations},'recurring-notice')
+ expect(check([...base,pending])).toEqual(['20260923010000'])
+ expect(check([...base,{...pending,remote:pending.local}])).toEqual([])
+ expect(()=>check(base)).toThrow()
+ expect(()=>check([...base.slice(0,-1),{...base.at(-1),remote:''},pending])).toThrow()
+ expect(()=>check([...base,pending,{local:'20260923020000',remote:''}])).toThrow()
+})

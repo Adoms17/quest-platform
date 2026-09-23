@@ -40,3 +40,9 @@ PR #83 и #84 объединены. Stage SHA: 7e5df1e69276fc19ac9e753eb359ff23a
 ## Публикация функций — 23.09.2026
 
 Supabase CLI опубликовал sandbox-recurring, sandbox-checkout, sandbox-reconcile, yookassa-sandbox-webhook в stage jeugfyaqzfgdvfhdxfht. Diff функций/config относительно staging 7e5df1e пустой. Перед публикацией явно установлен YOOKASSA_SANDBOX_RECURRING_ENABLED=false. Проверка endpoint: GET 405, POST без токена 401; оба ответа пустые, Cache-Control=no-store. Проверка 503 с корректным токеном на stage ещё не выполнена; токен не считывался. Расписание не добавлялось, списания не запускались. Следующий шаг: проверка с токеном через GitHub Actions и уведомление об окончательном отказе до включения.
+
+## Проверка выключенного обработчика на stage — 23.09.2026
+
+PR #85 объединён после успешного CI (10m16s) и CodeQL. Stage SHA: 7d4d44cc440ba7138d5b9039fdaed67136b3fd74. Workflow recurring-disabled-smoke, run 35823038229, PASS: GET 405, POST без токена 401, POST с корректным worker-токеном 503. Все ответы пустые, Cache-Control=no-store. Перед проверкой workflow повторно установил YOOKASSA_SANDBOX_RECURRING_ENABLED=false. Секреты не выводились, автопродление не включалось. Осталось реализовать уведомление об окончательном отказе и провести реальную sandbox-приёмку перед включением.
+
+Выпуск уведомления выполняется отдельно: сначала backend PR, recurring-notice-dry-run/apply (только 20260923010000 при применённых предыдущих миграциях), затем отдельная публикация frontend. UI пока остаётся локальным. Guard: 12 тестов PASS.
