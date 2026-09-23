@@ -37,3 +37,16 @@ test('поздний ответ предыдущей организации не
  await act(async () => finish([item]))
  expect(screen.queryByRole('button', { name: 'Отозвать согласие' })).toBeNull()
 })
+test('задержавшееся первое чтение не отменяет результат обновления и отзыва', async () => {
+ let finish
+ api.listRecurringConsents.mockImplementationOnce(() => new Promise(resolve => { finish = resolve })).mockResolvedValue([item])
+ render(<OrganizationRecurringConsent organizationId="org" />)
+ fireEvent.click(screen.getByRole('button', { name: 'Обновить согласия' }))
+ const button = await screen.findByRole('button', { name: 'Отозвать согласие' })
+ api.revokeRecurringConsent.mockResolvedValue({state:'revoked'})
+ api.listRecurringConsents.mockResolvedValue([{...item,state:'revoked'}])
+ fireEvent.click(button)
+ await screen.findByText('Согласие отозвано.')
+ await act(async () => finish([item]))
+ expect(screen.queryByRole('button', { name: 'Отозвать согласие' })).toBeNull()
+})

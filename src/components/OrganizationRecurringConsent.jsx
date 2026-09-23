@@ -6,14 +6,16 @@ export default function OrganizationRecurringConsent({ organizationId }) {
 }
 function ConsentManagement({ organizationId }) {
  const [items, setItems] = useState(null), [error, setError] = useState(false), [busy, setBusy] = useState(false)
- const running = useRef(false)
+ const running = useRef(false), requestVersion = useRef(0)
  useEffect(() => {
   let active = true
-  listRecurringConsents(organizationId).then(data => { if (active) setItems(data) }).catch(() => { if (active) setError(true) })
+  const request = ++requestVersion.current
+  listRecurringConsents(organizationId).then(data => { if (active && request === requestVersion.current) setItems(data) }).catch(() => { if (active && request === requestVersion.current) setError(true) })
   return () => { active = false }
  }, [organizationId])
  async function refresh(item) {
   if (running.current) return
+  requestVersion.current++
   running.current = true; setBusy(true); setError(false)
   try {
    if (item) await revokeRecurringConsent(organizationId, item.orderId, item.consentId)
