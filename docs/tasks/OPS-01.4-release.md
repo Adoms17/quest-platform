@@ -46,3 +46,7 @@ Supabase CLI опубликовал sandbox-recurring, sandbox-checkout, sandbox
 PR #85 объединён после успешного CI (10m16s) и CodeQL. Stage SHA: 7d4d44cc440ba7138d5b9039fdaed67136b3fd74. Workflow recurring-disabled-smoke, run 35823038229, PASS: GET 405, POST без токена 401, POST с корректным worker-токеном 503. Все ответы пустые, Cache-Control=no-store. Перед проверкой workflow повторно установил YOOKASSA_SANDBOX_RECURRING_ENABLED=false. Секреты не выводились, автопродление не включалось. Осталось реализовать уведомление об окончательном отказе и провести реальную sandbox-приёмку перед включением.
 
 Выпуск уведомления выполняется отдельно: сначала backend PR, recurring-notice-dry-run/apply (только 20260923010000 при применённых предыдущих миграциях), затем отдельная публикация frontend. UI пока остаётся локальным. Guard: 12 тестов PASS.
+
+## Выпуск RPC уведомления — 23.09.2026
+
+PR #86 объединён после всех CI. Stage SHA 1fa9998e73985c9983bc4877fe8218bd5ccefc77. Dry-run 35828436352 подтвердил только 20260923010000; apply 35828536322 PASS, pending отсутствует. UI выпускается отдельным PR после этой миграции; повтор 21 UI/API/page теста PASS. Автопродление не включалось.

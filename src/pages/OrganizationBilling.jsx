@@ -7,6 +7,7 @@ import MonthlyParticipantUsage from '../components/MonthlyParticipantUsage'
 import BillingIntentControls from '../components/BillingIntentControls'
 import FreeAccessControls from '../components/FreeAccessControls'
 import SandboxCheckout from '../components/SandboxCheckout'
+import RecurringFailureNotice from '../components/RecurringFailureNotice'
 import { isSandboxCheckoutVisible } from '../services/sandboxCheckoutVisibility'
 
 const statuses = {
@@ -61,7 +62,8 @@ function Billing({ organization, actorId }) {
       {data.support_notice && <section role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4"><h2 className="font-semibold">{data.support_notice.ended ? 'Поддержка версии тарифа завершена' : 'Поддержка версии тарифа заканчивается'}</h2><p>Дата окончания поддержки: {date(data.support_notice.ends_at)}. После этой даты продление по старой версии недоступно. Уже оплаченный период сохраняется до конца.</p><p>Для следующего периода выберите актуальный тариф. Автоматической замены условий нет.</p></section>}
       {actorId && <BillingIntentControls actorId={actorId} organizationId={organization.id} />}
       {actorId && data.can_manage && <FreeAccessControls actorId={actorId} organizationId={organization.id} onChanged={refresh} />}
-      {isSandboxCheckoutVisible(import.meta.env, window.location) && actorId && data.can_manage && <SandboxCheckout key={`${actorId}:${organization.id}`} actorId={actorId} organizationId={organization.id} />}
+      {isSandboxCheckoutVisible(import.meta.env, window.location) && actorId && <RecurringFailureNotice organizationId={organization.id} canPay={data.can_manage} refreshKey={revision} />}
+      {isSandboxCheckoutVisible(import.meta.env, window.location) && actorId && data.can_manage && <div id="sandbox-manual-checkout" tabIndex={-1}><SandboxCheckout key={`${actorId}:${organization.id}`} actorId={actorId} organizationId={organization.id} /></div>}
       <section className="grid gap-4 sm:grid-cols-2" aria-label="Использование ресурсов">
         {[['active_quests', 'Открытые квесты', 'Все открытые квесты, включая непубличные и запланированные.'], ['team_members', 'Команда', 'Активные аккаунты, включая владельца. Приглашения и профили участников не учитываются.']].map(([key, title, description]) => <article key={key} className="space-y-2 rounded-xl border bg-white p-4">
           <h2 className="font-semibold">{title}</h2>
