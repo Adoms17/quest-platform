@@ -101,3 +101,19 @@ test('полностью возвращённый закрытый заказ н
  expect(screen.getByRole('button',{name:'Закрыть завершённый заказ'})).toBeTruthy()
  expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
 })
+
+test.each([
+ ['deferred', 'Оплата подтверждена. Период начнётся в указанную дату.'],
+ ['applied', 'Оплаченный тестовый период применён.'],
+ ['review', 'Применение оплаты требует проверки. Действующая подписка сохранена.'],
+])('повторная проверка оплаты сохраняет один итог для %s', async (fulfillment_state, message) => {
+ mocks.loadSandboxOffer.mockResolvedValue({ order_id: 'order', plan_name: 'Pro', amount_minor: 100, period_start: '2026-10-23', period_end: '2026-11-23', state: 'review', fulfillment_state })
+ mocks.checkSandboxCheckout.mockResolvedValue({ status: 'succeeded', confirmationUrl: null })
+ render(<SandboxCheckout actorId="a" organizationId="o" />)
+ fireEvent.click(await screen.findByRole('checkbox'))
+ fireEvent.click(screen.getByRole('button', { name: 'Проверить платёж' }))
+ await waitFor(() => expect(mocks.loadSandboxOffer).toHaveBeenCalledTimes(2))
+ expect(screen.getAllByText(message)).toHaveLength(1)
+ expect(screen.queryByText('Тестовая оплата подтверждена.')).toBeNull()
+ expect(screen.queryByText('Тестовая оплата прошла. Активация подписки проверяется отдельно.')).toBeNull()
+})

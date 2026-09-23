@@ -74,10 +74,10 @@ export default function SandboxCheckout({ actorId, organizationId }) {
       {(state.offer.state === 'finished' || result?.status === 'canceled') && !state.offer.payment_requires_review && !result?.requiresReview && <button type="button" disabled={busy} onClick={() => void dismiss()} className="px-4 py-3 text-blue-700">Закрыть завершённый заказ</button>}
       {state.offer.state === 'finished' && state.offer.fulfillment_state === 'not_paid' && state.offer.refunded_minor === state.offer.amount_minor && state.offer.amount_minor > 0 && !state.offer.payment_requires_review && <p role="status">Заказ закрыт после полного возврата. Новый период по этому заказу не предоставлен; действующая подписка сохранена.</p>}
       {state.offer.fulfillment_state === 'applied' && !state.offer.payment_requires_review && <p role="status">{state.offer.period_scheduled ? 'Оплата подтверждена. Оплаченный период начнётся после trial в указанную дату.' : 'Оплаченный тестовый период применён.'}</p>}
-      {state.offer.fulfillment_state === 'deferred' && <p role="status">Оплата подтверждена. Период начнётся в указанную дату.</p>}
+      {state.offer.fulfillment_state === 'deferred' && !state.offer.payment_requires_review && <p role="status">Оплата подтверждена. Период начнётся в указанную дату.</p>}
       {state.offer.fulfillment_state === 'review' && <p role="status">Применение оплаты требует проверки. Действующая подписка сохранена.</p>}
       {result && <div role="status">
-        <p>{result.requiresReview ? 'Платёж требует проверки.' : result.status === 'succeeded' ? state.offer.fulfillment_state && state.offer.fulfillment_state !== 'none' ? 'Тестовая оплата подтверждена.' : 'Тестовая оплата прошла. Активация подписки проверяется отдельно.' : result.status === 'canceled' ? 'Платёж отменён.' : 'Платёж ожидает завершения.'}</p>
+        {!(result.status === 'succeeded' && !result.requiresReview && ['applied', 'deferred', 'review'].includes(state.offer.fulfillment_state)) && <p>{result.requiresReview ? 'Платёж требует проверки.' : result.status === 'succeeded' ? state.offer.fulfillment_state && state.offer.fulfillment_state !== 'none' ? 'Тестовая оплата подтверждена.' : 'Тестовая оплата прошла. Активация подписки проверяется отдельно.' : result.status === 'canceled' ? 'Платёж отменён.' : 'Платёж ожидает завершения.'}</p>}
         {result.confirmationUrl && <a href={result.confirmationUrl} className="inline-block py-3 text-blue-700 underline">Перейти к тестовой оплате</a>}
       </div>}
     </>}
