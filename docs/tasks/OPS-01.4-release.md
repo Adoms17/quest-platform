@@ -11,7 +11,7 @@
 ## Порядок выпуска с выключенным функционалом
 
 1. Проверить diff и состав коммита; зафиксировать SHA кандидата, CI и историю stage. Не применять все локальные миграции без точного allowlist.
-2. Использовать отдельный workflow recurring-staging.yml: сначала operation=dry-run, затем operation=apply на том же проверенном SHA ветки staging. Workflow проверяет allowlist до dry-run и повторно перед apply, после apply требует пустой pending-набор. Существующий payments-release по-прежнему отклоняет recurring-миграции. Workflow создан локально, в GitHub ещё не запускался.
+2. Использовать зарегистрированный workflow deploy-staging.yml: сначала operation=recurring-dry-run, затем operation=recurring-apply на том же проверенном SHA ветки staging. Workflow проверяет allowlist до dry-run и повторно перед apply, после apply требует пустой pending-набор. Существующий payments-release по-прежнему отклоняет recurring-миграции. Отдельный recurring-staging.yml недоступен для dispatch без регистрации в default branch; тот же изолированный job перенесён в deploy-staging.yml. Миграции ещё не запускались.
 3. Применить миграции штатным Git-процессом после dry-run. Флаги UI/автопродления остаются выключенными, расписание отсутствует.
 4. Опубликовать перечисленные функции и frontend того же SHA. Проверить 401 без токена и 503 при выключенном recurring.
 5. Только после закрытия условий ниже включить тестовый интерфейс согласия и провести приёмку на отдельной sandbox-организации. Запуск recurring вручную ограниченным worker-вызовом, без расписания.
