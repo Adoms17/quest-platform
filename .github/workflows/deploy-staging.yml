@@ -27,6 +27,11 @@ on:
           - recurring-scope-dry-run
           - recurring-scope-apply
           - recurring-disabled-smoke
+          - recurring-acceptance-run
+      recurring_organization_id:
+        description: Explicit sandbox organization UUID for one recurring acceptance run
+        type: string
+        required: false
       deploy_sandbox:
         description: Publish test billing Edge Functions (staging only)
         type: boolean
@@ -246,6 +251,44 @@ jobs:
         run: |
           echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
           echo 'No functions, schedules, frontend flags or recurring enablement changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  recurring-acceptance-run:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'recurring-acceptance-run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+      ACCEPTANCE_ORGANIZATION_ID: ${{ inputs.recurring_organization_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm test -- scripts/run-stage-recurring-worker.test.js scripts/verify-disabled-recurring.test.js --maxWorkers=1
+      - name: Validate explicit scope and worker credential
+        run: |
+          node -e "if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(process.env.ACCEPTANCE_ORGANIZATION_ID ?? '') || !/^[a-f0-9]{64}$/.test(process.env.YOOKASSA_SANDBOX_WORKER_TOKEN ?? '')) process.exit(1)"
+      - name: Disable before setting acceptance scope
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECURRING_ENABLED=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Select only the acceptance organization
+        run: npx supabase secrets set "YOOKASSA_SANDBOX_RECURRING_ORGANIZATION_ID=$ACCEPTANCE_ORGANIZATION_ID" --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Enable bounded acceptance
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECURRING_ENABLED=true --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Run once without automatic retry
+        run: node scripts/run-stage-recurring-worker.mjs
+      - name: Always disable after acceptance
+        if: always()
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECURRING_ENABLED=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Verify disabled state
+        if: always()
+        run: node scripts/verify-disabled-recurring.mjs
 
   recurring-disabled-smoke:
     if: github.ref == 'refs/heads/staging' && inputs.operation == 'recurring-disabled-smoke'
