@@ -24,11 +24,14 @@ export async function verifyRecurringEdge(container,sql,docker,serviceToken){
    '-e','YOOKASSA_SANDBOX_ENABLED=true','-e','YOOKASSA_SANDBOX_RECURRING_ENABLED=true',
    '-e','YOOKASSA_SANDBOX_WORKER_TOKEN='+workerToken,
    'supabase/edge-runtime:v1.74.3','start','--main-service','/fixture']);started=true
+  // Холодная загрузка npm-зависимостей имеет отдельный ограниченный бюджет.
+  const startupDeadline=Date.now()+180000
   let ready=false
-  for(let i=0;i<40;i++){try{if(request('GET').status===405){ready=true;break}}catch{}await new Promise(r=>setTimeout(r,500))}
+  while(Date.now()<startupDeadline){try{if(request('GET').status===405){ready=true;break}}catch{}await new Promise(r=>setTimeout(r,500))}
   if(!ready){
    const logs=docker(['logs','--tail','30',name]).replaceAll(serviceToken,'[redacted]').replaceAll(workerToken,'[redacted]')
-   throw new Error('Test Edge Runtime did not become ready: '+logs)
+   const state=docker(['inspect','--format','{{.State.Status}} exit={{.State.ExitCode}}',name])
+   throw new Error('Test Edge Runtime did not become ready within 180s ('+state+'): '+logs)
   }
   expect(request('POST',false).status).toBe(401)
   const result=request();expect(result.status,result.body).toBe(200)

@@ -11,14 +11,15 @@ export const tariffReleaseMigrations = [
 export const paymentReleaseMigrations = Array.from({ length: 9 }, (_, i) => `20260922${String(i + 1).padStart(2, '0')}0000`)
 export const recurringReleaseMigrations = [...Array.from({ length: 14 }, (_, i) => '20260922' + String(i + 10).padStart(2, '0') + '0000'), '20260922233000', '20260922234500', '20260922235000']
 export function validateAdminMigrationHistory(data, catalog = false) {
-  const consent = catalog === 'recurring-consents'
+  const processing = catalog === 'payment-processing'
+  const consent = catalog === 'recurring-consents' || processing
   const future = catalog === 'future-discount' || consent
   const scoped = catalog === 'recurring-scope' || future
   const notice = catalog === 'recurring-notice' || scoped
   const recurring = catalog === 'recurring-release' || notice
   const payments = catalog === 'payments-release' || recurring
   const release = catalog === 'tariff-release' || payments
-  const allowed = consent ? new Set(['20260923040000']) : future ? new Set(['20260923030000']) : scoped ? new Set(['20260923020000']) : notice ? new Set(['20260923010000']) : recurring ? new Set(recurringReleaseMigrations) : payments ? new Set(paymentReleaseMigrations) : release ? new Set(tariffReleaseMigrations) : catalog ? new Set(['20260919010000']) : expected
+  const allowed = processing ? new Set(['20260923050000']) : consent ? new Set(['20260923040000']) : future ? new Set(['20260923030000']) : scoped ? new Set(['20260923020000']) : notice ? new Set(['20260923010000']) : recurring ? new Set(recurringReleaseMigrations) : payments ? new Set(paymentReleaseMigrations) : release ? new Set(tariffReleaseMigrations) : catalog ? new Set(['20260919010000']) : expected
   if (!Array.isArray(data?.migrations) || data.migrations.length === 0) throw new Error('Нет истории миграций')
   const local = new Set(data.migrations.map(row => row.local).filter(Boolean))
   if ([...expected].some(version => !local.has(version))) throw new Error('Неполный локальный набор admin')
@@ -30,6 +31,7 @@ export function validateAdminMigrationHistory(data, catalog = false) {
   if (scoped && !local.has('20260923020000')) throw new Error('Нет миграции области приёмки')
   if (future && !local.has('20260923030000')) throw new Error('Нет миграции будущего платежа')
   if (consent && !local.has('20260923040000')) throw new Error('Нет миграции списка согласий')
+  if (processing && !local.has('20260923050000')) throw new Error('Нет миграции обработки платежей')
   const pending = []
   for (const row of data.migrations) {
     if (row.local === row.remote && row.local) continue
@@ -46,7 +48,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     output = execFileSync('npx', ['supabase', 'migration', 'list', '--linked', '--project-ref', process.env.SUPABASE_PROJECT_ID, '--output', 'json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 })
   } catch { throw new Error('Не удалось прочитать историю stage; применение запрещено') }
   const data = parseMigrationHistory(output)
-  const pending = validateAdminMigrationHistory(data, process.argv.includes('--recurring-consents') ? 'recurring-consents' : process.argv.includes('--future-discount') ? 'future-discount' : process.argv.includes('--recurring-scope') ? 'recurring-scope' : process.argv.includes('--recurring-notice') ? 'recurring-notice' : process.argv.includes('--recurring-release') ? 'recurring-release' : process.argv.includes('--payments-release') ? 'payments-release' : process.argv.includes('--tariff-release') ? 'tariff-release' : process.argv.includes('--catalog'))
+  const pending = validateAdminMigrationHistory(data, process.argv.includes('--payment-processing') ? 'payment-processing' : process.argv.includes('--recurring-consents') ? 'recurring-consents' : process.argv.includes('--future-discount') ? 'future-discount' : process.argv.includes('--recurring-scope') ? 'recurring-scope' : process.argv.includes('--recurring-notice') ? 'recurring-notice' : process.argv.includes('--recurring-release') ? 'recurring-release' : process.argv.includes('--payments-release') ? 'payments-release' : process.argv.includes('--tariff-release') ? 'tariff-release' : process.argv.includes('--catalog'))
   if (process.argv.includes('--require-applied') && pending.length) throw new Error('Остались неприменённые миграции')
   console.log('Ожидают применения admin:', pending.join(', ') || 'нет')
 }

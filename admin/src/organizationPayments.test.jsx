@@ -53,3 +53,48 @@ test('отсутствующий платёж не обозначается ка
  expect(screen.queryByText(/Оплачен/)).toBeNull()
  expect(screen.queryByText('Платёж: payment-a')).toBeNull()
 })
+
+test('одновременно показывает независимую проверку платежа и возврата', async () => {
+ const api = { payments: vi.fn().mockResolvedValue({ items: [{ ...item, payment_requires_review: true, order_state: 'review' }] }) }
+ render(<OrganizationPayments api={api} organizationId="org-a" />)
+ clickLoad()
+ await screen.findByText(/Требуется проверка платежа/)
+ expect(screen.getByText(/Требуется проверка возврата/)).toBeTruthy()
+ expect(screen.queryByText(/Требуется проверка обработки заказа/)).toBeNull()
+ expect(screen.queryByText('Рассчитать сумму')).toBeNull()
+})
+
+test('отделяет подтверждённую оплату от обработки заказа без выдуманной причины', async () => {
+ const api = { payments: vi.fn().mockResolvedValue({ items: [{ ...item, order_state: 'review', payment_requires_review: false, refund_requires_review: false }] }) }
+ render(<OrganizationPayments api={api} organizationId="org-a" />)
+ clickLoad()
+ await screen.findByText(/Требуется проверка обработки заказа/)
+ expect(screen.getByText(/Причина обработки в этом списке пока не указана/)).toBeTruthy()
+ expect(screen.queryByText(/Требуется проверка платежа/)).toBeNull()
+ expect(screen.queryByText(/Требуется проверка возврата/)).toBeNull()
+})
+
+test('завершённый заказ без флагов не показывает предупреждений проверки', async () => {
+ const api = { payments: vi.fn().mockResolvedValue({ items: [{ ...item, payment_requires_review: false, refund_requires_review: false }] }) }
+ render(<OrganizationPayments api={api} organizationId="org-a" />)
+ clickLoad()
+ await screen.findByText('Заказ: order-a')
+ expect(screen.queryByText(/Требуется проверка/)).toBeNull()
+})
+test('отложенный период не обозначается ошибкой обработки и сохраняет проверку возврата', async () => {
+ const api = { payments: vi.fn().mockResolvedValue({ items: [{ ...item, order_state: 'review', fulfillment_state: 'deferred', fulfillment_reason: 'future_period', period_start: '2026-10-23T13:52:13Z' }] }) }
+ render(<OrganizationPayments api={api} organizationId="org-a" />)
+ clickLoad()
+ await screen.findByText(/Период ожидает активации/)
+ expect(screen.getByText(/Запланированное начало/)).toBeTruthy()
+ expect(screen.getByText(/Требуется проверка возврата/)).toBeTruthy()
+ expect(screen.queryByText(/Требуется проверка обработки заказа/)).toBeNull()
+})
+
+test.each([['sandbox_scope_disabled', 'Выдача подписки отключена'], ['private-diagnostic', 'Причина обработки в этом списке пока не указана']])('показывает только известную категорию %s', async (reason, text) => {
+ const api = { payments: vi.fn().mockResolvedValue({ items: [{ ...item, fulfillment_state: 'review', fulfillment_reason: reason }] }) }
+ render(<OrganizationPayments api={api} organizationId="org-a" />)
+ clickLoad()
+ await screen.findByText(new RegExp(text))
+ expect(screen.queryByText(/private-diagnostic/)).toBeNull()
+})

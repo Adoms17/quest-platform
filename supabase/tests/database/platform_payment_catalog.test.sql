@@ -15,6 +15,10 @@ insert into public.billing_sandbox_payment_results(order_id,shop_id,payment_id,s
 values(md5('payment-page-1')::uuid,'123',md5('payment-id')::uuid,'succeeded',true,false);
 insert into public.billing_sandbox_refunds(order_id,actor_id,command_id,amount_minor,payment_id,state)
 select md5('payment-page-1')::uuid,auth.uid(),gen_random_uuid(),10,md5('payment-id')::uuid,state from unnest(array['succeeded','reserved','sending','pending','review','canceled','rejected'])state;
+insert into public.billing_sandbox_fulfillments(order_id,state,reason) values
+(md5('payment-page-1')::uuid,'deferred','future_period'),
+(md5('payment-page-2')::uuid,'review','private-provider-diagnostic'),
+(md5('payment-page-3')::uuid,'review','payment_conflict');
 select set_config('test.expected_order',(select array_agg(id order by created_at desc,id desc)::text from public.billing_sandbox_orders where organization_id=current_setting('test.org')::uuid),true);
 set local role authenticated;
 select set_config('test.page',public.read_platform_organization_payments(current_setting('test.org')::uuid)::text,true);
@@ -33,6 +37,12 @@ select is(current_setting('test.paid')::jsonb->>'refund_requires_review','true',
 select is(current_setting('test.paid')::jsonb->>'payment_status','succeeded','подтверждённая оплата');
 select is((select count(*) from jsonb_array_elements(current_setting('test.items')::jsonb)x where x->>'payment_status'='not_created'),29::bigint,'заказ без платежа не выдаётся за оплату');
 select ok(not exists(select 1 from jsonb_array_elements(current_setting('test.items')::jsonb)x where x ?| array['shop_id','actor_id','command_id','idempotency_key','confirmation_url','n']),'служебные поля скрыты');
+select is(current_setting('test.paid')::jsonb->>'fulfillment_state','deferred','будущий период отделён от проверки');
+select is(current_setting('test.paid')::jsonb->>'fulfillment_reason','future_period','безопасная причина ожидания');
+select ok(current_setting('test.paid')::jsonb->>'period_start' is not null,'дата начала доступна');
+select is((select x->>'fulfillment_reason' from jsonb_array_elements(current_setting('test.items')::jsonb)x where x->>'id'=md5('payment-page-2')::uuid::text),'other','неизвестная диагностика скрыта');
+select is((select x->>'fulfillment_reason' from jsonb_array_elements(current_setting('test.items')::jsonb)x where x->>'id'=md5('payment-page-3')::uuid::text),'payment_conflict','конфликт платежа классифицирован');
+select ok(position('private-provider' in current_setting('test.items'))=0,'нет утечки диагностики');
 select throws_ok($t$select public.read_platform_organization_payments(current_setting('test.other')::uuid)$t$,'42501','platform access denied','чужая область');
 select throws_ok($t$select public.read_platform_organization_payments(current_setting('test.org')::uuid,gen_random_uuid())$t$,'22023','invalid payment cursor','неизвестный курсор');
 select throws_ok('select * from public.billing_sandbox_orders','42501',null,'заказы закрыты напрямую');
