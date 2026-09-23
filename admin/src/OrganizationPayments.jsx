@@ -1,3 +1,5 @@
+import Tariffs from './Tariffs'
+import PaymentOrderDetails from './PaymentOrderDetails'
 import PaymentReviewStatus from './PaymentReviewStatus'
 import RefundHistory from './RefundHistory'
 import RefundPreview from './RefundPreview'
@@ -11,6 +13,8 @@ const paymentLabels = { not_created: 'Платёж не создан', pending: 
 const orderLabels = { reserved: 'Подготовлен', sending: 'Отправляется', review: 'Требует проверки', finished: 'Обработка завершена' }
 const money = value => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(Number(value) / 100)
 function PaymentList({ api, client, organizationId }) {
+ const [version, setVersion] = useState(null)
+ const versionTrigger = useRef(null)
  const [page, setPage] = useState(null)
  const [busy, setBusy] = useState(false)
  const [error, setError] = useState('')
@@ -32,7 +36,7 @@ function PaymentList({ api, client, organizationId }) {
    if (request === generation.current) setBusy(false)
   }
  }
- return <section aria-label="Платежи организации">
+ return <><div hidden={!!version}><section aria-label="Платежи организации">
   <h3>Платежи</h3>
   <p>Тестовая среда (sandbox). Реальные деньги не списываются. Здесь показаны денежные заказы; покупки со скидкой 100% без платежа в этот список не входят.</p>
   <p>Время указано по часовому поясу устройства. Возврат сам по себе не изменяет доступ.</p>
@@ -43,8 +47,9 @@ function PaymentList({ api, client, organizationId }) {
    {!page.items.length && <p>Тестовых платежей нет.</p>}
    <ul>{page.items.map(item => <li key={item.id}>
     <strong>{money(item.amount_minor)} · {paymentLabels[item.payment_status] || 'Неизвестный статус оплаты'}</strong>
-    <small>Заказ: {item.id}</small>
-    {item.payment_id && <small>Платёж: {item.payment_id}</small>}
+    <PaymentOrderDetails item={item} onOpen={client ? event => { versionTrigger.current = event.currentTarget; setVersion(item.plan_version_id) } : null} />
+    <details><summary>Технические данные</summary><small>Заказ: {item.id}</small>
+    {item.payment_id && <small>Платёж: {item.payment_id}</small>}</details>
     <p>Заказ: {item.fulfillment_state === 'deferred' && !item.payment_requires_review ? 'Ожидает активации периода' : (orderLabels[item.order_state] || 'Неизвестный статус заказа')}.</p>
     <p>Создан: {new Date(item.created_at).toLocaleString('ru-RU')}.</p>
     <p>Возвращено: {money(item.refunded_minor)}. Ожидает возврата: {money(item.refund_pending_minor)}.</p>
@@ -55,5 +60,5 @@ function PaymentList({ api, client, organizationId }) {
    </li>)}</ul>
    {page.next_cursor && <button type="button" disabled={busy} onClick={() => load(page.next_cursor)}>Следующая страница платежей</button>}
   </>}
- </section>
+ </section></div>{version && <section aria-label="Тариф заказа"><button type="button" onClick={() => { setVersion(null); requestAnimationFrame(() => versionTrigger.current?.focus()) }}>К платежам</button><Tariffs key={version} client={client} initialVersionId={version} /></section>}</>
 }
