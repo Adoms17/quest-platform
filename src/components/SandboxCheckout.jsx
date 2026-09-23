@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { readSandboxCheckout, recoverSandboxCheckout, loadSandboxOffer, checkSandboxCheckout, listSandboxOffers, dismissCanceledSandboxCheckout, cancelUnsentSandboxCheckout } from '../services/sandboxCheckoutApi'
 import SandboxOfferPicker from './SandboxOfferPicker'
+import RecurringConsent from './RecurringConsent'
 
 export default function SandboxCheckout({ actorId, organizationId }) {
   const [state, setState] = useState({ loading: true })
@@ -65,6 +66,7 @@ export default function SandboxCheckout({ actorId, organizationId }) {
         {state.offer.payment_status === 'waiting_for_capture' && <p role="status">Платёж ожидает подтверждения списания. Оплаченный период ещё не подтверждён.</p>}
         {state.offer.payment_status === 'pending' && !result && <p role="status">Ожидаем завершения платежа. Проверяйте этот заказ перед новой оплатой.</p>}
       </>}
+      {import.meta.env.VITE_SANDBOX_RECURRING_SETUP === 'true' && <RecurringConsent key={`${organizationId}:${state.offer.order_id}`} organizationId={organizationId} orderId={state.offer.order_id} disabled={busy} />}
       <label className="flex items-start gap-3 py-3"><input type="checkbox" checked={accepted} disabled={busy} onChange={event => setAccepted(event.target.checked)} className="mt-1" />Подтверждаю условия тестового заказа</label>
       <button type="button" disabled={!accepted || busy} onClick={() => void submit()} className="rounded-lg bg-blue-600 px-4 py-3 text-white disabled:opacity-50">{busy ? 'Проверяем…' : result || error || state.offer.state !== 'reserved' ? 'Проверить платёж' : 'Подтвердить тестовую оплату'}</button>
       {error && <p role="alert">Не удалось подтвердить состояние платежа. Повторите проверку этого заказа.</p>}

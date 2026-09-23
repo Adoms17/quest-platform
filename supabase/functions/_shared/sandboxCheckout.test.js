@@ -34,3 +34,12 @@ it('возвращает сохранённый финал вместо позд
   deps.rpc.mockImplementation(async name => ({ data: name === 'read_sandbox_payment_order' ? { order: { id: 'order', providerPaymentId: 'payment' } } : { order_id: 'order', payment_id: 'payment', status: 'succeeded', requires_review: true, confirmation_url: null } }))
   expect(await runSandboxCheckout('order', deps)).toMatchObject({ status: 'succeeded', confirmationUrl: null, requiresReview: true })
 })
+it('не возвращает идентификатор сохранённого метода клиенту', async () => {
+  const deps = fixture()
+  deps.provider.readPayment.mockResolvedValue({ ...payment, status: 'succeeded', paid: true, savedMethodId: 'private-method' })
+  deps.rpc.mockImplementation(async name => ({ data: name === 'read_sandbox_payment_order' ? { order: { id: 'order', providerPaymentId: 'payment' } } : { order_id: 'order', payment_id: 'payment', status: 'succeeded', requires_review: false, confirmation_url: null } }))
+  const result = await runSandboxCheckout('order', deps)
+  expect(result).not.toHaveProperty('savedMethodId')
+  expect(JSON.stringify(result)).not.toContain('private-method')
+  expect(deps.rpc.mock.calls.find(([name]) => name === 'record_sandbox_payment_result')[1]).not.toHaveProperty('savedMethodId')
+})

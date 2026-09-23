@@ -32,3 +32,23 @@ it('не пропускает посторонний redirect и не возвр
   expect(result).not.toHaveProperty('payment_method')
   expect(result.test).toBe(true)
 })
+it('сохраняет только идентификатор подтверждённого способа оплаты для сервера', () => {
+  const result = validateSandboxPayment({ ...payment(), status: 'succeeded', paid: true, payment_method: { id: 'test-method-1', saved: true, card: { last4: '0000' }, title: 'Private details' } }, order)
+  expect(result.savedMethodId).toBe('test-method-1')
+  expect(result).not.toHaveProperty('payment_method')
+  expect(JSON.stringify(result)).not.toContain('Private details')
+  expect(JSON.stringify(result)).not.toContain('last4')
+})
+it.each([
+  { saved: false, id: 'method' }, { saved: 'true', id: 'method' },
+  { saved: true, id: '' }, { saved: true, id: '../method' }, { saved: true, id: 'x'.repeat(257) },
+])('не привязывает непроверенный способ оплаты %j', method => {
+  expect(validateSandboxPayment({ ...payment(), status: 'succeeded', paid: true, payment_method: method }, order)).not.toHaveProperty('savedMethodId')
+})
+it('ожидающий платёж не подтверждает сохранение метода', () => {
+  expect(validateSandboxPayment({ ...payment(), payment_method: { saved: true, id: 'method' } }, order)).not.toHaveProperty('savedMethodId')
+})
+it('явное серверное разрешение включает сохранение; строка вместо boolean не принимается', () => {
+  expect(buildSandboxPaymentRequest({ ...order, savePaymentMethod: true }, now).body.save_payment_method).toBe(true)
+  expect(buildSandboxPaymentRequest({ ...order, savePaymentMethod: 'true' }, now).body).not.toHaveProperty('save_payment_method')
+})
