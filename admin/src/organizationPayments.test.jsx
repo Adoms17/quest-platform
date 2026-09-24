@@ -114,3 +114,25 @@ test('открывает точную версию заказа и возвра�
  expect(screen.getByRole('button', { name: 'Pro · Версия №2' })).toBeTruthy()
  expect(api.payments).toHaveBeenCalledTimes(1)
 })
+ test('показывает подтверждённую оплату и сверку, но не считает прошедшую дату активацией', async () => {
+ const pending = { ...item, paid: true, fulfillment_state: 'deferred', order_state: 'review', period_start: '2020-01-01T00:00:00Z', fulfillment_checked_at: '2026-09-24T07:00:00Z', refund_requires_review: false }
+ const api = { payments: vi.fn().mockResolvedValueOnce({ items: [pending] }).mockResolvedValueOnce({ items: [{ ...pending, fulfillment_state: 'applied', order_state: 'finished' }] }) }
+ render(<OrganizationPayments api={api} organizationId="org-a" />)
+ clickLoad()
+ await screen.findByText('Оплачено, ожидает активации.')
+ expect(screen.getByText(/Последняя сверка активации:/)).toBeTruthy()
+ expect(screen.queryByText('Период по заказу выдан.')).toBeNull()
+ clickLoad()
+ await screen.findByText('Период по заказу выдан.')
+ expect(screen.queryByText('Оплачено, ожидает активации.')).toBeNull()
+ })
+ test.each(['deferred', 'applied'])('проверка платежа имеет приоритет над %s', async fulfillment_state => {
+ const api = { payments: vi.fn().mockResolvedValue({ items: [{ ...item, paid: true, fulfillment_state, payment_requires_review: true, fulfillment_checked_at: 'invalid' }] }) }
+ render(<OrganizationPayments api={api} organizationId="org-a" />)
+ clickLoad()
+ await screen.findByText(/Требуется проверка платежа/)
+ expect(screen.queryByText('Период по заказу выдан.')).toBeNull()
+ expect(screen.queryByText('Оплачено, ожидает активации.')).toBeNull()
+ expect(screen.getByText('Время последней сверки активации не указано.')).toBeTruthy()
+ expect(screen.queryByText(/Invalid Date/)).toBeNull()
+ })
