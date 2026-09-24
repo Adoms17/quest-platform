@@ -12,6 +12,7 @@ on:
           - dry-run
           - deploy
           - reconcile
+          - reconcile-order
           - admin-dry-run
           - admin-deploy
           - admin-catalog-dry-run
@@ -36,6 +37,10 @@ on:
           - payment-details-apply
           - recurring-disabled-smoke
           - recurring-acceptance-run
+      sandbox_order_id:
+        description: Exact sandbox order UUID for reconcile-order
+        type: string
+        required: false
       recurring_organization_id:
         description: Explicit sandbox organization UUID for one recurring acceptance run
         type: string
@@ -130,6 +135,7 @@ jobs:
           npx supabase secrets set YOOKASSA_SANDBOX_WORKER_TOKEN="$YOOKASSA_SANDBOX_WORKER_TOKEN" --project-ref "$SUPABASE_PROJECT_ID"
           npx supabase functions deploy sandbox-checkout --project-ref "$SUPABASE_PROJECT_ID"
           npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-reconcile-order --project-ref "$SUPABASE_PROJECT_ID"
           npx supabase functions deploy yookassa-sandbox-webhook --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Enable verified sandbox after publication
@@ -153,6 +159,21 @@ jobs:
           YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
         run: node scripts/run-stage-billing-worker.mjs
 
+  reconcile-order:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'reconcile-order'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+      - name: Reconcile exactly one sandbox order (no refunds)
+        env:
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+          SANDBOX_ORDER_ID: ${{ inputs.sandbox_order_id }}
+        run: node scripts/run-stage-billing-worker.mjs --order
   admin-migrate:
     if: inputs.operation == 'payments-release-dry-run' || inputs.operation == 'payments-release-deploy' || inputs.operation == 'tariff-release-dry-run' || inputs.operation == 'tariff-release-deploy' || inputs.operation == 'admin-dry-run' || inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-dry-run' || inputs.operation == 'admin-catalog-deploy'
     runs-on: ubuntu-latest

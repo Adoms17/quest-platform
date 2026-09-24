@@ -23,6 +23,16 @@ export function createSandboxReconciler({ rpc, provider, shopId }) {
       // Никакие status/paid/amount из тела уведомления не передаются в БД.
       await apply(order, payment, notification.event)
     },
+    async order(orderId) {
+      if (!uuid.test(orderId ?? '')) throw new Error('invalid_order_id')
+      const order = await call('read_sandbox_reconciliation_order', { p_shop_id: shopId, p_order_id: orderId, p_payment_id: null })
+      if (!order || order.id !== orderId) throw new Error('order_unavailable')
+      const payment = await provider.findPayment(order)
+      if (!payment) throw new Error('payment_not_found')
+      const result = await apply(order, payment, 'reconciliation')
+      if (!['applied', 'review', 'deferred', 'not_paid'].includes(result.fulfillmentState)) throw new Error('invalid_fulfillment_state')
+      return { checked: 1, state: result.fulfillmentState }
+    },
     async batch() {
       const ids = await call('claim_sandbox_reconciliation', { p_shop_id: shopId, p_limit: 5 })
       const summary = { checked: 0, applied: 0, review: 0, deferred: 0, failed: 0 }
