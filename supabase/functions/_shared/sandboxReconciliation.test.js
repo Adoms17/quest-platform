@@ -68,3 +68,30 @@ test.each(['storage','provider','verification'])('batch classifies %s failures w
   expect(JSON.stringify(log.mock.calls)).not.toContain('private-')
  } finally {log.mockRestore()}
 })
+
+test('single order only reads verified provider state and never claims a batch', async () => {
+ const payment={paymentId,status:'succeeded',paid:true,test:true}
+ const rpc=vi.fn().mockResolvedValueOnce({data:{id}}).mockResolvedValueOnce({data:paymentId}).mockResolvedValueOnce({data:{fulfillmentState:'applied'}})
+ const findPayment=vi.fn().mockResolvedValue(payment)
+ expect(await createSandboxReconciler({rpc,provider:{findPayment},shopId:'123'}).order(id)).toEqual({checked:1,state:'applied'})
+ expect(rpc.mock.calls).toEqual([
+  ['read_sandbox_reconciliation_order',{p_shop_id:'123',p_order_id:id,p_payment_id:null}],
+  ['enqueue_sandbox_payment_event',{p_shop_id:'123',p_order_id:id,p_payment_id:paymentId,p_event_type:'reconciliation'}],
+  ['apply_sandbox_payment_event',{p_event_id:paymentId,p_payment:payment}],
+ ])
+})
+test.each([null,{id:paymentId}])('single unavailable or mismatched order never contacts provider', async data => {
+ const rpc=vi.fn().mockResolvedValue({data}),findPayment=vi.fn()
+ await expect(createSandboxReconciler({rpc,provider:{findPayment},shopId:'123'}).order(id)).rejects.toThrow('order_unavailable')
+ expect(rpc).toHaveBeenCalledTimes(1); expect(findPayment).not.toHaveBeenCalled()
+})
+test.each([undefined,'','bad',`${id},${paymentId}`])('invalid single order cannot fall back to batch', async value => {
+ const rpc=vi.fn(),findPayment=vi.fn()
+ await expect(createSandboxReconciler({rpc,provider:{findPayment},shopId:'123'}).order(value)).rejects.toThrow('invalid_order_id')
+ expect(rpc).not.toHaveBeenCalled(); expect(findPayment).not.toHaveBeenCalled()
+})
+test('single order provider failure does not enqueue or apply', async () => {
+ const rpc=vi.fn().mockResolvedValue({data:{id}})
+ await expect(createSandboxReconciler({rpc,provider:{findPayment:vi.fn().mockRejectedValue(Error('provider_unavailable'))},shopId:'123'}).order(id)).rejects.toThrow('provider_unavailable')
+ expect(rpc).toHaveBeenCalledTimes(1)
+})

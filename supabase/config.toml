@@ -424,3 +424,6 @@ verify_jwt = false
 
 [functions.sandbox-recurring]
 verify_jwt = false
+
+[functions.sandbox-reconcile-order]
+verify_jwt = false
