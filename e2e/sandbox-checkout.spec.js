@@ -17,6 +17,7 @@ test('sandbox checkout: catalog, lost reservation, reload, payment retry and saf
     if (path.endsWith('/profiles')) data = { username: 'Тест' }
     if (path.endsWith('/organization_memberships')) data = [{ organizations: { id: org, name: 'Тестовая организация', personal_owner_id: user.id }, membership_roles: [{ roles: { key: 'owner', role_permissions: ['billing.read','billing.manage'].map(key => ({ permissions: { key } })) } }] }]
     if (path.endsWith('/get_organization_billing_overview')) data = { organization_id: org, status: 'unconfigured', configured_plan: null, can_manage: true, usage: { active_quests: 0, team_members: 1 }, enforcement: { active_quests: false, team_members: false }, effective_entitlements: null, measured_at: '2026-09-16T00:00:00Z' }
+    if (path.endsWith('/read_recurring_failure_notice')) data = paid ? null : { status: 'payment_failed', period_start: offer.period_start, failed_at: '2026-09-16T00:01:00Z' }
     if (path.endsWith('/find_pending_sandbox_order')) data = executing ? id : null
     if (path.endsWith('/list_sandbox_checkout_offers')) data = [offer]
     if (path.endsWith('/get_sandbox_order_offer')) data = { ...offer, discount: { base_amount_minor: 100, discount_amount_minor: 0, discount_bps: 0 }, order_id: id, state: paid ? 'finished' : 'reserved', fulfillment_state: paid ? 'applied' : 'none' }
@@ -36,6 +37,10 @@ test('sandbox checkout: catalog, lost reservation, reload, payment retry and saf
     await route.fulfill({ json: data })
   })
   await page.goto('/organization/billing')
+  const failureNotice = page.getByRole('heading', { name: 'Тестовое автопродление не оплачено' })
+  await expect(failureNotice).toBeVisible()
+  await page.getByRole('link', { name: 'Перейти к ручной оплате' }).click()
+  await expect(page).toHaveURL(/#sandbox-manual-checkout$/)
   await page.getByLabel('Тестовое предложение').selectOption(offerId)
   expect(payments).toHaveLength(0)
   await page.getByRole('button', { name: 'Рассчитать стоимость' }).click()
@@ -56,10 +61,14 @@ test('sandbox checkout: catalog, lost reservation, reload, payment retry and saf
   expect(payments).toEqual([{ orderId: id }, { orderId: id }])
   await page.screenshot({ path: testInfo.outputPath('sandbox-checkout.png'), fullPage: true })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+  await expect(failureNotice).toBeVisible()
   paid = true
   await page.reload()
   await expect(page.getByText('Оплаченный тестовый период применён.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Закрыть завершённый заказ' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Перейти к тестовой оплате' })).toHaveCount(0)
+  await expect(failureNotice).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Перейти к ручной оплате' })).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('manual-payment-notice-cleared.png'), fullPage: true })
   expect(errors).toEqual([])
 })
