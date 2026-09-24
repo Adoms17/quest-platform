@@ -144,3 +144,14 @@ it('payment details allows only its migration after applied scope', () => {
  expect(()=>check([...base.slice(0,-1),{...base.at(-1),remote:''},pending])).toThrow()
  expect(()=>check([...base,pending,{local:'20260923070000',remote:''}])).toThrow()
 })
+it('order schedule allows only its migration after applied scope', () => {
+ const base=[...rows(),{local:'20260919010000'},...[...tariffReleaseMigrations,...paymentReleaseMigrations,...recurringReleaseMigrations,'20260923010000','20260923020000','20260923030000','20260923040000','20260923050000','20260923060000'].map(local=>({local}))].map(row=>({...row,remote:row.local}))
+ const pending={local:'20260924010000',remote:''}
+ const check=migrations=>validateAdminMigrationHistory({migrations},'order-schedule')
+ expect(check([...base,pending])).toEqual([pending.local])
+ expect(check([...base,{...pending,remote:pending.local}])).toEqual([])
+ expect(()=>check(base)).toThrow()
+ expect(()=>check([...base.slice(0,-1),pending])).toThrow()
+ expect(()=>check([...base.slice(0,-1),{...base.at(-1),remote:''},pending])).toThrow()
+ expect(()=>check([...base,pending,{local:'20260924020000',remote:''}])).toThrow()
+})

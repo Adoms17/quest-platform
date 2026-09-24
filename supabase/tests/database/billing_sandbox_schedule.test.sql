@@ -1,0 +1,57 @@
+begin;
+select no_plan();
+select is((select active from cron.job where jobname='quest-stage-order-reconciliation'),false,'new schedule disabled');
+select is((select active from cron.job where jobname='quest-billing-lifecycle'),false,'old lifecycle stays disabled');
+select is(platform_private.run_scheduled_sandbox_orders()->>'sent','0','empty allowlist does not require token');
+select ok(not has_function_privilege('service_role','platform_private.run_scheduled_sandbox_orders()','execute'),'API role cannot trigger cron');
+set local role authenticated;
+select throws_ok($$select * from net.http_request_queue$$,'42501',null,'HTTP authentication headers hidden from browser');
+select throws_ok($$select * from vault.decrypted_secrets$$,'42501',null,'Vault hidden from browser');
+select throws_ok($$select * from public.billing_sandbox_scheduled_orders$$,'42501',null,'browser cannot read allowlist');
+select throws_ok($$insert into public.billing_sandbox_scheduled_orders(order_id,not_before,expires_at) values(gen_random_uuid(),now(),now()+interval '1 hour')$$,'42501',null,'browser cannot schedule');
+reset role;
+set local role anon;
+select throws_ok($$select * from public.billing_sandbox_scheduled_orders$$,'42501',null,'anonymous denied');
+reset role;
+insert into auth.users(id,email) values(md5('schedule-owner')::uuid,'schedule-owner@example.test');
+select set_config('test.schedule.org',(select id::text from public.organizations where personal_owner_id=md5('schedule-owner')::uuid),true);
+insert into public.billing_sandbox_orders(id,organization_id,actor_id,command_id,plan_version_id,expected_revision,amount_minor,currency,shop_id,return_url,period_start,period_end,first_sent_at)
+values(md5('schedule-order')::uuid,current_setting('test.schedule.org')::uuid,md5('schedule-owner')::uuid,gen_random_uuid(),(select id from public.billing_plan_versions where plan_key='pro' and version=1),0,200,'RUB','123','https://stage.qvesta.ru',now()-interval '1 minute',now()+interval '1 month',now());
+insert into public.billing_sandbox_scheduled_orders(order_id,not_before,expires_at)
+values(md5('schedule-order')::uuid,now(),now()+interval '1 hour');
+select is(platform_private.run_scheduled_sandbox_orders()->>'sent','0','disabled order ignored');
+update public.billing_sandbox_scheduled_orders set enabled=true;
+select is(platform_private.run_scheduled_sandbox_orders()->>'stopped','1','unverified payment stopped without HTTP');
+select is((select stop_reason from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid),'ineligible','ineligible reason');
+insert into public.billing_sandbox_fulfillments(order_id,state) values(md5('schedule-order')::uuid,'applied');
+update public.billing_sandbox_scheduled_orders set enabled=true;
+select is(platform_private.run_scheduled_sandbox_orders()->>'stopped','1','completed order stopped');
+select is((select stop_reason from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid),'applied','completion retained');
+update public.billing_sandbox_fulfillments set state='deferred';
+update public.billing_sandbox_scheduled_orders set enabled=true,not_before=now()-interval '2 hours',expires_at=now()-interval '1 hour';
+select is(platform_private.run_scheduled_sandbox_orders()->>'stopped','1','expired schedule stopped');
+select is((select stop_reason from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid),'expired','deadline reason');
+-- All HTTP inserts remain in this transaction and are rolled back: pg_net never sends them.
+insert into public.billing_sandbox_application_scope values(current_setting('test.schedule.org')::uuid);
+insert into public.billing_sandbox_payment_results(order_id,shop_id,payment_id,status,paid)
+values(md5('schedule-order')::uuid,'123',md5('schedule-payment')::uuid,'succeeded',true);
+update public.billing_sandbox_scheduled_orders set enabled=true,stop_reason=null,not_before=now()+interval '1 hour',expires_at=now()+interval '2 hours';
+select is(platform_private.run_scheduled_sandbox_orders()->>'sent','0','future schedule waits without token');
+update public.billing_sandbox_scheduled_orders set not_before=now(),expires_at=now()+interval '1 hour';
+select throws_ok($$select platform_private.run_scheduled_sandbox_orders()$$,'55000','scheduler token unavailable','missing token fails closed');
+select is((select attempts from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid),0,'missing token does not consume attempt');
+select vault.create_secret(repeat('a',64),'qvesta_stage_reconcile_worker_token');
+select is(platform_private.run_scheduled_sandbox_orders()->>'sent','1','due verified order queued');
+select is((select attempts from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid),1,'one dispatch counted');
+select is((select url from net.http_request_queue where id=(select last_request_id from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid)),'https://jeugfyaqzfgdvfhdxfht.supabase.co/functions/v1/sandbox-reconcile-order','only fixed stage endpoint');
+select is((select headers->>'x-qvesta-order-id' from net.http_request_queue where id=(select last_request_id from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid)),md5('schedule-order')::uuid::text,'exact order header');
+select is(platform_private.run_scheduled_sandbox_orders()->>'sent','0','immediate rerun sends nothing');
+update public.billing_sandbox_scheduled_orders set attempts=6,next_check_at=now();
+select is(platform_private.run_scheduled_sandbox_orders()->>'stopped','1','bounded retry stops');
+select is((select stop_reason from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid),'attempt_limit','attempt cap reason');
+update public.billing_sandbox_scheduled_orders set enabled=true,attempts=0;
+update public.billing_sandbox_fulfillments set state='review' where order_id=md5('schedule-order')::uuid;
+select is(platform_private.run_scheduled_sandbox_orders()->>'stopped','1','review is not retried automatically');
+select is((select stop_reason from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid),'review','review reason');
+select * from finish();
+rollback;

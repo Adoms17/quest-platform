@@ -330,3 +330,32 @@ HTTP 200, публичный /assets/index-Clg2pD_D.js содержит дета
 Добавлен отдельный sandbox-reconcile-order: POST с серверным worker-token и обязательным x-qvesta-order-id; ID проверяется до запросов БД, read_sandbox_reconciliation_order проверяет магазин, состояние перечитывается у провайдера и передаётся штатному apply_sandbox_payment_event. Нет claim общей очереди и обработки возвратов. Отсутствующий/чужой заказ не вызывает провайдера; неверный ID не переключает на batch. Runner --order требует SANDBOX_ORDER_ID и фиксирует stage endpoint; workflow operation=reconcile-order разрешён только staging. Публикация новой функции включена в существующий deploy_sandbox шаг. Схема БД и RLS не менялись.
 
 52 unit-теста PASS (handler авторизация, single-order, batch regression, runner). Lint PASS с прежними предупреждениями, build PASS, diff-check PASS. Deno endpoint и полный путь на stage ещё не проверены; изменения не опубликованы. Следующее: выпуск отдельной функции и запуск reconcile-order для 492a538e-b621-4058-a1e7-d4c78a347256, затем read-back billing_sandbox_fulfillments=applied. Отклонённый общий workflow не запускался.
+
+
+## 2026-09-24 — точечная сверка выпущена и проверена
+
+По явному разрешению выполнены commit/push/PR #95 и squash merge в staging: 4a9cb999f3550cbe02b3925139bd4dc522d32427. CI 35954934388 PASS (9m54s), CodeQL PASS. После проверки соответствия исходников stage опубликован только sandbox-reconcile-order; миграции и секреты не менялись. Публичный smoke: GET 405, POST без токена 401, пустые ответы/no-store.
+
+Workflow 35955735796 с operation=reconcile-order и единственным заказом 492a538e-b621-4058-a1e7-d4c78a347256 PASS: checked=1/state=applied. Независимое чтение: fulfillment applied/reason null, order finished, payment succeeded/paid, subscription active/revision=2; один заказ/одно подтверждение, даты сохранены. Новых платежей и обработки возвратов нет. Устаревшая проекция deferred исправлена штатной сверкой провайдера. Notion OPS-01 обновлён: будущая активация завершена, расписание и фактическое автосписание полной цены после скидки остаются открытыми. Production не затронут.
+
+
+## 2026-09-24 — локальная подготовка ограниченного расписания
+
+Stage read-only: pg_cron установлен, quest-billing-lifecycle active=false; pg_net отсутствует, Vault пуст. GitHub default branch main, поэтому расписание на staging само по себе не запускается. Выбран отдельный Supabase Cron → pg_net → sandbox-reconcile-order, по официальной документации https://supabase.com/docs/guides/functions/schedule-functions .
+
+Черновик миграции 20260924010000 добавляет закрытый RLS allowlist заказов, срок до 24 часов, максимум 6 попыток с интервалом 5 минут и остановку applied/review/expired/ineligible. До начала оплаченного периода вызов не отправляется. Endpoint фиксирован на stage, token читается из Vault только для готового заказа. Новое расписание создаётся disabled, старое не включается; token и заказы миграцией не создаются. SQL-тесты доступа и остановок добавлены, harness обновлён на 80 миграций.
+
+Lint PASS (прежние предупреждения). Vite build собрал assets, но процесс ещё не завершил PWA-этап; полный build PASS пока не подтверждён. SQL/RLS/replay НЕ запущены: Docker Engine недоступен (pipe dockerDesktopLinuxEngine отсутствует). Алексей получил просьбу запустить Docker Desktop. Миграция не применена и не опубликована; перед выпуском нужен полный SQL-прогон, расширение тестов очереди HTTP/ограничения попыток, настройка Vault без вывода секретов и явное включение только согласованного заказа. Автоматическое расписание пока не работает.
+
+PWA-этап затем завершился, npm run build exit=0: полный build PASS подтверждён.
+
+
+## 2026-09-24 — проверка и защита расписания
+
+Docker Desktop доступен. Первые replay остановились на настройках изолированного контейнера: preload pg_net, затем собственный preload/getkey_script supabase_vault. Harness теперь создаёт отдельный ключ во временном контейнере; реальные секреты не читаются. SQL-проверки подтвердили постановку точного заказа в HTTP-очередь, отсутствие немедленного повтора, остановку по лимиту и review, отказ без Vault-токена. HTTP-очередь теста откатывается транзакцией без отправки.
+
+Обнаружено стандартное право authenticated на net.http_request_queue. В миграцию добавлен REVOKE для public/anon/authenticated/service_role: заголовки с worker-токеном не должны быть доступны клиенту. Регрессионный тест чтения очереди добавлен вместе с проверкой запрета чтения Vault. Финальный replay выполняется на новой миграции; предыдущий запуск видел старую миграцию и новый тест и корректно выявил открытый доступ.
+
+Подготовлен order-schedule-dry-run/apply в stage workflow и отдельный allowlist только 20260924010000 после полностью применённых предшественников; 18 guard-тестов PASS. Stage read-only подтвердил pg_net в shared_preload_libraries. Релиз создаёт только выключенное расписание; настройка Vault, регистрация заказа и включение выполняются отдельно после проверки.
+
+Финальный полный replay PASS 154.49s: 80 миграций, 28 проверок расписания (включая запрет чтения HTTP-заголовков), остальные SQL/RLS, concurrency, PostgREST/Edge. Временные контейнеры удалены. Guard 18 PASS; lint/build PASS с прежними warnings, diff-check PASS. Подготовлен выпуск выключенного основания без token/заказов/включения cron.
