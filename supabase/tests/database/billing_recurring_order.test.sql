@@ -37,6 +37,21 @@ select is(pg_temp.prepare()->>'amount_minor','0','продление испол�
 select is(pg_temp.prepare()->>'requires_payment','false','нулевой расчёт не требует платежа');
 select is((select count(*) from public.billing_discount_reservations where organization_id=current_setting('test.org')::uuid and state='reserved'),1::bigint,'повтор не резервирует второй льготный период');
 rollback to zero_discount;
+-- Последний льготный период израсходован: полная цена именно в заказе автопродления.
+savepoint exhausted_discount;
+insert into public.billing_discount_codes(id,organization_id,plan_key,code_hash,discount_bps,eligible_periods,period_months,activate_before,issuer_id,issue_command_id)
+values(md5('recurring-exhausted-code')::uuid,current_setting('test.org')::uuid,'pro',repeat('b',64),5000,1,1,now()-interval '1 day',auth.uid(),gen_random_uuid());
+insert into public.billing_discount_reservations(order_id,discount_id,organization_id,request,quote,state,created_at,settled_at)
+values(md5('recurring-exhausted-benefit')::uuid,md5('recurring-exhausted-code')::uuid,current_setting('test.org')::uuid,'{}','{}','consumed',now()-interval '3 days',now()-interval '2 days');
+select set_config('test.full_quote',pg_temp.prepare()::text,true);
+select is(current_setting('test.full_quote')::jsonb->>'amount_minor','10000','после последней скидки заказ автопродления на полную исходную цену');
+select is(current_setting('test.full_quote')::jsonb->>'plan_version_id',current_setting('test.plan'),'исчерпание скидки сохраняет исходную версию подписки');
+select is(pg_temp.prepare(),current_setting('test.full_quote')::jsonb,'повтор полной цены не создаёт новый заказ');
+select is((select count(*) from public.billing_recurring_orders where organization_id=current_setting('test.org')::uuid),1::bigint,'после скидки один заказ автопродления');
+select is((select count(*) from public.billing_discount_reservations where discount_id=md5('recurring-exhausted-code')::uuid and state='consumed'),1::bigint,'израсходованная льгота не расходуется повторно');
+select is((select count(*) from public.billing_discount_reservations where discount_id=md5('recurring-exhausted-code')::uuid and state='reserved'),0::bigint,'исчерпанная скидка не резервируется заново');
+select is((select count(*) from public.billing_sandbox_orders where organization_id=current_setting('test.org')::uuid),1::bigint,'подготовка полной цены не отправляет новый платёж');
+rollback to exhausted_discount;
 select set_config('test.quote',pg_temp.prepare()::text,true);
 select is(current_setting('test.quote')::jsonb->>'base_amount_minor','10000','используется исходная полная цена, а не сумма первого платежа со скидкой');
 select is(current_setting('test.quote')::jsonb->>'amount_minor','10000','без активного промокода цена полная');

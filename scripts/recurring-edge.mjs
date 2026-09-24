@@ -23,6 +23,7 @@ export async function verifyRecurringEdge(container,sql,docker,serviceToken){
    '-e','YOOKASSA_SANDBOX_RECURRING_ORGANIZATION_ID='+scopedOrg,
    '-e','YOOKASSA_SANDBOX_ENABLED=true','-e','YOOKASSA_SANDBOX_RECURRING_ENABLED=true',
    '-e','YOOKASSA_SANDBOX_WORKER_TOKEN='+workerToken,
+   '-e','QVESTA_TEST_LOST_PAYMENT_RESPONSE=1',
    'supabase/edge-runtime:v1.74.3','start','--main-service','/fixture']);started=true
   // Холодная загрузка npm-зависимостей имеет отдельный ограниченный бюджет.
   const startupDeadline=Date.now()+180000
@@ -35,8 +36,21 @@ export async function verifyRecurringEdge(container,sql,docker,serviceToken){
   }
   expect(request('POST',false).status).toBe(401)
   const result=request();expect(result.status,result.body).toBe(200)
-  expect(JSON.parse(result.body)).toEqual({processed:1,failed:0,reconciliationRequired:0,reviewRequired:0})
+  expect(JSON.parse(result.body)).toEqual({processed:1,failed:0,reconciliationRequired:1,reviewRequired:0})
   const org="(select organization_id from public.billing_recurring_consents where id=md5('edge-recurring-source-consent')::uuid)"
+  const orders=`select id from public.billing_recurring_orders where organization_id=${org}`
+  expect(sql(`select revision from public.organization_subscriptions where organization_id=${org}`).trim()).toBe('1')
+  expect(sql(`select count(*) from public.billing_period_confirmations where confirmation_id in (${orders})`).trim()).toBe('0')
+  expect(sql(`select count(*) from public.billing_recurring_results where order_id in (${orders})`).trim()).toBe('0')
+  expect(sql(`select count(*) from public.billing_discount_reservations where order_id in (${orders}) and state='reserved'`).trim()).toBe('1')
+  const paused=request();expect(paused.status).toBe(200)
+  expect(JSON.parse(paused.body)).toEqual({processed:0,failed:0,reconciliationRequired:0,reviewRequired:0})
+  // Advance only the synthetic fixture's retry time; no production clock or endpoint changes.
+  sql(`update public.billing_recurring_checks set next_check_at=now()-interval '1 second' where order_id in (${orders})`)
+  const recovered=request();expect(recovered.status,recovered.body).toBe(200)
+  expect(JSON.parse(recovered.body)).toEqual({processed:1,failed:0,reconciliationRequired:0,reviewRequired:0})
+  expect(sql(`select count(*) from public.billing_recurring_dispatches where order_id in (${orders})`).trim()).toBe('1')
+  expect(sql(`select count(*) from public.billing_recurring_results where order_id in (${orders}) and status='succeeded' and paid and not requires_review`).trim()).toBe('1')
   expect(sql(`select revision from public.organization_subscriptions where organization_id=${org}`).trim()).toBe('2')
   expect(sql(`select count(*) from public.billing_recurring_orders r join public.billing_period_confirmations p on p.confirmation_id=r.id where r.organization_id=${org}`).trim()).toBe('1')
   const again=request();expect(again.status).toBe(200);expect(JSON.parse(again.body).processed).toBe(0)
