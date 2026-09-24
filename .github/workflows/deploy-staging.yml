@@ -35,6 +35,8 @@ on:
           - payment-processing-apply
           - payment-details-dry-run
           - payment-details-apply
+          - order-schedule-dry-run
+          - order-schedule-apply
           - recurring-disabled-smoke
           - recurring-acceptance-run
       sandbox_order_id:
@@ -623,3 +625,50 @@ jobs:
         run: |
           echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
           echo 'No functions, schedules, frontend flags or recurring enablement changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  order-schedule-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'order-schedule-dry-run' || inputs.operation == 'order-schedule-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = order-schedule-dry-run || test "$OPERATION" = order-schedule-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --order-schedule
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'order-schedule-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --order-schedule
+      - name: Apply recurring migrations
+        if: inputs.operation == 'order-schedule-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'order-schedule-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --order-schedule --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Only disabled order schedule foundation installed; no tokens, orders or enablement configured.' >> "$GITHUB_STEP_SUMMARY"
