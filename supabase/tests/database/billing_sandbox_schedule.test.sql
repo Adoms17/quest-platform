@@ -53,5 +53,7 @@ update public.billing_sandbox_scheduled_orders set enabled=true,attempts=0;
 update public.billing_sandbox_fulfillments set state='review' where order_id=md5('schedule-order')::uuid;
 select is(platform_private.run_scheduled_sandbox_orders()->>'stopped','1','review is not retried automatically');
 select is((select stop_reason from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid),'review','review reason');
+select ok(not (select headers ? 'x-qvesta-worker-token' from net.http_request_queue where id=(select last_request_id from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid)),'permanent token absent from queue');
+select ok((select headers->>'x-qvesta-order-signature' ~ '^[a-f0-9]{64}$' from net.http_request_queue where id=(select last_request_id from public.billing_sandbox_scheduled_orders where order_id=md5('schedule-order')::uuid)),'queue has bounded signed authorization');
 select * from finish();
 rollback;
