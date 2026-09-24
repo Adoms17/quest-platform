@@ -17,8 +17,10 @@ globalThis.fetch = async (input, init) => {
   const body = JSON.parse(String(init.body))
   savedPayment = { id: paymentId, status: 'succeeded', paid: true, test: true, amount: body.amount,
    recipient: { account_id: '987' }, metadata: body.metadata, payment_method: { id: body.payment_method_id, saved: true } }
+  if (Deno.env.get('QVESTA_TEST_LOST_PAYMENT_RESPONSE') === '1') throw new Error('synthetic lost payment response')
   return Response.json(savedPayment)
  }
+ if (url.pathname === '/v3/payments' && (!init?.method || init.method === 'GET')) return Response.json({ items: savedPayment ? [savedPayment] : [] })
  if (url.pathname === '/v3/payments/'+paymentId && savedPayment) return Response.json(savedPayment)
  throw new Error('unexpected test provider request')
 }
