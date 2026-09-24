@@ -7,6 +7,7 @@ import {verifyRecurringConcurrency,verifyDispatchConcurrency} from './recurring-
 import {verifyTrialCheckoutConcurrency} from './trial-checkout-concurrency.mjs'
 import {verifyPlatformRefundConcurrency} from './platform-refund-concurrency.mjs'
 import {verifyRecurringPostgrest} from './recurring-postgrest.mjs'
+import {configureStageSchedulerVault} from './configure-stage-scheduler-vault.mjs'
 const enabled=process.env.QVESTA_TEST_TARIFF_RELEASE==='1'
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
 test.skipIf(!enabled)('чистая схема staging → 81 миграций тарифного релиза',async()=>{
@@ -50,6 +51,15 @@ select public.redeem_organization_promotion(current_setting('test.org')::uuid,cu
 ${removal}`)).toThrow('legacy promotion access must be resolved before removal')
   sql(release.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
   expect(release).toHaveLength(81)
+  // Реальный Vault в изолированном контейнере: создание, повтор, запрет ротации и активного cron.
+  const vaultEnv={SUPABASE_PROJECT_ID:'jeugfyaqzfgdvfhdxfht',GITHUB_REF:'refs/heads/staging',SUPABASE_ACCESS_TOKEN:'synthetic',YOOKASSA_SANDBOX_WORKER_TOKEN:'cd'.repeat(32)}
+  await configureStageSchedulerVault(vaultEnv,sql)
+  await configureStageSchedulerVault(vaultEnv,sql)
+  expect(sql("select count(*) from vault.secrets where name='qvesta_stage_reconcile_worker_token';").trim()).toBe('1')
+  await expect(configureStageSchedulerVault({...vaultEnv,YOOKASSA_SANDBOX_WORKER_TOKEN:'ef'.repeat(32)},sql)).rejects.toThrow('stage_vault_configuration_failed')
+  sql("select cron.alter_job((select jobid from cron.job where jobname='quest-stage-order-reconciliation'),active:=true);")
+  await expect(configureStageSchedulerVault(vaultEnv,sql)).rejects.toThrow('stage_vault_configuration_failed')
+  sql("select cron.alter_job((select jobid from cron.job where jobname='quest-stage-order-reconciliation'),active:=false); delete from vault.secrets where name='qvesta_stage_reconcile_worker_token';")
   await verifyPlatformRefundConcurrency(name,sql)
   bridgeContract()
   sql('create extension pgtap with schema extensions; grant usage on schema extensions to authenticated,anon,service_role;')

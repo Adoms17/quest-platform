@@ -33,6 +33,8 @@ set local lock_timeout='5s';
 do $configure$
 declare existing text; definition text;
 begin
+ if has_table_privilege('anon','vault.decrypted_secrets','SELECT') or has_table_privilege('authenticated','vault.decrypted_secrets','SELECT')
+ then raise exception 'client Vault access forbidden'; end if;
  if not pg_try_advisory_xact_lock(24092026,7) then raise exception 'scheduler busy'; end if;
  if (select count(*) from cron.job where jobname in ('quest-stage-order-reconciliation','quest-billing-lifecycle'))<>2
  or exists(select 1 from cron.job where jobname in ('quest-stage-order-reconciliation','quest-billing-lifecycle') and active)
