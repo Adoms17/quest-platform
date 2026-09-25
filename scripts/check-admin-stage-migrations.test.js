@@ -177,3 +177,18 @@ it('organization quests allows only its migration after applied scope', () => {
  expect(()=>check([...base.slice(0,-1),{...base.at(-1),remote:''},pending])).toThrow()
  expect(()=>check([...base,pending,{local:'20260925020000',remote:''}])).toThrow()
 })
+it('statistics requires its three migrations and applied quest foundation', () => {
+ const base=[...rows(),{local:'20260919010000'},...[...tariffReleaseMigrations,...paymentReleaseMigrations,...recurringReleaseMigrations,'20260923010000','20260923020000','20260923030000','20260923040000','20260923050000','20260923060000','20260924010000','20260924020000','20260925010000'].map(local=>({local}))].map(row=>({...row,remote:row.local}))
+ const versions=['20260925020000','20260925025000','20260925030000']
+ const pending=versions.map(local=>({local,remote:''}))
+ const check=migrations=>validateAdminMigrationHistory({migrations},'organization-statistics')
+ expect(check([...base,...pending])).toEqual(versions)
+ expect(check([...base,...pending.map(row=>({...row,remote:row.local}))])).toEqual([])
+ expect(check([...base,{...pending[0],remote:pending[0].local},...pending.slice(1)])).toEqual(versions.slice(1))
+ for(let i=0;i<pending.length;i++) expect(()=>check([...base,...pending.filter((_,j)=>j!==i)])).toThrow()
+ expect(()=>check([...base.slice(0,-1),...pending])).toThrow()
+ expect(()=>check([...base.slice(0,-1),{...base.at(-1),remote:''},...pending])).toThrow()
+ expect(()=>check([...base,...pending,{local:'20260925040000',remote:''}])).toThrow()
+ expect(()=>check([...base,...pending,{local:'',remote:'20260925040000'}])).toThrow()
+ expect(()=>check([...base,...pending,pending[0]])).toThrow()
+})
