@@ -107,7 +107,7 @@ test('карточка получает фокус и возвращает ег�
   await expect(page.getByRole('article')).toBeFocused()
   await expect(page.getByLabel('Название или ID организации')).toBeHidden()
   await page.getByRole('button', { name: 'Квесты и участники', exact: true }).click()
-  await expect(page.getByText('Просмотр квестов и участников организации появится в следующих обновлениях.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Найти квесты' })).toBeVisible()
   await page.getByRole('button', { name: 'Акции и бонусы', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Загрузить промокоды' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Загрузить платежи' })).toHaveCount(0)
@@ -369,4 +369,33 @@ test('история возвратов: восстановление без л�
  await expect(page.getByRole('alert')).toContainText('Доступ не предоставлен или отозван')
  await expect(page.getByRole('button',{name:'Продолжить возврат',exact:true})).toHaveCount(0)
  await expect(page.getByText('private',{exact:true})).toHaveCount(0)
+})
+
+test('реестр квестов: поиск, статусы и отзыв доступа', async ({ page }, testInfo) => {
+ await mockApi(page, 'aal2')
+ let denied = false
+ await page.route('**/rest/v1/rpc/read_platform_organization_quests', route => {
+  const request = route.request().postDataJSON()
+  expect(request.p_organization_id).toBe('org')
+  expect(request.p_search).toBe('Маяк')
+  expect(request.p_status).toBe('open')
+  return denied ? route.fulfill({ status: 403, json: { code: '42501', message: 'private' } }) : route.fulfill({ json: {
+   summary: { total: 2, open: 1, closed: 1 }, items: [{ id: 'q', title: 'Маяк', is_open: true, is_public: false, created_at: '2026-09-01T12:00:00Z' }], next_cursor: { id: 'q' },
+  } })
+ })
+ await page.goto('/')
+ await page.getByRole('button', { name: 'Найти', exact: true }).click()
+ await page.getByRole('button', { name: 'Тестовая организация', exact: true }).click()
+ await page.getByRole('button', { name: 'Квесты и участники', exact: true }).click()
+ await page.getByLabel('Название квеста').fill('Маяк')
+ await page.getByRole('combobox', { name: 'Доступность', exact: true }).selectOption('open')
+ await page.getByRole('button', { name: 'Найти квесты' }).click()
+ await expect(page.getByRole('heading', { name: 'Маяк' })).toBeVisible()
+ await expect(page.getByText('Открыт · Приватный')).toBeVisible()
+ expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width)
+ await capture(page, testInfo, 'organization-quests')
+ denied = true
+ await page.getByRole('button', { name: 'Следующая страница квестов' }).click()
+ await expect(page.getByRole('alert')).toContainText('Доступ не предоставлен или отозван')
+ await expect(page.getByRole('heading', { name: 'Маяк' })).toHaveCount(0)
 })

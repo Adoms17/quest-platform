@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import OrganizationQuests from './OrganizationQuests'
 import OrganizationPayments from './OrganizationPayments'
 import OrganizationDiscounts from './OrganizationDiscounts'
 import OrganizationCampaigns from './OrganizationCampaigns'
@@ -29,7 +30,7 @@ export default function OrganizationCard({ organization, api, client, onBack }) 
         <OrganizationDiscounts api={api} organizationId={organization.id} />
         <OrganizationCampaigns client={client} api={api} organizationId={organization.id} />
       </>}
-      {section === 'quests' && <p>Просмотр квестов и участников организации появится в следующих обновлениях.</p>}
+      {section === 'quests' && <OrganizationQuests api={api} organizationId={organization.id} />}
     </div>
   </article>
 }

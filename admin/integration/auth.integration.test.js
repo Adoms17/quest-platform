@@ -134,6 +134,10 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       alter table public.organization_subscriptions enable row level security;
       revoke all on public.organization_subscriptions from public,anon,authenticated,service_role;
       create table public.organizations(id uuid primary key,name text not null,created_at timestamptz default now());
+      -- Минимальная зависимость реестра; полная схема отдельно проверена replay.
+      create table public.quests(id uuid primary key,organization_id uuid references public.organizations(id),title text,description text,is_open boolean,is_public boolean,created_at timestamptz,start_at timestamptz,end_at timestamptz);
+      alter table public.quests enable row level security;
+      revoke all on public.quests from public,anon,authenticated,service_role;
       alter table public.organizations enable row level security;
       revoke all on public.organizations from public,anon,authenticated;
     `)
@@ -165,6 +169,7 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       '20260922040000_authorize_platform_refund_execution.sql',
       '20260922050000_platform_refund_gateway.sql',
       '20260922070000_validate_platform_refund_amount.sql',
+      '20260925010000_read_platform_organization_quests.sql',
     ]) await sql(readFileSync(new URL(`../../supabase/migrations/${migration}`, import.meta.url), 'utf8'))
     // Только DDL inbox: команды жизненного цикла подписок не входят в этот стенд.
     // Полный файл отдельно проверяет replay всех миграций.
@@ -278,6 +283,16 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
         return totp(enrolled.totp.secret)
       } })
     }
+    const questId = randomUUID()
+    await sql(`insert into public.quests(id,organization_id,title,description,is_open,is_public,created_at) values('${questId}','${org}','Synthetic quest','private-content',true,false,now());`)
+    const questQuery = { p_organization_id: org }
+    const questPage = successful(await rpc('read_platform_organization_quests', questQuery))
+    expect(questPage.summary).toEqual({ total: 1, open: 1, closed: 0 })
+    expect(questPage.items).toMatchObject([{ id: questId, title: 'Synthetic quest', is_open: true, is_public: false }])
+    expect(questPage.items[0]).not.toHaveProperty('description')
+    expect((await rpc('read_platform_organization_quests', questQuery, null)).status).toBe(401)
+    expect((await rpc('read_platform_organization_quests', questQuery, login.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_organization_quests', questQuery, parts.join('.'))).status).toBe(401)
     // Отдельный настоящий аккаунт продаж: сначала платформа, затем одна организация.
     const salesCredentials = { email: 'sales@example.test', password: randomBytes(24).toString('hex') }
     const sales = successful(await request('/signup', salesCredentials))
@@ -290,6 +305,16 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       p_organization_id: organizationId, p_reason_code: 'role_change',
     })
     const globalSales = successful(await grantSales(null))
+    expect((await rpc('read_platform_organization_quests', questQuery, salesMfa.access_token)).status).toBe(403)
+    const otherOrg = randomUUID()
+    await sql(`insert into public.organizations(id,name) values('${otherOrg}','Other synthetic organization');`)
+    const operationsAssignment = randomUUID()
+    await sql(`insert into public.platform_access_assignments(id,user_id,role_key,scope_kind,organization_id) values('${operationsAssignment}','${sales.user.id}','operations','organization','${org}');`)
+    expect(successful(await rpc('read_platform_organization_quests', questQuery, salesMfa.access_token)).items).toHaveLength(1)
+    expect((await rpc('read_platform_organization_quests', questQuery, sales.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_organization_quests', { p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
+    await sql(`update public.platform_access_assignments set revoked_at=now() where id='${operationsAssignment}';`)
+    expect((await rpc('read_platform_organization_quests', questQuery, salesMfa.access_token)).status).toBe(403)
     const salesDraft = { ...saveCampaign, p_command_id: randomUUID(), p_id: randomUUID() }
     expect((await rpc('save_platform_discount_campaign', salesDraft, sales.access_token)).status).toBe(403)
     expect(successful(await rpc('save_platform_discount_campaign', salesDraft, salesMfa.access_token))).toMatchObject({ id: salesDraft.p_id, state: 'draft' })
@@ -299,8 +324,7 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     successful(await rpc('approve_platform_discount_campaign', salesApproval))
     successful(await rpc('revoke_platform_assignment', { p_command_id: randomUUID(), p_assignment_id: globalSales, p_reason_code: 'role_change' }))
     const scopedSales = successful(await grantSales(org))
-    const otherOrg = randomUUID()
-    await sql(`insert into public.organizations(id,name) values('${otherOrg}','Other synthetic organization');`)
+
     expect(successful(await rpc('read_platform_organization_payments', paymentQuery, salesMfa.access_token)).items).toHaveLength(1)
     expect((await rpc('read_platform_organization_payments', { p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
     expect(successful(await rpc('preview_platform_sandbox_refund', refundQuery, salesMfa.access_token))).toMatchObject({ available_minor: 1000 })
