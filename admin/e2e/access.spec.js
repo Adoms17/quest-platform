@@ -96,6 +96,8 @@ test('карточка получает фокус и возвращает ег�
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: 'Акции', exact: true })).toBeFocused()
   await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Статистика', exact: true })).toBeFocused()
+  await page.keyboard.press('Tab')
   await expect(page.getByLabel('Название или ID организации')).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: 'Найти', exact: true })).toBeFocused()
