@@ -135,7 +135,19 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       revoke all on public.organization_subscriptions from public,anon,authenticated,service_role;
       create table public.organizations(id uuid primary key,name text not null,created_at timestamptz default now());
       -- Минимальная зависимость реестра; полная схема отдельно проверена replay.
-      create table public.quests(id uuid primary key,organization_id uuid references public.organizations(id),title text,description text,is_open boolean,is_public boolean,created_at timestamptz,start_at timestamptz,end_at timestamptz);
+      create table public.quests(id uuid primary key,organization_id uuid references public.organizations(id),title text,description text,verification_mode text default 'online',is_open boolean,is_public boolean,created_at timestamptz,start_at timestamptz,end_at timestamptz);
+      create table public.participant_profiles(id uuid primary key,display_name text,age_group text,status text);
+      create table public.participant_groups(id uuid primary key,name text,status text);
+      create table public.participant_group_members(group_id uuid,participant_profile_id uuid,status text);
+      create table public.quest_attempts(id uuid primary key,quest_id uuid,participant_profile_id uuid,started_at timestamptz,finished_at timestamptz,created_at timestamptz default now(),total_tasks integer default 1,completed_tasks integer default 0,failed_tasks integer default 0);
+      create table public.task_attempts(id uuid primary key,quest_attempt_id uuid,created_at timestamptz);
+      create table public.task_submission_events(id uuid primary key,quest_attempt_id uuid,created_at timestamptz,server_state jsonb);
+      alter table public.task_attempts enable row level security;
+      alter table public.task_submission_events enable row level security;
+      alter table public.participant_profiles enable row level security;
+      alter table public.participant_groups enable row level security;
+      alter table public.participant_group_members enable row level security;
+      alter table public.quest_attempts enable row level security;
       alter table public.quests enable row level security;
       revoke all on public.quests from public,anon,authenticated,service_role;
       alter table public.organizations enable row level security;
@@ -170,6 +182,9 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       '20260922050000_platform_refund_gateway.sql',
       '20260922070000_validate_platform_refund_amount.sql',
       '20260925010000_read_platform_organization_quests.sql',
+      '20260925020000_read_platform_organization_participants.sql',
+      '20260925025000_track_quest_attempt_activity.sql',
+      '20260925030000_read_platform_quest_statistics.sql',
     ]) await sql(readFileSync(new URL(`../../supabase/migrations/${migration}`, import.meta.url), 'utf8'))
     // Только DDL inbox: команды жизненного цикла подписок не входят в этот стенд.
     // Полный файл отдельно проверяет replay всех миграций.
@@ -285,6 +300,22 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     }
     const questId = randomUUID()
     await sql(`insert into public.quests(id,organization_id,title,description,is_open,is_public,created_at) values('${questId}','${org}','Synthetic quest','private-content',true,false,now());`)
+    const participantId = randomUUID(), groupId = randomUUID(), hiddenId = randomUUID()
+    await sql(`insert into public.participant_profiles values('${participantId}','Synthetic participant','unknown','active'),('${hiddenId}','Hidden participant','child','active');
+      insert into public.participant_groups values('${groupId}','Synthetic group','active');
+      insert into public.participant_group_members values('${groupId}','${participantId}','active'),('${groupId}','${hiddenId}','active');
+      insert into public.quest_attempts(id,quest_id,participant_profile_id) values('${randomUUID()}','${questId}','${participantId}');`)
+    await sql(`update public.quest_attempts set started_at='2026-09-01T10:00:00Z';`)
+    const statisticsQuery={p_from:'2026-09-01',p_to:'2026-09-02',p_grain:'day',p_organization_id:org}
+    expect(successful(await rpc('read_platform_quest_statistics',statisticsQuery)).summary.started_attempts).toBe(1)
+    expect(successful(await rpc('read_platform_quest_statistics',{...statisticsQuery,p_organization_id:null})).summary.active_organizations).toBe(1)
+    expect((await rpc('read_platform_quest_statistics',statisticsQuery,login.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_quest_statistics',statisticsQuery,parts.join('.'))).status).toBe(401)
+    const participantQuery = { p_organization_id: org, p_group_id: groupId }
+    expect(successful(await rpc('read_platform_organization_participants', participantQuery)).items).toEqual([{id:participantId,name:'Synthetic participant',age_group:'unknown',status:'active'}])
+    expect((await rpc('read_platform_organization_participants', participantQuery, null)).status).toBe(401)
+    expect((await rpc('read_platform_organization_participants', participantQuery, login.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_organization_participants', participantQuery, parts.join('.'))).status).toBe(401)
     const questQuery = { p_organization_id: org }
     const questPage = successful(await rpc('read_platform_organization_quests', questQuery))
     expect(questPage.summary).toEqual({ total: 1, open: 1, closed: 0 })
@@ -306,15 +337,23 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     })
     const globalSales = successful(await grantSales(null))
     expect((await rpc('read_platform_organization_quests', questQuery, salesMfa.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_organization_participants', participantQuery, salesMfa.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_quest_statistics',statisticsQuery,salesMfa.access_token)).status).toBe(403)
     const otherOrg = randomUUID()
     await sql(`insert into public.organizations(id,name) values('${otherOrg}','Other synthetic organization');`)
     const operationsAssignment = randomUUID()
     await sql(`insert into public.platform_access_assignments(id,user_id,role_key,scope_kind,organization_id) values('${operationsAssignment}','${sales.user.id}','operations','organization','${org}');`)
     expect(successful(await rpc('read_platform_organization_quests', questQuery, salesMfa.access_token)).items).toHaveLength(1)
+    expect(successful(await rpc('read_platform_organization_participants', participantQuery, salesMfa.access_token)).items).toHaveLength(1)
+    expect(successful(await rpc('read_platform_quest_statistics',statisticsQuery,salesMfa.access_token)).summary.started_attempts).toBe(1)
+    expect((await rpc('read_platform_quest_statistics',{...statisticsQuery,p_organization_id:null},salesMfa.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_organization_participants', { p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
     expect((await rpc('read_platform_organization_quests', questQuery, sales.access_token)).status).toBe(403)
     expect((await rpc('read_platform_organization_quests', { p_organization_id: otherOrg }, salesMfa.access_token)).status).toBe(403)
     await sql(`update public.platform_access_assignments set revoked_at=now() where id='${operationsAssignment}';`)
     expect((await rpc('read_platform_organization_quests', questQuery, salesMfa.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_organization_participants', participantQuery, salesMfa.access_token)).status).toBe(403)
+    expect((await rpc('read_platform_quest_statistics',statisticsQuery,salesMfa.access_token)).status).toBe(403)
     const salesDraft = { ...saveCampaign, p_command_id: randomUUID(), p_id: randomUUID() }
     expect((await rpc('save_platform_discount_campaign', salesDraft, sales.access_token)).status).toBe(403)
     expect(successful(await rpc('save_platform_discount_campaign', salesDraft, salesMfa.access_token))).toMatchObject({ id: salesDraft.p_id, state: 'draft' })
