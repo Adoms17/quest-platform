@@ -50,7 +50,7 @@ select set_config('test.promo',public.issue_organization_promotion(current_setti
 select public.redeem_organization_promotion(current_setting('test.org')::uuid,current_setting('test.promo')::jsonb->>'code',gen_random_uuid(),0);
 ${removal}`)).toThrow('legacy promotion access must be resolved before removal')
   sql(release.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
-  expect(release).toHaveLength(81)
+  expect(release).toHaveLength(82)
   // Реальный Vault в изолированном контейнере: создание, повтор, запрет ротации и активного cron.
   const vaultEnv={SUPABASE_PROJECT_ID:'jeugfyaqzfgdvfhdxfht',GITHUB_REF:'refs/heads/staging',SUPABASE_ACCESS_TOKEN:'synthetic',YOOKASSA_SANDBOX_WORKER_TOKEN:'cd'.repeat(32)}
   await configureStageSchedulerVault(vaultEnv,sql)
@@ -63,7 +63,7 @@ ${removal}`)).toThrow('legacy promotion access must be resolved before removal')
   await verifyPlatformRefundConcurrency(name,sql)
   bridgeContract()
   sql('create extension pgtap with schema extensions; grant usage on schema extensions to authenticated,anon,service_role;')
-  const suites=readdirSync(new URL('../supabase/tests/database/',import.meta.url)).filter(f=>/^(billing_discount.*|billing_sandbox_renewal|billing_sandbox_schedule|billing_recurring_.*|billing_refunded_duplicate|billing_trial.*|billing_tariff.*|billing_promotions|billing_free_access_controls|platform_tariff.*|platform_fixed_tariffs|platform_discount_.*|platform_payment_catalog)\.test\.sql$/.test(f))
+  const suites=readdirSync(new URL('../supabase/tests/database/',import.meta.url)).filter(f=>/^(billing_discount.*|billing_sandbox_renewal|billing_sandbox_schedule|billing_recurring_.*|billing_refunded_duplicate|billing_trial.*|billing_tariff.*|billing_promotions|billing_free_access_controls|platform_tariff.*|platform_fixed_tariffs|platform_discount_.*|platform_payment_catalog|platform_organization_quests)\.test\.sql$/.test(f))
   const cleanSuites=suites.filter(f=>!f.startsWith('platform_discount_'))
   for(const file of cleanSuites){const result=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/'+file,import.meta.url),'utf8'));expect(result,file).not.toMatch(/^not ok /m);expect(result,file).toMatch(/^1\.\.\d+/m)}
   // Посторонние записи должны пережить каждый транзакционный SQL-набор.
