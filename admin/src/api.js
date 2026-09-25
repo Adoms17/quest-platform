@@ -1,3 +1,4 @@
+import { createSubscriptionRefundApi } from './subscriptionRefundApi'
 // Все административные чтения проходят серверную проверку прав и MFA.
 export function createAdminApi(client) {
   async function rpc(name, parameters) {
@@ -5,7 +6,7 @@ export function createAdminApi(client) {
     if (error) throw error
     return data
   }
-  return {
+  return { ...createSubscriptionRefundApi(client),
     statistics: (from, to, grain = 'day', organizationId = null, modes = ['online', 'hybrid', 'secure_online']) => rpc('read_platform_quest_statistics', { p_from: from, p_to: to, p_grain: grain, p_organization_id: organizationId, p_modes: modes }),
     participants: (organizationId, kind = 'profiles', search = '', groupId = null, profileId = null, cursor = null) => rpc('read_platform_organization_participants', { p_organization_id: organizationId, p_kind: kind, p_search: search, p_group_id: groupId, p_profile_id: profileId, p_after: cursor }),
     quests: (organizationId, search = '', status = 'all', cursor = null) => rpc('read_platform_organization_quests', { p_organization_id: organizationId, p_search: search, p_status: status, p_after: cursor }),

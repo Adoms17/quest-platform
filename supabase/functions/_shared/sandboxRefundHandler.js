@@ -2,7 +2,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // authenticate проверяет токен, authorize — владельца/MFA для конкретного резерва.
 // Ни личность, ни сумму, ни контекст MFA нельзя принимать из JSON запроса.
-export function createSandboxRefundHandler({ enabled = false, allowedOrigins = [], authenticate, authorize, execute }) {
+export function createSandboxRefundHandler({ enabled = false, allowedOrigins = [], authenticate, authorize, execute, formatResult }) {
  return async request => {
   const origin = request.headers.get('origin')
   const headers = {
@@ -44,7 +44,7 @@ export function createSandboxRefundHandler({ enabled = false, allowedOrigins = [
   try {
    const result = await execute(identity, payload.refundId)
    if (result?.id !== payload.refundId || !['reserved','sending','pending','succeeded','canceled','rejected','review'].includes(result.state)) throw new Error('invalid_result')
-   return reply({ refundId: result.id, state: result.state, environment: 'sandbox', accessEffect: 'unchanged' }, 200)
+   return reply(formatResult ? formatResult(result) : { refundId: result.id, state: result.state, environment: 'sandbox', accessEffect: 'unchanged' }, 200)
   } catch {
    // Сбой не означает отмену: клиент восстанавливает ту же операцию по refundId.
    return reply({ error: 'sandbox_refund_unconfirmed', refundId: payload.refundId }, 503)

@@ -1,3 +1,4 @@
+import { retrySubscriptionRefundAccess } from './subscriptionRefundAccessRetry.js'
 export function createSandboxRefundReconciler({ rpc, provider, shopId }) {
   async function call(name,args){const {data,error}=await rpc(name,args);if(error)throw new Error('refund_storage_unavailable');return data}
   async function reconcile(providerId){
@@ -17,6 +18,7 @@ export function createSandboxRefundReconciler({ rpc, provider, shopId }) {
         await call('touch_sandbox_refund_reconciliation',{p_shop_id:shopId,p_provider_id:id})
         summary.checked++
       }
+      summary.access = await retrySubscriptionRefundAccess({ rpc, shopId })
       return summary
     },
   }
