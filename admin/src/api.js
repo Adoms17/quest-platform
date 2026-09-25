@@ -6,6 +6,7 @@ export function createAdminApi(client) {
     return data
   }
   return {
+    quests: (organizationId, search = '', status = 'all', cursor = null) => rpc('read_platform_organization_quests', { p_organization_id: organizationId, p_search: search, p_status: status, p_after: cursor }),
     refunds: (organizationId, orderId, cursor = null) => rpc('read_platform_order_refunds', { p_organization_id: organizationId, p_order_id: orderId, p_after: cursor }),
     confirmRefund: (organizationId, orderId, amount, reason, command) => rpc('confirm_platform_sandbox_refund', { p_organization_id: organizationId, p_order_id: orderId, p_amount_minor: amount, p_reason_code: reason, p_command_id: command }),
     executeRefund: async refundId => {
