@@ -468,3 +468,37 @@ test('статистика: организация и платформа, инт
  await expect(page.getByRole('alert')).toBeVisible()
  await expect(page.getByRole('table',{name:/Показатели по/})).toHaveCount(0)
 })
+
+test('subscription refund visual flow',async({page},testInfo)=>{
+ await mockApi(page,'aal2')
+ let reserves=0,sends=0
+ await page.route('**/rest/v1/rpc/read_platform_organization_payments',r=>r.fulfill({json:{items:[{id:'order',amount_minor:1000,payment_status:'succeeded',created_at:'2026-09-22',refunded_minor:0,refund_pending_minor:0,refund_review_minor:0}],next_cursor:null}}))
+ await page.route('**/functions/v1/admin-subscription-refund-prepare',r=>{
+  const body=r.request().postDataJSON()
+  if(body.action==='request')return r.fulfill({json:{request_id:'request',amount_minor:500,currency:'RUB',period_start:'2026-09-01T00:00:00Z',period_end:'2026-10-01T00:00:00Z'}})
+  reserves++;return r.fulfill({json:{request_id:'request',refund_id:'refund'}})
+ })
+ await page.route('**/functions/v1/admin-subscription-refund',r=>{
+  sends++;return r.fulfill({json:{refundId:'refund',state:'succeeded',accessEffect:sends===1?'not_applied':'applied'}})
+ })
+ await page.goto('/')
+ await page.getByRole('button',{name:'Найти',exact:true}).click()
+ await page.getByRole('button',{name:'Тестовая организация',exact:true}).click()
+ await page.getByRole('button',{name:'Тарифы и оплата',exact:true}).click()
+ await page.getByRole('button',{name:'Загрузить платежи',exact:true}).click()
+ const section=page.getByRole('region',{name:'Возврат подписки',exact:true})
+ await section.getByLabel('Код MFA для возврата подписки').fill('123456')
+ await section.getByRole('button',{name:'Получить расчёт возврата подписки'}).click()
+ await expect(section).toContainText('К возврату: 5,00')
+ expect(reserves).toBe(0)
+ await section.screenshot({path:testInfo.outputPath('subscription-quote.png')})
+ for(let i=0;i<2;i++){
+  await section.getByRole('checkbox').check()
+  await section.getByLabel('Код MFA для возврата подписки').fill('123456')
+  await section.getByRole('button',{name:'Подтвердить или повторить возврат подписки'}).click()
+  await expect(section.getByRole('status')).toContainText(i===0?'Прекращение периода ещё не подтверждено':'Возврат выполнен, возвращаемый период прекращён')
+  await section.screenshot({path:testInfo.outputPath(i===0?'subscription-pending.png':'subscription-complete.png')})
+ }
+ expect(reserves).toBe(1)
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width)
+})

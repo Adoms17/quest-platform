@@ -1,0 +1,107 @@
+[
+  {
+    "version": "20260925040000",
+    "sha256": "8057d00950f2e66ba0b27b8abf53171920e1345d1b501160c8fab28c3966206a",
+    "file": "20260925040000_subscription_refund_requests.sql"
+  },
+  {
+    "version": "20260925041000",
+    "sha256": "28a859a62f5ed2de07d8612297f4e206ed7e7b3fb7ee0a4706956dcaea3ba69b",
+    "file": "20260925041000_subscription_refund_reservations.sql"
+  },
+  {
+    "version": "20260925042000",
+    "sha256": "812b07c699fa9d1e03c2eec865222df62de0101bfd76a2e7c1621933554c1340",
+    "file": "20260925042000_subscription_refund_period_binding.sql"
+  },
+  {
+    "version": "20260925043000",
+    "sha256": "159dfc1ff4eb059ccc1f1e1cf48e22b9e8fac7ddef541b4d8fa83313a850e5c5",
+    "file": "20260925043000_apply_current_subscription_refund.sql"
+  },
+  {
+    "version": "20260925044000",
+    "sha256": "8682ca43442fee109897510f0a50c00ccbb7b4c75305b18a9ae381607f2af9d1",
+    "file": "20260925044000_refund_future_trial_period.sql"
+  },
+  {
+    "version": "20260925045000",
+    "sha256": "ce63fb5fb760d09bd257d78a3ae0b4ab4a93a95ac59886d462275e0aacc9dd49",
+    "file": "20260925045000_repurchase_after_trial_refund.sql"
+  },
+  {
+    "version": "20260925046000",
+    "sha256": "25b0d3d055b9148d30eb7590e0cfee630af2f5db99b81b5ef7bef54073519015",
+    "file": "20260925046000_refund_activated_trial_period.sql"
+  },
+  {
+    "version": "20260925047000",
+    "sha256": "97043e7635ccf2d41d302cc343b4dba384bf98d49b3865d002533e97ca662c25",
+    "file": "20260925047000_apply_refund_across_trial_boundary.sql"
+  },
+  {
+    "version": "20260925048000",
+    "sha256": "728341332477331afa3572bb4f06a63306ee67bf70b57b28d4624b1ba72e7b88",
+    "file": "20260925048000_reconcile_subscription_refund.sql"
+  },
+  {
+    "version": "20260925049000",
+    "sha256": "a885680caae51ed3aa61883d5ee13dd75282d62b7621605a9029d649ef4198a2",
+    "file": "20260925049000_retry_subscription_refund_access.sql"
+  },
+  {
+    "version": "20260925050000",
+    "sha256": "81d75d1d989b0a7184b09a23e72024e9d2a75b96bcb1e4cf574bf55517944d86",
+    "file": "20260925050000_guard_refund_dispatched_renewal.sql"
+  },
+  {
+    "version": "20260925051000",
+    "sha256": "9e26382a6e38987b9af0276f4b3962f3ad82df3f54da8f29e813ffa3e26c6e41",
+    "file": "20260925051000_refund_renewal_preflight.sql"
+  },
+  {
+    "version": "20260925052000",
+    "sha256": "e83460f5d0d86ba9c164c609f14fed00dfcba212ea819598008e4b9414ff2f63",
+    "file": "20260925052000_guard_zero_renewal_during_refund.sql"
+  },
+  {
+    "version": "20260925053000",
+    "sha256": "a12d1b7436d5627a39d51ed198dd6e7503492465203e401bd78711a99e66c1dd",
+    "file": "20260925053000_check_refund_period_before_reserve.sql"
+  },
+  {
+    "version": "20260925054000",
+    "sha256": "dc06de77652bae8f36e6dadbcdaca43976f087597434fbe9f5e4d669d988469b",
+    "file": "20260925054000_claim_subscription_refund_dispatch.sql"
+  },
+  {
+    "version": "20260925055000",
+    "sha256": "670b7c368904b953429d22ae9ec29c00af30e4b8d05e1dbe436e440f9a3214c6",
+    "file": "20260925055000_record_subscription_refund_result.sql"
+  },
+  {
+    "version": "20260925056000",
+    "sha256": "84aa97be4f5e32b0610053b9e2a1e95356f4957373cdaae8e3732582464461e5",
+    "file": "20260925056000_prepare_refund_recovery.sql"
+  },
+  {
+    "version": "20260925057000",
+    "sha256": "6579934180cc1045ca9377fbbf5c2a684ec38961812de562a63492b937f32dc5",
+    "file": "20260925057000_subscription_refund_gateway.sql"
+  },
+  {
+    "version": "20260925058000",
+    "sha256": "f2799c9e9aa5c1d8c4a161e3dc0613eb5267492c58807ef26aac10521e9966e0",
+    "file": "20260925058000_reject_subscription_refund.sql"
+  },
+  {
+    "version": "20260925059000",
+    "sha256": "77778fbdd39012ab36c07aac0cc74d254997173ef73b438c128dfefa654bc055",
+    "file": "20260925059000_prepare_subscription_refund_gateway.sql"
+  },
+  {
+    "version": "20260926000000",
+    "sha256": "0e50c5f6afe0cef2e94a1c4763d3b6040bf53ace2180b815c453edee33385b3c",
+    "file": "20260926000000_subscription_refund_history.sql"
+  }
+]

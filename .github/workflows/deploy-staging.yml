@@ -43,6 +43,8 @@ on:
           - organization-quests-apply
           - organization-statistics-dry-run
           - organization-statistics-apply
+          - subscription-refunds-dry-run
+          - subscription-refunds-apply
           - order-vault-configure
           - recurring-disabled-smoke
           - recurring-acceptance-run
@@ -843,3 +845,65 @@ jobs:
         run: |
           echo "Participants and statistics migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
           echo 'Participants read RPC, server activity tracking and statistics RPC installed; frontend release follows separately.' >> "$GITHUB_STEP_SUMMARY"
+
+  subscription-refunds-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-refunds-dry-run' || inputs.operation == 'subscription-refunds-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-refunds-dry-run || test "$OPERATION" = subscription-refunds-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-refund-stage-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact refund migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/refund-migrations.json"
+          node scripts/check-refund-stage-release.mjs "$RUNNER_TEMP/refund-migrations.json"
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history and apply refund migrations
+        if: inputs.operation == 'subscription-refunds-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/refund-migrations.json"
+          node scripts/check-refund-stage-release.mjs "$RUNNER_TEMP/refund-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'subscription-refunds-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/refund-migrations.json"
+          node scripts/check-refund-stage-release.mjs "$RUNNER_TEMP/refund-migrations.json" --require-applied
+      - name: Publish refund functions with new operations disabled
+        if: inputs.operation == 'subscription-refunds-apply' && inputs.deploy_sandbox
+        run: |
+          npx supabase secrets set ADMIN_SUBSCRIPTION_REFUNDS_ENABLED=false --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy admin-subscription-refund-prepare --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy admin-subscription-refund --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Record release scope
+        env:
+          OPERATION: ${{ inputs.operation }}
+          PUBLISH_FUNCTIONS: ${{ inputs.deploy_sandbox }}
+        run: |
+          echo "Refund operation: $OPERATION; commit: $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo "Function publication requested: $PUBLISH_FUNCTIONS (apply only)." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Function publication disables new subscription refunds, including on reruns. Enable only during separate controlled acceptance. Existing reconciliation remains available. Admin and website are not deployed.' >> "$GITHUB_STEP_SUMMARY"

@@ -17,6 +17,6 @@ export default defineConfig({
     cwd: fileURLToPath(new URL('..', import.meta.url)),
     url: 'http://127.0.0.1:4175',
     reuseExistingServer: false,
-    env: { VITE_ADMIN_SANDBOX_REFUNDS: 'true', VITE_ADMIN_SUPABASE_URL: 'http://127.0.0.1:54499', VITE_ADMIN_SUPABASE_ANON_KEY: 'synthetic-browser-placeholder' },
+    env: { VITE_ADMIN_SUBSCRIPTION_REFUNDS: 'true', VITE_ADMIN_SANDBOX_REFUNDS: 'true', VITE_ADMIN_SUPABASE_URL: 'http://127.0.0.1:54499', VITE_ADMIN_SUPABASE_ANON_KEY: 'synthetic-browser-placeholder' },
   },
 })
