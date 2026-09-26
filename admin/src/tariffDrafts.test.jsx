@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import TariffDrafts from './TariffDrafts'
-const source = { id: 'source', plan_key: 'pro', version: 1, display_name: 'Pro', active_quests_limit: 5, team_members_limit: 3, trial_duration_days: 14 }
+const source = { monthly_price_minor: 99000, id: 'source', plan_key: 'pro', version: 1, display_name: 'Pro', active_quests_limit: 5, team_members_limit: 3, trial_duration_days: 14 }
 it('reuses command on uncertain retry and saves without publishing', async () => {
  const client = { rpc: vi.fn().mockResolvedValueOnce({ error: { code: 'network' } }).mockResolvedValueOnce({ data: { ...source, id: 'draft', source_version_id: 'source', plan_key: 'pro', version: 1, revision: 1 } }) }
  render(<TariffDrafts client={client} source={source} />)
@@ -37,7 +37,7 @@ it('compares saved server values and dismisses preview on form editing', async (
 
 it('hides trial input for Free and scopes the list on the server', async () => {
  const client = { rpc: vi.fn().mockResolvedValue({ data: { items: [], next_cursor: null } }) }
- render(<TariffDrafts client={client} source={{ ...source, plan_key: 'free', display_name: 'Free' }} />)
+ render(<TariffDrafts client={client} source={{ ...source, plan_key: 'free', display_name: 'Free', monthly_price_minor: 0 }} />)
  fireEvent.click(screen.getByText('Подготовить черновик этой версии'))
  expect(screen.queryByLabelText('Пробный доступ, суток')).not.toBeInTheDocument()
  fireEvent.click(screen.getByText('К черновикам этого тарифа'))
@@ -69,4 +69,25 @@ it('shows publication status and makes published draft read-only', async () => {
  expect(screen.queryByText(/Зафиксирована, не включена/)).toBeNull()
  fireEvent.click(screen.getByText('Pro · черновик publishe · правка 1'))
  expect(screen.getByRole('button',{name:'Сохранить черновик'})).toBeDisabled()
+})
+
+it('saves monthly price in exact kopecks and preserves it on retry', async () => {
+ const client={rpc:vi.fn().mockResolvedValue({error:{code:'network'}})}
+ render(<TariffDrafts client={client} source={source} />)
+ fireEvent.click(screen.getByText('Подготовить черновик этой версии'))
+ expect(screen.getByLabelText('Цена за месяц, ₽')).toHaveValue(990)
+ fireEvent.change(screen.getByLabelText('Цена за месяц, ₽'),{target:{value:'1234.56'}})
+ fireEvent.click(screen.getByText('Сохранить черновик'));await screen.findByRole('alert')
+ expect(client.rpc.mock.calls[0][1].p_monthly_price_minor).toBe(123456)
+ expect(screen.getByLabelText('Цена за месяц, ₽')).toHaveValue(1234.56)
+ fireEvent.click(screen.getByText('Сохранить черновик'));await screen.findByRole('alert')
+ expect(client.rpc.mock.calls[1]).toEqual(client.rpc.mock.calls[0])
+})
+it('does not silently turn an empty monthly price into zero', () => {
+ const client={rpc:vi.fn()}
+ render(<TariffDrafts client={client} source={source} />)
+ fireEvent.click(screen.getByText('Подготовить черновик этой версии'))
+ fireEvent.change(screen.getByLabelText('Цена за месяц, ₽'),{target:{value:''}})
+ fireEvent.click(screen.getByText('Сохранить черновик'))
+ expect(client.rpc).not.toHaveBeenCalled()
 })

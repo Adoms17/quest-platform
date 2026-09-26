@@ -43,6 +43,8 @@ on:
           - organization-quests-apply
           - organization-statistics-dry-run
           - organization-statistics-apply
+          - public-tariffs-dry-run
+          - public-tariffs-apply
           - purchase-documents-dry-run
           - purchase-documents-apply
           - purchase-documents-fixture
@@ -910,6 +912,53 @@ jobs:
           echo "Refund operation: $OPERATION; commit: $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
           echo "Function publication requested: $PUBLISH_FUNCTIONS (apply only)." >> "$GITHUB_STEP_SUMMARY"
           echo 'Function publication disables new subscription refunds, including on reruns. Enable only during separate controlled acceptance. Existing reconciliation remains available. Admin and website are not deployed.' >> "$GITHUB_STEP_SUMMARY"
+
+  public-tariffs-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'public-tariffs-dry-run' || inputs.operation == 'public-tariffs-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = public-tariffs-dry-run || test "$OPERATION" = public-tariffs-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-public-tariff-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact public tariff migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/public-tariff-migrations.json"
+          node scripts/check-public-tariff-release.mjs "$RUNNER_TEMP/public-tariff-migrations.json"
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history and apply public tariff migrations
+        if: inputs.operation == 'public-tariffs-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/public-tariff-migrations.json"
+          node scripts/check-public-tariff-release.mjs "$RUNNER_TEMP/public-tariff-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'public-tariffs-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/public-tariff-migrations.json"
+          node scripts/check-public-tariff-release.mjs "$RUNNER_TEMP/public-tariff-migrations.json" --require-applied
 
   purchase-documents-migrate:
     if: github.ref == 'refs/heads/staging' && (inputs.operation == 'purchase-documents-dry-run' || inputs.operation == 'purchase-documents-apply')
