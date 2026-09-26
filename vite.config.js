@@ -4,7 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { localDevWorker } from './scripts/vite-dev-worker.mjs'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  define: mode === 'staging' ? { 'import.meta.env.VITE_CHECKOUT_DOCUMENTS': JSON.stringify('true') } : {},
   plugins: [
     localDevWorker(),
     tailwindcss(),
@@ -46,4 +47,4 @@ export default defineConfig({
       }
     })
   ]
-})
+}))

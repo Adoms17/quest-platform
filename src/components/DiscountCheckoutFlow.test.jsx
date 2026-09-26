@@ -1,3 +1,4 @@
+vi.mock('../services/purchaseDocumentsApi', () => ({ loadDocumentCheckoutScope: vi.fn().mockResolvedValue(false), loadPurchaseDocuments: vi.fn(), loadPurchaseDocument: vi.fn(), loadAcceptedDocuments: vi.fn() }))
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 const mocks=vi.hoisted(()=>({recoverDiscountCheckout:vi.fn(),executeDiscountCheckout:vi.fn(),cancelDiscountCheckout:vi.fn(),dismissDiscountCheckout:vi.fn(),acceptDiscountCheckout:vi.fn(),rememberSandboxCheckout:vi.fn()}))

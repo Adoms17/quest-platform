@@ -1,0 +1,17 @@
+begin;
+select plan(6);
+insert into public.platform_access_assignments values('00000000-0000-4000-8000-000000000001','owner','platform',null,now()-interval '1 day',null);
+select set_config('request.jwt.claims',jsonb_build_object('sub','00000000-0000-4000-8000-000000000001','aal','aal1')::text,true);
+set local role authenticated;
+select throws_ok($$select public.save_purchase_document_draft('owner-draft','agreement','text')$$,'42501','platform owner required','AAL1 denied');
+select set_config('request.jwt.claims',jsonb_build_object('sub','00000000-0000-4000-8000-000000000001','aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from now())))))::text,true);
+select lives_ok($$select public.save_purchase_document_draft('owner-draft','agreement','text')$$,'owner creates draft');
+select throws_ok($$select public.save_purchase_document_draft('owner-draft','agreement','changed','wrong')$$,'40001','document draft changed','stale edit rejected');
+select set_config('test.doc_hash',public.save_purchase_document_draft('owner-draft','agreement','text')->>'sha256',true);
+select set_config('test.doc_start',(now()+interval '1 day')::text,true);
+select lives_ok($$select public.publish_purchase_document('owner-draft',current_setting('test.doc_hash'),current_setting('test.doc_start')::timestamptz)$$,'owner publishes exact draft');
+select lives_ok($$select public.publish_purchase_document('owner-draft',current_setting('test.doc_hash'),current_setting('test.doc_start')::timestamptz)$$,'publication retry succeeds');
+select throws_ok($$select public.save_purchase_document_draft('owner-draft','agreement','text')$$,'55000','published purchase document is immutable','publication cannot be edited');
+reset role;
+select * from finish();
+rollback;
