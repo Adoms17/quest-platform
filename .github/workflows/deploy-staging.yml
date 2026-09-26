@@ -976,4 +976,4 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Prepare non-binding stage acceptance fixture
-        run: npx supabase db query --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-document-fixture.sql
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-document-fixture.sql
