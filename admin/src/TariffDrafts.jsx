@@ -40,7 +40,7 @@ export default function TariffDrafts({ client, source, onOpenTimeline, onPublish
   const payload = { p_id: draft.id, p_source_version_id: draft.source_version_id,
    p_description: draft.description ?? '', p_expected_revision: draft.revision, p_display_name: draft.display_name,
    p_active_quests_limit: Number(draft.active_quests_limit), p_team_members_limit: Number(draft.team_members_limit),
-   p_trial_duration_days: Number(draft.trial_duration_days) }
+   p_monthly_price_minor: draft.monthly_price_minor, p_trial_duration_days: Number(draft.trial_duration_days) }
   const signature = JSON.stringify(payload)
   if (pending.current?.signature !== signature) pending.current = { signature, command: crypto.randomUUID() }
   const request = ++generation.current
@@ -67,10 +67,10 @@ export default function TariffDrafts({ client, source, onOpenTimeline, onPublish
  <label>Описание черновика<input maxLength={500} value={draft.description ?? ""} onChange={e => { setPreview(null); setDraft({ ...draft, description: e.target.value }) }} /></label>
  <label>Название<input required maxLength={80} value={draft.display_name} onChange={e => { setPreview(null); setDraft({ ...draft, display_name: e.target.value }) }} /></label>
  {[["active_quests_limit", "Открытые квесты", 0], ["team_members_limit", "Аккаунты команды", 1], ["trial_duration_days", "Пробный доступ, суток", 1]].filter(([key]) => key !== "trial_duration_days" || source.plan_key !== "free").map(([key, label, min]) => <label key={key}>{label}<input required type="number" min={min} max={2147483647} step="1" value={draft[key]} onChange={e => { setPreview(null); setDraft({ ...draft, [key]: e.target.value }) }} /></label>)}
- {source.plan_key === "free" && <p>Для Free пробный доступ не применяется.</p>}<p>Цена здесь не задаётся.</p>
+ {source.plan_key === "free" && <p>Для Free пробный доступ не применяется.</p>}<label>Цена за месяц, ₽<input required type="number" min="0" step="0.01" max="21474836.47" disabled={source.plan_key === "free"} key={`${draft.id}:${draft.revision}`} defaultValue={draft.monthly_price_minor == null ? "" : draft.monthly_price_minor / 100} onChange={e => { setPreview(null); setDraft({ ...draft, monthly_price_minor: e.target.value === "" ? null : Math.round(Number(e.target.value) * 100) }) }} /></label>
  <button type="submit">Сохранить черновик</button>{draft.revision > 0 && <button type="button" onClick={compare}>Сравнить сохранённую правку</button>}</fieldset></form>}
  {preview && <article aria-label="Сравнение сохранённого черновика"><h3>{source.display_name} · черновик {preview.draft.id.slice(0, 8)} · сохранённая правка {preview.draft.revision}</h3><p>Несохранённые значения формы в это сравнение не входят.</p><dl>
- {Object.keys(preview.changes).filter(key => preview.changes[key]).map(key => <div key={key}><dt>{{display_name:'Название', active_quests_limit:'Открытые квесты', team_members_limit:'Аккаунты команды', trial_duration_days:'Пробный доступ, суток'}[key]}</dt><dd>{preview.source[key]} → {preview.draft[key]}</dd></div>)}
+ {Object.keys(preview.changes).filter(key => preview.changes[key]).map(key => <div key={key}><dt>{{monthly_price_minor:'Цена за месяц, коп.', display_name:'Название', active_quests_limit:'Открытые квесты', team_members_limit:'Аккаунты команды', trial_duration_days:'Пробный доступ, суток'}[key]}</dt><dd>{preview.source[key]} → {preview.draft[key]}</dd></div>)}
  </dl>{!Object.values(preview.changes).some(Boolean) && <p>Применимых изменений условий нет.</p>}<p>Действующие подписки сохраняются. Новые подключения не включаются.</p><PublishTariffDraft key={`${preview.draft.id}:${preview.draft.revision}`} client={client} draft={preview.draft} onChanged={onPublished} /></article>}
  </section>
 }

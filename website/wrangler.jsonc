@@ -2,14 +2,14 @@
   "name": "qvesta-website",
   "compatibility_date": "2026-09-18",
   "build": {
-    "command": "npm run build && npm run test:build -- production"
+    "command": "node scripts/check-catalog-env.mjs production && npm run build && npm run test:build -- production"
   },
   "assets": { "directory": "./dist/client" },
   "env": {
     "staging": {
       "name": "qvesta-website-stage",
       "build": {
-        "command": "npm run build:stage && npm run test:build -- staging"
+        "command": "node scripts/check-catalog-env.mjs staging && npm run build:stage && npm run test:build -- staging"
       },
       "routes": [{ "pattern": "stage-www.qvesta.ru", "custom_domain": true }],
       "assets": { "directory": "./dist/client" }

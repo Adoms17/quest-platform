@@ -40,5 +40,6 @@ jobs:
       - name: Build stage
         if: matrix.environment == 'staging'
         run: npm run build:stage
+      - run: node --test tests/tariff-catalog.test.mjs
       - run: npm run test:sites
       - run: npm run test:build -- ${{ matrix.environment }}
