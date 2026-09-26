@@ -5,6 +5,7 @@ const mocks=vi.hoisted(()=>({recoverDiscountCheckout:vi.fn(),executeDiscountChec
 vi.mock('../services/discountCheckoutCommands',()=>mocks)
 vi.mock('../services/sandboxCheckoutApi',()=>mocks)
 vi.mock('./DiscountCheckoutPreview',()=>({default:()=> <p>Расчёт</p>}))
+import { loadDocumentCheckoutScope } from '../services/purchaseDocumentsApi'
 import DiscountCheckoutFlow from './DiscountCheckoutFlow'
 const order={order_id:'order',amount_minor:0,state:'ready',requires_payment:false}
 beforeEach(()=>vi.resetAllMocks())
@@ -29,4 +30,15 @@ test('ошибка восстановления скрывает новую по
  mocks.recoverDiscountCheckout.mockRejectedValue(new Error('secret'))
  render(<DiscountCheckoutFlow actorId="a" organizationId="o" offer={{}} />)
  await screen.findByRole('alert');expect(screen.queryByText('Расчёт')).toBeNull()
+})
+
+test('ошибка проверки документов не снимает защиту при восстановлении',async()=>{
+ vi.stubEnv('VITE_CHECKOUT_DOCUMENTS','true')
+ try {
+ mocks.recoverDiscountCheckout.mockResolvedValue({order:null})
+ loadDocumentCheckoutScope.mockRejectedValue(Error('offline'))
+ render(<DiscountCheckoutFlow actorId="a" organizationId="o" offer={{}} />)
+ await screen.findByRole('alert');fireEvent.click(screen.getByRole('button',{name:'Восстановить заказ'}))
+ await screen.findByRole('alert');expect(screen.queryByText('Расчёт')).toBeNull()
+ } finally {vi.unstubAllEnvs()}
 })

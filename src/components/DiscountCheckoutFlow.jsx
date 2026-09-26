@@ -18,6 +18,11 @@ export default function DiscountCheckoutFlow({ actorId, organizationId, offer, o
   return () => { active = false }
  }, [actorId, organizationId])
  useEffect(() => { onSelectionLocked?.(Boolean(state.loading || state.order || busy || error)) }, [state.loading, state.order, busy, error, onSelectionLocked])
+ async function restore() {
+  const [result,required]=await Promise.all([recoverDiscountCheckout(actorId,organizationId),import.meta.env.VITE_CHECKOUT_DOCUMENTS==='true'?loadDocumentCheckoutScope(organizationId):Promise.resolve(false)])
+  setRequireDocuments(required)
+  return result
+ }
  async function run(action) {
   if (running.current) return
   running.current = true; onSelectionLocked?.(true); setBusy(true); setError(false)
@@ -30,7 +35,7 @@ export default function DiscountCheckoutFlow({ actorId, organizationId, offer, o
  return <section aria-label="Заказ подписки" className="space-y-3">
   {error && <p role="alert">Не удалось подтвердить состояние заказа. Восстановите его перед продолжением.</p>}
   <div className="flex flex-wrap gap-3">
-  <button className={secondaryButton} type="button" disabled={busy} onClick={() => run(() => recoverDiscountCheckout(actorId, organizationId))}>Восстановить заказ</button>
+  <button className={secondaryButton} type="button" disabled={busy} onClick={() => run(restore)}>Восстановить заказ</button>
   {!order && !error && !state.commandId && <button className={secondaryButton} type="button" disabled={busy} onClick={onClosed}>Вернуться к предложениям</button>}
   </div>
   {!order && !error && <>
