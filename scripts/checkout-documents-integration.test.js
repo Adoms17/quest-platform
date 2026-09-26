@@ -24,7 +24,8 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  expect(out).not.toMatch(/not ok|Looks like/)
  expect(out).toMatch(/1\.\.\d+/)
  const paid=suite.replace('10000,2,1','5000,2,1').replace("'0','100 percent discount supported'", "'6172','paid checkout with discount supported'")
- const paidOut=sql('set search_path=public,extensions;'+paid)
+ const orderChecks=readFileSync(new URL('../supabase/tests/database/platform_order_documents.test.sql',import.meta.url),'utf8')
+ const paidOut=sql('set search_path=public,extensions;'+paid.replace('select * from finish();rollback;', () => orderChecks+'\nselect * from finish();rollback;'))
  expect(paidOut).not.toMatch(/not ok|Looks like/)
 
  } finally {if(created)docker(['rm','-f',name])}
