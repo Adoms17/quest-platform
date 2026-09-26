@@ -1,3 +1,4 @@
+import OrderPurchaseDocuments from './OrderPurchaseDocuments'
 import SubscriptionRefund from './SubscriptionRefund'
 import Tariffs from './Tariffs'
 import PaymentOrderDetails from './PaymentOrderDetails'
@@ -56,6 +57,7 @@ function PaymentList({ api, client, organizationId }) {
     <p>Возвращено: {money(item.refunded_minor)}. Ожидает возврата: {money(item.refund_pending_minor)}.</p>
     <p>Возвраты на проверке: {money(item.refund_review_minor)}.</p>
     <PaymentReviewStatus item={item} />
+    {client && <OrderPurchaseDocuments client={client} workspace={organizationId} order={item.id} />}
     {client && import.meta.env.VITE_ADMIN_SUBSCRIPTION_REFUNDS === 'true' && item.payment_status === 'succeeded' && !item.payment_requires_review && <SubscriptionRefund key={organizationId+':'+item.id} api={api} client={client} organizationId={organizationId} orderId={item.id} />}
     {item.payment_status === 'succeeded' && !item.payment_requires_review && <RefundPreview api={api} client={client} organizationId={organizationId} orderId={item.id} />}
     {client && import.meta.env.VITE_ADMIN_SANDBOX_REFUNDS === 'true' && <RefundHistory api={api} client={client} organizationId={organizationId} orderId={item.id} />}

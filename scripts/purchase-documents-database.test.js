@@ -25,6 +25,9 @@ test.skipIf(process.env.QVESTA_TEST_PURCHASE_DOCUMENTS!=='1')('document registry
   sql(readFileSync(new URL('../supabase/migrations/20260926011000_manage_purchase_documents.sql',import.meta.url),'utf8'))
   sql(readFileSync(new URL('../supabase/migrations/20260926012000_purchase_document_audit.sql',import.meta.url),'utf8'))
   sql(readFileSync(new URL('../supabase/migrations/20260926013000_read_purchase_documents.sql',import.meta.url),'utf8'))
+  sql(readFileSync(new URL('../supabase/migrations/20260926017000_list_platform_purchase_documents.sql',import.meta.url),'utf8'))
+  const listing=sql(readFileSync(new URL('../supabase/tests/database/purchase_document_list.test.sql',import.meta.url),'utf8'))
+  expect(listing).not.toMatch(/not ok|Looks like/)
   // Minimal checkout fixture; full creation/payment integration is tested separately when wired.
   sql("create table public.billing_discount_checkouts(id uuid primary key,actor_id uuid,organization_id uuid); create function public.has_organization_permission(uuid,text) returns boolean language sql as 'select $1::text=current_setting(''test.workspace'',true)';")
   sql(readFileSync(new URL('../supabase/migrations/20260926014000_record_checkout_documents.sql',import.meta.url),'utf8'))

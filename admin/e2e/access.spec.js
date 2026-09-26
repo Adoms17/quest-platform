@@ -98,6 +98,8 @@ test('карточка получает фокус и возвращает ег�
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: 'Статистика платформы', exact: true })).toBeFocused()
   await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Документы', exact: true })).toBeFocused()
+  await page.keyboard.press('Tab')
   await expect(page.getByLabel('Название или ID организации')).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: 'Найти', exact: true })).toBeFocused()
@@ -501,4 +503,84 @@ test('subscription refund visual flow',async({page},testInfo)=>{
  }
  expect(reserves).toBe(1)
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width)
+})
+
+
+test('документы: создание, просмотр, сохранение и повторное открытие', async ({ page }, testInfo) => {
+ await mockApi(page, 'aal2')
+ let saved = null
+ await page.route('**/rest/v1/rpc/list_platform_purchase_documents', route => route.fulfill({ json: { items: saved ? [{ ...saved, display_status: 'draft' }] : [], next_cursor: null } }))
+ await page.route('**/rest/v1/rpc/save_purchase_document_draft', route => {
+  const data = route.request().postDataJSON()
+  saved = { id: data.p_id, kind: data.p_kind, body: data.p_body, sha256: 'synthetic-hash', status: 'draft' }
+  return route.fulfill({ json: saved })
+ })
+ await page.route('**/rest/v1/rpc/read_platform_purchase_document', route => route.fulfill({ json: saved }))
+ await page.goto('/')
+ await page.getByRole('button', { name: 'Документы', exact: true }).click()
+ await page.getByRole('button', { name: 'Создать черновик' }).click()
+ await page.getByLabel('Текст документа').fill('Тестовый документ\nТекст для проверки <script>не выполняется</script>')
+ await page.getByRole('button', { name: 'Предварительный просмотр', exact: true }).click()
+ await expect(page.getByLabel('Предварительный просмотр текста')).toContainText('<script>не выполняется</script>')
+ await page.getByRole('button', { name: 'Сохранить черновик' }).click()
+ await expect(page.getByRole('status')).toContainText('Черновик сохранён')
+ await capture(page, testInfo, 'document-preview')
+ expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width)
+ await page.getByRole('button', { name: 'К списку документов' }).click()
+ await page.getByRole('button', { name: saved.id, exact: true }).click()
+ await expect(page.getByLabel('Текст документа')).toHaveValue(saved.body)
+ await page.getByLabel('Текст документа').fill('Исправленный текст')
+ await page.getByRole('button', { name: 'Сохранить черновик' }).click()
+ await expect(page.getByRole('status')).toContainText('Черновик сохранён')
+ expect(saved.body).toBe('Исправленный текст')
+})
+
+
+test('документы: публикация с MFA и журнал редакции', async ({ page }, testInfo) => {
+ await mockApi(page, 'aal2')
+ let edition = { id: 'synthetic-agreement', kind: 'agreement', status: 'draft', body: 'Сохранённый текст для публикации', sha256: 'synthetic-hash' }
+ await page.route('**/rest/v1/rpc/list_platform_purchase_documents', route => route.fulfill({ json: { items: [{ ...edition, display_status: edition.status === 'draft' ? 'draft' : 'scheduled' }], next_cursor: null } }))
+ await page.route('**/rest/v1/rpc/read_platform_purchase_document', route => route.fulfill({ json: edition }))
+ await page.route('**/rest/v1/rpc/publish_purchase_document', route => {
+  const data = route.request().postDataJSON()
+  expect(data.p_expected_sha256).toBe(edition.sha256)
+  edition = { ...edition, status: 'published', effective_at: data.p_effective_at }
+  return route.fulfill({ json: edition })
+ })
+ await page.route('**/rest/v1/rpc/read_platform_purchase_document_audit', route => route.fulfill({ json: [{ id: 1, action: 'published', created_at: '2026-09-26T10:00:00Z', effective_at: edition.effective_at, after_sha256: edition.sha256 }] }))
+ await page.goto('/')
+ await page.getByRole('button', { name: 'Документы', exact: true }).click()
+ await page.getByRole('button', { name: edition.id, exact: true }).click()
+ await page.getByRole('button', { name: 'Опубликовать редакцию…', exact: true }).click()
+ await page.getByLabel('Дата и время вступления в силу').fill('2099-01-01T12:00')
+ await page.getByRole('button', { name: 'Перейти к подтверждению MFA' }).click()
+ await page.getByLabel('Новый код MFA').fill('123456')
+ await page.getByRole('button', { name: 'Подтвердить публикацию' }).click()
+ await expect(page.getByText('Опубликована · только чтение')).toBeVisible()
+ await expect(page.getByRole('textbox')).toHaveCount(0)
+ await page.getByRole('button', { name: 'Загрузить журнал' }).click()
+ await expect(page.getByText('Редакция опубликована', { exact: true })).toBeVisible()
+ await capture(page, testInfo, 'document-published-audit')
+ expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width)
+})
+
+test('документы заказа: просмотр исторической редакции', async ({ page }, testInfo) => {
+ await mockApi(page, 'aal2')
+ await page.route('**/rest/v1/rpc/read_platform_organization_payments', route => route.fulfill({ json: { items: [{ id: 'payment', amount_minor: 200, payment_status: 'pending', order_state: 'reserved', created_at: '2026-09-26T10:00:00Z', refunded_minor: 0, refund_pending_minor: 0, refund_review_minor: 0 }], next_cursor: null } }))
+ await page.route('**/rest/v1/rpc/read_platform_order_documents', route => {
+  const request = route.request().postDataJSON()
+  expect(request.p_organization_id).toBe('org')
+  expect(request.p_payment_order_id).toBe('payment')
+  return route.fulfill({ json: { accepted_at: '2026-09-26T09:00:00Z', documents: [{ id: 'historic-agreement', kind: 'agreement' }], document: request.p_document_id ? { id: 'historic-agreement', kind: 'agreement', body: 'Исторический текст, принятый покупателем' } : null } })
+ })
+ await page.goto('/')
+ await page.getByRole('button', { name: 'Найти', exact: true }).click()
+ await page.getByRole('button', { name: 'Тестовая организация', exact: true }).click()
+ await page.getByRole('button', { name: 'Тарифы и оплата', exact: true }).click()
+ await page.getByRole('button', { name: 'Загрузить платежи' }).click()
+ await page.getByRole('button', { name: 'Показать документы заказа' }).click()
+ await page.getByRole('button', { name: 'Пользовательское соглашение · historic-agreement' }).click()
+ await expect(page.getByText('Исторический текст, принятый покупателем')).toBeVisible()
+ await capture(page, testInfo, 'order-accepted-document')
+ expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width)
 })

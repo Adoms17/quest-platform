@@ -33,5 +33,15 @@
     "version": "20260926016000",
     "file": "20260926016000_checkout_document_flow.sql",
     "sha256": "82cd760fca9362de56dea373dfd221a6786e04c7f6ec43f4e80127009c02f1b4"
+  },
+  {
+    "version": "20260926017000",
+    "file": "20260926017000_list_platform_purchase_documents.sql",
+    "sha256": "f4e6d0a705d3f4087a26d588d032c746cdcd74d9fca30981a900ddcdc84bef82"
+  },
+  {
+    "version": "20260926018000",
+    "file": "20260926018000_read_platform_order_documents.sql",
+    "sha256": "8bac91cb6010c3abc614cd2dec35983f0e0c93fcfded6c78e7b0923e7d0e461d"
   }
 ]
