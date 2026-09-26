@@ -18,7 +18,7 @@ export default function PublicTariffs({ service }) {
  if (state.loading) return <p role="status">Загружаем актуальные тарифы…</p>;
  if (state.error) return <div role="alert"><p>Не удалось загрузить актуальные тарифы. Попробуйте ещё раз.</p><button className="button" onClick={() => { setState({ loading: true }); setAttempt(value => value + 1); }}>Повторить загрузку</button></div>;
  return <div className="service-plans">{state.items.map(plan => <article key={plan.id} className={'service-plan' + (plan.plan_key === 'free' ? '' : ' service-paid')}>
-  <h3>{plan.display_name}</h3><p className="service-price">{plan.monthly_price_minor === 0 ? 'Бесплатно' : <>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 }).format(plan.monthly_price_minor / 100)}<span> / месяц</span></>}</p>
+  <h3>{plan.display_name}</h3><p className="service-price">{plan.monthly_price_minor === 0 ? 'Бесплатно' : <>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(plan.monthly_price_minor / 100)}<span> / месяц</span></>}</p>
   <ul><li>Одновременно открытых квестов: {plan.active_quests_limit}</li><li>Мест в команде, включая владельца: {plan.team_members_limit}</li>{plan.plan_key !== 'free' && <li>Ручное продление на месяц</li>}</ul>
   {plan.plan_key === 'free' ? <a className="button" href={`${service}/quests/new`}>Начать создавать</a> : <p>Скоро в продаже</p>}
  </article>)}</div>;
