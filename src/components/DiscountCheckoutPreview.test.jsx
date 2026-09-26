@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 const { preview } = vi.hoisted(() => ({ preview: vi.fn() }))
 vi.mock('../services/discountCheckoutApi', () => ({ previewDiscountCheckout: preview }))
+vi.mock('../services/purchaseDocumentsApi', () => ({ loadPurchaseDocuments: vi.fn().mockResolvedValue([{kind:'agreement',id:'a'},{kind:'payment_terms',id:'p'}]), loadPurchaseDocument: vi.fn(), loadAcceptedDocuments: vi.fn() }))
 import DiscountCheckoutPreview from './DiscountCheckoutPreview'
 const offer = { offer_id: 'offer', amount_minor: 10000 }
 const quote = { ok: true, base_amount_minor: 10000, discount_amount_minor: 10000, amount_minor: 0, discount_bps: 10000, requires_payment: false, remaining_periods: 2, period_months: 1 }
@@ -26,7 +27,7 @@ test('запоздавший ответ на старый код отбрасы�
  expect(screen.queryByRole('status')).toBeNull()
  expect(screen.getByRole('button').disabled).toBe(false)
 })
-test('смена организации сбрасывает код и защищает от старого ответа', async () => {
+test('смена рабочей области сбрасывает код и защищает от старого ответа', async () => {
  let resolve; preview.mockReturnValue(new Promise(r => { resolve = r }))
  const view = render(<DiscountCheckoutPreview organizationId="org" offer={offer} />)
  enter(); view.rerender(<DiscountCheckoutPreview organizationId="other" offer={offer} />)
@@ -68,4 +69,20 @@ test('оплаченный период объясняется без предл
  enter()
  expect(await screen.findByRole('alert')).toHaveTextContent('Период после пробного доступа уже оплачен')
  expect(screen.queryByText('Подтвердить расчёт и создать заказ')).toBeNull()
+})
+
+test('новый расчёт требует отдельного согласия на документы', async () => {
+ vi.stubEnv('VITE_CHECKOUT_DOCUMENTS','true')
+ try {
+ preview.mockResolvedValue(quote);const confirm=vi.fn()
+ render(<DiscountCheckoutPreview organizationId="org" offer={offer} onConfirm={confirm} requireDocuments />)
+ enter();const checkbox=await screen.findByRole('checkbox')
+ const button=screen.getByRole('button',{name:'Подтвердить расчёт и создать заказ'})
+ expect(button.disabled).toBe(true);expect(checkbox.checked).toBe(false)
+ fireEvent.click(checkbox);fireEvent.click(button)
+ expect(confirm).toHaveBeenCalledWith('CODE',quote,[{kind:'agreement',id:'a'},{kind:'payment_terms',id:'p'}])
+ fireEvent.click(screen.getByRole('button',{name:'Рассчитать стоимость'}))
+ expect((await screen.findByRole('checkbox')).checked).toBe(false)
+ expect(screen.getByRole('button',{name:'Подтвердить расчёт и создать заказ'}).disabled).toBe(true)
+ } finally {vi.unstubAllEnvs()}
 })

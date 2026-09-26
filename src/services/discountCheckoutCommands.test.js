@@ -45,3 +45,17 @@ test('подмена ID для исполнения не вызывает ком
  await expect(executeDiscountCheckout(actor,org,actor)).rejects.toThrow()
  expect(rpc).toHaveBeenCalledTimes(1)
 })
+
+test('новый API получает явное согласие и точные редакции',async()=>{
+ vi.stubEnv('VITE_CHECKOUT_DOCUMENTS','true')
+ try {
+ rpc.mockResolvedValueOnce({data:{ok:false,reason:'documents_changed'}})
+ const result=await acceptDiscountCheckout(actor,org,offer,'',quote,[{kind:'agreement',id:'a'},{kind:'payment_terms',id:'p'}])
+ expect(result.reason).toBe('documents_changed')
+ expect(rpc).toHaveBeenCalledWith('accept_sandbox_checkout_documents',expect.objectContaining({p_agreement_id:'a',p_payment_terms_id:'p',p_accepted:true}))
+ } finally {vi.unstubAllEnvs()}
+})
+test('без согласия новый API не вызывается',async()=>{
+ vi.stubEnv('VITE_CHECKOUT_DOCUMENTS','true')
+ try {await expect(acceptDiscountCheckout(actor,org,offer,'',quote,[])).rejects.toThrow();expect(rpc).not.toHaveBeenCalled()} finally {vi.unstubAllEnvs()}
+})

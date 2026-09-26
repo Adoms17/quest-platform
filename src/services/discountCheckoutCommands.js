@@ -37,7 +37,7 @@ export async function recoverDiscountCheckout(actor, org) {
  // null не доказывает отказ: первоначальный запрос может ещё выполняться.
  return { commandId, order: data === null ? null : validateOrder(data, org) }
 }
-export async function acceptDiscountCheckout(actor, org, offerId, code, quote) {
+export async function acceptDiscountCheckout(actor, org, offerId, code, quote, documents = null) {
  if (!uuid.test(offerId) || !quote || quote.organization_id !== org || quote.offer_id !== offerId
   || typeof code !== 'string' || code.length > 128) throw uncertain()
  let commandId = readDiscountCommand(actor, org)
@@ -49,9 +49,11 @@ export async function acceptDiscountCheckout(actor, org, offerId, code, quote) {
   localStorage.setItem(key(actor, org), commandId)
  }
  if (readDiscountCommand(actor, org) !== commandId) throw uncertain()
- const data = await rpc('accept_sandbox_discount_checkout', { p_organization_id: org, p_offer_id: offerId, p_command_id: commandId, p_code: code.trim(), p_reviewed_quote: quote })
+ const withDocuments=documents!==null && documents!==undefined
+ if(withDocuments && (!Array.isArray(documents) || documents.length!==2 || !['agreement','payment_terms'].every(k=>documents.filter(d=>d.kind===k).length===1))) throw uncertain()
+ const data = await rpc(withDocuments?'accept_sandbox_checkout_documents':'accept_sandbox_discount_checkout', { ...(withDocuments?{p_agreement_id:documents.find(d=>d.kind==='agreement').id,p_payment_terms_id:documents.find(d=>d.kind==='payment_terms').id,p_accepted:true}:{}), p_organization_id: org, p_offer_id: offerId, p_command_id: commandId, p_code: code.trim(), p_reviewed_quote: quote })
  if (readDiscountCommand(actor, org) !== commandId) throw uncertain()
- if (data?.ok === false && ['invalid_code','rate_limited','offer_unavailable','trial_period_already_paid','discount_exhausted','checkout_pending','quote_changed'].includes(data.reason)) return { commandId, order: null, reason: data.reason }
+ if (data?.ok === false && ['documents_changed','invalid_code','rate_limited','offer_unavailable','trial_period_already_paid','discount_exhausted','checkout_pending','quote_changed'].includes(data.reason)) return { commandId, order: null, reason: data.reason }
  if (data?.ok !== true || !uuid.test(data.order_id)) throw uncertain()
  const restored = await recoverDiscountCheckout(actor, org)
  if (restored.order?.order_id !== data.order_id) throw uncertain()

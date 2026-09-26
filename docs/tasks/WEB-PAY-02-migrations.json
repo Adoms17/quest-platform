@@ -1,0 +1,37 @@
+[
+  {
+    "version": "20260926010000",
+    "file": "20260926010000_purchase_document_versions.sql",
+    "sha256": "ec3d8a02888b9cb3f4aa9f25096ee64ad6dff9439485899ff7bc80349fd834da"
+  },
+  {
+    "version": "20260926011000",
+    "file": "20260926011000_manage_purchase_documents.sql",
+    "sha256": "8935fa863167d4cc0e933da38c4e904e5c563bc44b92ac4516ea0175d27b4227"
+  },
+  {
+    "version": "20260926012000",
+    "file": "20260926012000_purchase_document_audit.sql",
+    "sha256": "1f7d2715cdd7c3c5b4022e5cf34a84db399bf4091f1510ec7c98c72ac67c363a"
+  },
+  {
+    "version": "20260926013000",
+    "file": "20260926013000_read_purchase_documents.sql",
+    "sha256": "c6aa4fcb389a28edf0cfd51d748994b4b8ac12b6aec55c432145b66548ee2b24"
+  },
+  {
+    "version": "20260926014000",
+    "file": "20260926014000_record_checkout_documents.sql",
+    "sha256": "c82928dffc3d52be10775b7e7fd8e2186dcd5f1e7c52f1b60a2b65cd9d2789d8"
+  },
+  {
+    "version": "20260926015000",
+    "file": "20260926015000_accept_checkout_with_documents.sql",
+    "sha256": "215250c0b8f31ec62e357b8bd2fff3973d9c97856bc27cc9a17af29ee7fca153"
+  },
+  {
+    "version": "20260926016000",
+    "file": "20260926016000_checkout_document_flow.sql",
+    "sha256": "82cd760fca9362de56dea373dfd221a6786e04c7f6ec43f4e80127009c02f1b4"
+  }
+]

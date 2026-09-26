@@ -43,6 +43,9 @@ on:
           - organization-quests-apply
           - organization-statistics-dry-run
           - organization-statistics-apply
+          - purchase-documents-dry-run
+          - purchase-documents-apply
+          - purchase-documents-fixture
           - subscription-refunds-dry-run
           - subscription-refunds-apply
           - order-vault-configure
@@ -907,3 +910,70 @@ jobs:
           echo "Refund operation: $OPERATION; commit: $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
           echo "Function publication requested: $PUBLISH_FUNCTIONS (apply only)." >> "$GITHUB_STEP_SUMMARY"
           echo 'Function publication disables new subscription refunds, including on reruns. Enable only during separate controlled acceptance. Existing reconciliation remains available. Admin and website are not deployed.' >> "$GITHUB_STEP_SUMMARY"
+
+  purchase-documents-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'purchase-documents-dry-run' || inputs.operation == 'purchase-documents-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = purchase-documents-dry-run || test "$OPERATION" = purchase-documents-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-document-stage-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact document migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/document-migrations.json"
+          node scripts/check-document-stage-release.mjs "$RUNNER_TEMP/document-migrations.json"
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history and apply document migrations
+        if: inputs.operation == 'purchase-documents-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/document-migrations.json"
+          node scripts/check-document-stage-release.mjs "$RUNNER_TEMP/document-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'purchase-documents-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/document-migrations.json"
+          node scripts/check-document-stage-release.mjs "$RUNNER_TEMP/document-migrations.json" --require-applied
+
+  purchase-documents-fixture:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'purchase-documents-fixture'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Prepare non-binding stage acceptance fixture
+        run: npx supabase db query --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-document-fixture.sql
