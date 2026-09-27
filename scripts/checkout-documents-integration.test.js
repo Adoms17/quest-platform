@@ -18,10 +18,12 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
 
   // Reproduce stage rollout: public tariff prices are already applied before receipts.
   const receiptVersions=new Set(JSON.parse(readFileSync(new URL('../docs/tasks/WEB-PAY-03-migrations.json',import.meta.url),'utf8')).map(item=>item.version))
-  const base=files.filter(file=>!receiptVersions.has(file.slice(0,14)))
+  const followups=files.filter(file=>file>='20260927010000')
+  const base=files.filter(file=>!receiptVersions.has(file.slice(0,14))&&!followups.includes(file))
   const receipts=files.filter(file=>receiptVersions.has(file.slice(0,14)))
   sql(base.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
   sql(receipts.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
+  sql(followups.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
   sql('create extension if not exists pgtap with schema extensions; grant usage on schema extensions to anon,authenticated,service_role;')
 
  const tariffPrices=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/tariff_monthly_prices.test.sql',import.meta.url),'utf8'))
@@ -35,6 +37,10 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  const receiptChecks=readFileSync(new URL('../supabase/tests/database/receipt_full_schema.test.sql',import.meta.url),'utf8')
  const paidOut=sql('set search_path=public,extensions;'+paid.replace('select * from finish();rollback;', () => orderChecks+'\n'+receiptChecks+'\nselect * from finish();rollback;'))
  expect(paidOut).not.toMatch(/not ok|Looks like/)
+ const modelChecks=readFileSync(new URL('../supabase/tests/database/subscription_fiscal_model_full_schema.test.sql',import.meta.url),'utf8')
+ const modeledOut=sql('set search_path=public,extensions;'+paid.replace('select * from finish();rollback;', () => orderChecks+'\n'+modelChecks+'\nselect * from finish();rollback;'))
+ expect(modeledOut).not.toMatch(/not ok|Looks like/)
+ expect(modeledOut).toContain('real other organization cannot recover modeled receipt')
  const recurringReceipt=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/recurring_receipt_snapshot.test.sql',import.meta.url),'utf8'))
  expect(recurringReceipt).not.toMatch(/not ok|Looks like/)
  expect(recurringReceipt).toMatch(/1\.\.\d+/)
@@ -43,7 +49,21 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  // Commit synthetic receipt fixtures only in this disposable database so two
  // independent PostgreSQL sessions can compete for the same order lock.
  const receiptPrefix=receiptChecks.split('savepoint settlement_fixture;')[0]
- const committed=sql('set search_path=public,extensions;'+paid.replace('select * from finish();rollback;',()=>orderChecks+'\n'+receiptPrefix+`
+ const modeledPrefix=receiptPrefix.replace("now()-interval '1 hour',1,'service','full_prepayment');", `clock_timestamp()+interval '2 seconds',1,'service','full_prepayment');
+ insert into public.billing_fiscal_policy_models(policy_id,product_kind,model_version,seller_tax_regime,settlement_basis)
+ values(md5('receipt-initial-policy')::uuid,'subscription','subscription_access_v1','ausn','period_end');
+ select pg_sleep(2.1);`)
+ expect(modeledPrefix).not.toBe(receiptPrefix)
+ const dueChecks=readFileSync(new URL('../supabase/tests/database/subscription_settlement_due.test.sql',import.meta.url),'utf8')
+ const dueOut=sql('set search_path=public,extensions;'+paid.replace('select * from finish();rollback;',()=>orderChecks+'\n'+modeledPrefix+'\n'+dueChecks+'\nselect * from finish();rollback;'))
+ expect(dueOut).not.toMatch(/not ok|Looks like/)
+ expect(dueOut).toContain('unknown remains in existing reconciliation queue')
+
+ const committed=sql('set search_path=public,extensions;'+paid.replace('select * from finish();rollback;',()=>orderChecks+'\n'+modeledPrefix+`
+ reset role;
+ alter table public.billing_subscription_fiscal_terms disable trigger subscription_fiscal_terms_immutable;
+ update public.billing_subscription_fiscal_terms set period_start=now()-interval '1 month',period_end=now();
+ alter table public.billing_subscription_fiscal_terms enable trigger subscription_fiscal_terms_immutable;
  reset role;
  insert into public.billing_sandbox_payment_results(order_id,shop_id,payment_id,status,paid)
  values(current_setting('test.payment')::uuid,'123',md5('fiscal-payment')::uuid,'succeeded',true)
