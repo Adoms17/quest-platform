@@ -1,4 +1,4 @@
-import { reconcilePrepaymentSettlements } from '../_shared/settlementReconciliation.js'
+import { runSandboxSettlementPhase } from '../_shared/sandboxSettlementPhase.js'
 import { createRefundReceiptTransport } from '../_shared/refundReceiptTransport.js'
 import { reconcileReceiptPayments } from '../_shared/receiptReconciliation.js'
 import { createReceiptPaymentTransport } from '../_shared/receiptPaymentTransport.js'
@@ -28,10 +28,12 @@ Deno.serve(async request => {
       ? await reconcileReceiptPayments({ rpc: client.rpc.bind(client), shopId, refund: true,
         provider: createSandboxHttpClient({ enabled, shopId, secretKey }, { refundReceipts: createRefundReceiptTransport(client.rpc.bind(client)) }) })
       : null
-    const settlements = Deno.env.get('YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION') === 'true'
-      ? await reconcilePrepaymentSettlements({ rpc: client.rpc.bind(client), shopId,
-        provider: createSandboxHttpClient({ enabled, shopId, secretKey }) })
-      : null
-    return { ...result, refunds, receipts, recurringReceipts, refundReceipts, settlements }
+    const { settlements, dueSettlements } = await runSandboxSettlementPhase({
+      reconciliationEnabled: Deno.env.get('YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION') === 'true',
+      dispatchEnabled: Deno.env.get('YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH') === 'true',
+      rpc: client.rpc.bind(client), shopId,
+      createProvider: () => createSandboxHttpClient({ enabled, shopId, secretKey }),
+    })
+    return { ...result, refunds, receipts, recurringReceipts, refundReceipts, settlements, dueSettlements }
   } })(request)
 })

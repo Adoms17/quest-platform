@@ -48,6 +48,9 @@ on:
           - receipts-dry-run
           - receipts-apply
           - receipts-functions-deploy
+          - subscription-model-dry-run
+          - subscription-model-apply
+          - subscription-model-functions-deploy
           - purchase-documents-dry-run
           - purchase-documents-apply
           - purchase-documents-fixture
@@ -1123,3 +1126,96 @@ jobs:
           npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
           npx supabase functions deploy admin-sandbox-refund --project-ref "$SUPABASE_PROJECT_ID"
           npx supabase functions deploy admin-subscription-refund --project-ref "$SUPABASE_PROJECT_ID"
+
+  subscription-model-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-model-dry-run' || inputs.operation == 'subscription-model-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-model-dry-run || test "$OPERATION" = subscription-model-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-model-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+      - name: Preview migrations
+        run: |
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+      - name: Disable receipt rollout flags before apply
+        if: inputs.operation == 'subscription-model-apply'
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Recheck history and apply receipt migrations
+        if: inputs.operation == 'subscription-model-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'subscription-model-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+
+  subscription-model-functions:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'subscription-model-functions-deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-model-functions-deploy
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-model-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable receipt rollout flags
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy compatible sandbox functions
+        run: |
+          npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
