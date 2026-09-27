@@ -1,3 +1,4 @@
+import { createRefundReceiptTransport } from './refundReceiptTransport.js'
 import { createSandboxRefundHandler } from './sandboxRefundHandler.js'
 import { authenticateRefundOwner } from './sandboxRefundIdentity.js'
 import { createSandboxHttpClient } from './yookassaSandboxHttp.js'
@@ -34,6 +35,7 @@ export function createSubscriptionRefundEndpoint({ enabled = false, allowedOrigi
    if (!['read_provider', 'retry_same_request'].includes(recovery.action)) throw new Error('refund_review_required')
    const provider = createSandboxHttpClient(providerConfig, {
     ...transport,
+    refundReceipts: createRefundReceiptTransport(service.rpc.bind(service)),
     beforeRefundSend: async snapshot => {
      // Runs after the provider GET and before POST; identity/MFA and window are checked again.
      const fresh = await rpc('recover', id)

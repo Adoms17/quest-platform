@@ -1,6 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.112.3'
-import { createSandboxHttpClient } from '../_shared/yookassaSandboxHttp.js'
-import { runSandboxCheckout } from '../_shared/sandboxCheckout.js'
+import { runReceiptCheckout } from '../_shared/receiptCheckout.js'
 import { createSandboxCheckoutHandler, sandboxGatewayRpc } from '../_shared/sandboxCheckoutHandler.js'
 
 Deno.serve(async request => {
@@ -20,7 +19,7 @@ Deno.serve(async request => {
     },
     checkout:async (actor:string,orderId:string) => {
       const service=createClient(url!,serviceKey!,{auth:{persistSession:false,autoRefreshToken:false}})
-      return runSandboxCheckout(orderId,{rpc:sandboxGatewayRpc(service,actor),provider:createSandboxHttpClient({enabled,shopId,secretKey})})
+      return runReceiptCheckout(orderId,{rpc:sandboxGatewayRpc(service,actor),serviceRpc:service.rpc.bind(service),config:{enabled,shopId,secretKey},required:Deno.env.get('YOOKASSA_SANDBOX_RECEIPTS_REQUIRED')==='true'})
     },
   })(request)
 })

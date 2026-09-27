@@ -1,3 +1,4 @@
+import { createRefundReceiptTransport } from './refundReceiptTransport.js'
 import { createSandboxRefundHandler } from './sandboxRefundHandler.js'
 import { authenticateRefundOwner } from './sandboxRefundIdentity.js'
 import { sandboxRefundGatewayRpc } from './sandboxRefundGateway.js'
@@ -16,6 +17,7 @@ export function createPlatformRefundEndpoint({ enabled, allowedOrigins, auth, se
    const rpc = sandboxRefundGatewayRpc(service, identity)
    const provider = createSandboxHttpClient(providerConfig, {
     ...transport,
+    refundReceipts: createRefundReceiptTransport(service.rpc.bind(service)),
     beforeRefundSend: async saved => {
      // После GET проверки магазина/платежа, непосредственно перед POST.
      const { data, error } = await rpc('begin_sandbox_refund', { p_refund_id: saved.refund.id })
