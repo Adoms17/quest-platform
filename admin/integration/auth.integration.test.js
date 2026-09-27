@@ -186,6 +186,13 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       '20260925025000_track_quest_attempt_activity.sql',
       '20260925030000_read_platform_quest_statistics.sql',
     ]) await sql(readFileSync(new URL(`../../supabase/migrations/${migration}`, import.meta.url), 'utf8'))
+    // The real refund endpoint now reads fiscal storage even for legacy orders.
+    // This Auth fixture has no recurring flow; its empty FK target is sufficient.
+    await sql(readFileSync(new URL('../../supabase/migrations/20260926019000_receipt_snapshot_storage.sql', import.meta.url), 'utf8'))
+    await sql('create table public.billing_recurring_orders(id uuid primary key);')
+    const recurringReceiptDdl = readFileSync(new URL('../../supabase/migrations/20260926026000_recurring_receipt_snapshot.sql', import.meta.url), 'utf8').split('-- Preparation must precede')[0]
+    await sql(recurringReceiptDdl + '\ncommit;')
+    await sql(readFileSync(new URL('../../supabase/migrations/20260926029000_full_refund_receipts.sql', import.meta.url), 'utf8'))
     // Только DDL inbox: команды жизненного цикла подписок не входят в этот стенд.
     // Полный файл отдельно проверяет replay всех миграций.
     const inboxDdl = readFileSync(new URL('../../supabase/migrations/20260916031000_add_sandbox_payment_inbox.sql', import.meta.url), 'utf8').split('-- Разделить доверенную запись')[0]
@@ -410,6 +417,9 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     const sdkService = createClient('http://synthetic.test',serviceToken,sdkOptions)
     await sql(`update public.billing_sandbox_orders set first_sent_at=now() where id='${paymentOrder}';`)
     const paymentInfo = JSON.parse(await sql(`select jsonb_build_object('payment',r.payment_id,'plan',o.plan_version_id) from public.billing_sandbox_orders o join public.billing_sandbox_payment_results r on r.order_id=o.id where o.id='${paymentOrder}';`))
+    const fiscalRpcErrors=[]
+    const realServiceRpc=sdkService.rpc.bind(sdkService)
+    sdkService.rpc=async(name,args)=>{const result=await realServiceRpc(name,args);if(result.error)fiscalRpcErrors.push({name,code:result.error.code});return result}
     let refundPosts = 0
     const providerRefund = randomUUID()
     const providerFetch = async (url, options) => {
@@ -426,6 +436,7 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     const endpoint=createPlatformRefundEndpoint({enabled:true,allowedOrigins:[],auth:sdkAuth,service:sdkService,providerConfig:{enabled:true,shopId:'123',secretKey:'synthetic'},transport:{fetchImpl:providerFetch}})
     const refundRequest=()=>new Request('http://synthetic.test/refund',{method:'POST',headers:{authorization:'Bearer '+verified.access_token},body:JSON.stringify({refundId:confirmedRefund.refund_id})})
     const sent=await endpoint(refundRequest())
+    expect(fiscalRpcErrors).toEqual([])
     expect({status:sent.status,body:await sent.json()}).toEqual({status:200,body:{refundId:confirmedRefund.refund_id,state:'succeeded',environment:'sandbox',accessEffect:'unchanged'}})
     expect((await endpoint(refundRequest())).status).toBe(200)
     expect(refundPosts).toBe(1)
