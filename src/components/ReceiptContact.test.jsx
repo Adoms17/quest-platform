@@ -1,0 +1,50 @@
+import { render,screen,fireEvent,waitFor } from '@testing-library/react'
+import { beforeEach,it,expect,vi } from 'vitest'
+const api=vi.hoisted(()=>({readReceiptContact:vi.fn(),readReceiptStatus:vi.fn(),prepareReceiptContact:vi.fn()}))
+vi.mock('../services/receiptApi',()=>api)
+import ReceiptContact from './ReceiptContact'
+beforeEach(()=>{
+ vi.resetAllMocks()
+ api.readReceiptContact.mockResolvedValue({prepared:false,email:null,canPrepare:true})
+ api.readReceiptStatus.mockResolvedValue({status:'not_sent'})
+})
+it('view does not save contact; successful explicit save enables payment',async()=>{
+ const ready=vi.fn()
+ api.prepareReceiptContact.mockResolvedValue({prepared:true,email:'test@example.test',canPrepare:true})
+ render(<ReceiptContact orderId="one" onReady={ready}/> )
+ fireEvent.change(await screen.findByRole('textbox'),{target:{value:'test@example.test'}})
+ expect(api.prepareReceiptContact).not.toHaveBeenCalled()
+ fireEvent.submit(screen.getByRole('textbox').closest('form'))
+ await screen.findByText('Почта для чека: test@example.test')
+ expect(ready).toHaveBeenLastCalledWith(true)
+})
+it('restores contact and fiscal failure independently, without asking to repay',async()=>{
+ api.readReceiptContact.mockResolvedValue({prepared:true,email:'saved@example.test',canPrepare:false})
+ api.readReceiptStatus.mockResolvedValue({status:'canceled'})
+ render(<ReceiptContact orderId="one" onReady={vi.fn()}/> )
+ await screen.findByText(/Чек не зарегистрирован/)
+ expect(screen.queryByRole('textbox')).toBeNull()
+ expect(api.prepareReceiptContact).not.toHaveBeenCalled()
+})
+it('failed load keeps payment blocked and allows reload without exposing error',async()=>{
+ const ready=vi.fn()
+ api.readReceiptContact.mockRejectedValueOnce(Error('private'))
+ render(<ReceiptContact orderId="one" onReady={ready}/> )
+ await screen.findByRole('alert')
+ expect(ready).not.toHaveBeenCalledWith(true)
+ expect(screen.queryByText('private')).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:'Обновить данные чека'}))
+ await screen.findByRole('textbox')
+})
+it('late save after unmount cannot enable another order',async()=>{
+ let resolve
+ api.prepareReceiptContact.mockReturnValue(new Promise(done=>{resolve=done}))
+ const ready=vi.fn()
+ const {unmount}=render(<ReceiptContact orderId="one" onReady={ready}/> )
+ fireEvent.change(await screen.findByRole('textbox'),{target:{value:'test@example.test'}})
+ fireEvent.submit(screen.getByRole('textbox').closest('form'))
+ await waitFor(()=>expect(api.prepareReceiptContact).toHaveBeenCalledTimes(1))
+ unmount();resolve({prepared:true,email:'test@example.test'})
+ await Promise.resolve()
+ expect(ready).not.toHaveBeenCalledWith(true)
+})

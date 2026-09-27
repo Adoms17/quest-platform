@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { readSandboxCheckout, recoverSandboxCheckout, loadSandboxOffer, checkSandboxCheckout, listSandboxOffers, dismissCanceledSandboxCheckout, cancelUnsentSandboxCheckout } from '../services/sandboxCheckoutApi'
 import SandboxOfferPicker from './SandboxOfferPicker'
 import RecurringConsent from './RecurringConsent'
+import ReceiptContact from './ReceiptContact'
 
 export default function SandboxCheckout({ actorId, organizationId }) {
   const [state, setState] = useState({ loading: true })
@@ -10,6 +11,8 @@ export default function SandboxCheckout({ actorId, organizationId }) {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(false)
   const [retry, setRetry] = useState(0)
+  const receiptsEnabled = import.meta.env.VITE_SANDBOX_RECEIPTS === 'true'
+  const [receiptReady, setReceiptReady] = useState(false)
   const running = useRef(false)
   useEffect(() => {
     let active = true
@@ -25,7 +28,7 @@ export default function SandboxCheckout({ actorId, organizationId }) {
     return () => { active = false }
   }, [actorId, organizationId, retry])
   async function submit() {
-    if (!accepted || !state.offer || running.current) return
+    if (!accepted || !state.offer || running.current || (receiptsEnabled && !receiptReady)) return
     running.current = true; setBusy(true); setError(false)
     try {
       if (readSandboxCheckout(actorId, organizationId) !== state.offer.order_id) throw new Error('order_changed')
@@ -67,8 +70,9 @@ export default function SandboxCheckout({ actorId, organizationId }) {
         {state.offer.payment_status === 'pending' && !result && <p role="status">Ожидаем завершения платежа. Проверяйте этот заказ перед новой оплатой.</p>}
       </>}
       {import.meta.env.VITE_SANDBOX_RECURRING_SETUP === 'true' && <RecurringConsent key={`${organizationId}:${state.offer.order_id}`} organizationId={organizationId} orderId={state.offer.order_id} disabled={busy} />}
+      {receiptsEnabled && <ReceiptContact key={`${actorId}:${state.offer.order_id}`} orderId={state.offer.order_id} onReady={setReceiptReady} disabled={busy} revision={result} />}
       <label className="flex items-start gap-3 py-3"><input type="checkbox" checked={accepted} disabled={busy} onChange={event => setAccepted(event.target.checked)} className="mt-1" />Подтверждаю условия тестового заказа</label>
-      <button type="button" disabled={!accepted || busy} onClick={() => void submit()} className="rounded-lg bg-blue-600 px-4 py-3 text-white disabled:opacity-50">{busy ? 'Проверяем…' : result || error || state.offer.state !== 'reserved' ? 'Проверить платёж' : 'Подтвердить тестовую оплату'}</button>
+      <button type="button" disabled={!accepted || busy || (receiptsEnabled && !receiptReady)} onClick={() => void submit()} className="rounded-lg bg-blue-600 px-4 py-3 text-white disabled:opacity-50">{busy ? 'Проверяем…' : result || error || state.offer.state !== 'reserved' ? 'Проверить платёж' : 'Подтвердить тестовую оплату'}</button>
       {error && <p role="alert">Не удалось подтвердить состояние платежа. Повторите проверку этого заказа.</p>}
       {state.offer.state === 'reserved' && !result && <button type="button" disabled={busy} onClick={() => void dismiss(true)} className="px-4 py-3 text-blue-700">Отменить неотправленный заказ</button>}
       {(state.offer.state === 'finished' || result?.status === 'canceled') && !state.offer.payment_requires_review && !result?.requiresReview && <button type="button" disabled={busy} onClick={() => void dismiss()} className="px-4 py-3 text-blue-700">Закрыть завершённый заказ</button>}

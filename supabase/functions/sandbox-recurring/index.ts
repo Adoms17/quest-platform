@@ -14,7 +14,7 @@ Deno.serve(async request => {
  return createSandboxWorkerHandler({ token: Deno.env.get('YOOKASSA_SANDBOX_WORKER_TOKEN'), enabled, run: async () => {
   const client = createClient(url!, serviceKey!, { auth: { persistSession: false, autoRefreshToken: false } })
   const rpc = client.rpc.bind(client)
-  const worker = createSandboxRecurringWorker({ rpc, config: { enabled, shopId, secretKey } })
+  const worker = createSandboxRecurringWorker({ rpc, config: { enabled, shopId, secretKey }, receiptsRequired: Deno.env.get('YOOKASSA_SANDBOX_RECEIPTS_REQUIRED') === 'true' })
   return runSandboxRecurringBatch({ rpc, worker, shopId, organizationId })
  } })(request)
 })

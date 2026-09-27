@@ -7,7 +7,8 @@ function setup(){
  const order={id,organizationId:actor,planVersionId:providerId,idempotencyKey:id,amountMinor:100,currency:'RUB',shopId:'123',environment:'sandbox',returnUrl:'https://stage.qvesta.ru',firstSentAt:new Date().toISOString(),providerPaymentId:paymentId}
  const refund={id,order_id:id,payment_id:paymentId,amount_minor:100,state:'reserved',first_sent_at:null,provider_refund_id:null}
  const auth={getClaims:vi.fn().mockResolvedValue({data:{claims:{sub:actor,role:'authenticated',aal:'aal2',exp:epoch+300,amr:[{method:'totp',timestamp:epoch}]}}}),getUser:vi.fn().mockResolvedValue({data:{user:{id:actor}}})}
- const service={rpc:vi.fn(async(_,args)=>{
+ const service={rpc:vi.fn(async(name,args)=>{
+  if(['prepare_refund_receipt_request','record_refund_receipt_status'].includes(name))return {data:null}
   const action=args.p_action
   if(action==='read')return {data:structuredClone({order,refund})}
   if(action==='claim'){refund.state='sending';refund.first_sent_at=new Date().toISOString();return {data:{can_send:true}}}

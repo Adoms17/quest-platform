@@ -9,10 +9,13 @@ const config = { enabled: true, shopId: '123', secretKey: 'synthetic-test-value'
 const info = { account_id: '123', test: true, status: 'enabled' }
 const payment = { id, test: true, status: 'pending', paid: false, recipient: { account_id: '123' }, amount: { value: '1.00', currency: 'RUB' }, metadata: { order_id: order.id, organization_id: order.organizationId, plan_version_id: order.planVersionId, environment: 'sandbox' } }
 const response = value => ({ ok: true, json: async () => value })
-function system({lostResponse=false,failedApply=false,zero=false,denied=false}={}) {
+function system({lostResponse=false,failedApply=false,zero=false,denied=false,fiscal=false}={}) {
  let attempted=false,claimed=false,recorded=null,applied=false,posts=0,applies=0
  const success={...payment,status:'succeeded',paid:true,payment_method:{id:order.providerMethodId,saved:true}}
  const rpc=vi.fn(async(name,args)=>{
+  if(name==='read_recurring_receipt_snapshot_internal')return {data:fiscal?{order_id:order.id,policy_id:order.planVersionId,prepared_at:order.firstSentAt,email:'receipt@example.test',description:'Renewal',amount_minor:100,currency:'RUB',vat_code:1,payment_subject:'service',payment_mode:'full_payment'}:null}
+  if(name==='save_recurring_receipt_request')return {data:{body:args.p_body,key:args.p_key,sha256:'a'.repeat(64)}}
+  if(name==='record_recurring_receipt_status')return {data:null}
   if(name==='prepare_scoped_sandbox_recurring')return {data:{prepared:1,skipped:0}}
   if(name==='list_scoped_sandbox_recurring_work')return {data:applied?[]:[order.id]}
   switch(args.p_action){
@@ -73,4 +76,10 @@ it('denied dispatch cannot charge or apply',async()=>{
 it('unauthorized call reaches neither database nor provider',async()=>{
  const x=system();expect((await x.request(false)).status).toBe(401)
  expect(x.rpc).not.toHaveBeenCalled();expect(x.fetchImpl).not.toHaveBeenCalled()
+})
+it('lost payment response with a receipt is recovered without a second charge',async()=>{
+ const x=system({lostResponse:true,fiscal:true})
+ await x.request();await x.request()
+ expect(x.state()).toEqual({posts:1,applies:1})
+ expect(x.rpc.mock.calls.some(([name])=>name==='record_recurring_receipt_status')).toBe(true)
 })

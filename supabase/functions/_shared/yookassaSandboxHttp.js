@@ -1,8 +1,9 @@
+import { settlementHttpMethods } from './settlementHttp.js'
 import { buildSandboxPaymentRequest, buildSandboxRecurringRequest, validateSandboxPayment, validateOrder, SandboxPaymentError } from './yookassaSandbox.js'
 
 // Только для серверного вызывающего слоя с заказом, загруженным из БД.
 // Ответ нужно сохранить до передачи confirmationUrl клиенту. Здесь нет выдачи прав.
-export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000, beforeRefundSend, beforeRecurringSend } = {}) {
+export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000, beforeRefundSend, beforeRecurringSend, receipts, refundReceipts } = {}) {
   if (enabled !== true || typeof shopId !== 'string' || !/^\d+$/.test(shopId)
     || typeof secretKey !== 'string' || !/^[\x21-\x7e]+$/.test(secretKey)
     || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30000) throw new SandboxPaymentError('sandbox_configuration_unavailable')
@@ -64,25 +65,46 @@ export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, 
       || !['pending', 'succeeded', 'canceled'].includes(data.status)) throw new SandboxPaymentError('refund_mismatch')
     return { refundId: data.id, status: data.status }
   }
+  async function verifiedRefund(raw, saved) {
+    const result = validateRefund(raw, saved)
+    if (refundReceipts) await refundReceipts.record(saved, result, raw)
+    return result
+  }
+  async function verifiedPayment(raw, saved) {
+    const payment = validateSandboxPayment(raw, saved)
+    if (receipts) await receipts.record(saved, payment, raw)
+    return payment
+  }
+  async function paymentRequest(saved, build) {
+    let prepared = build(saved, now())
+    if (receipts) prepared = await receipts.prepare(saved, prepared)
+    // Storage and shop verification may consume the remaining retry window.
+    build(saved, now())
+    return prepared
+  }
   return {
+    ...settlementHttpMethods({ request, verifyShop, shopId, now }),
     verifyShop,
     async createRefund(value) {
       const saved = refundSnapshot(value), r = saved.refund
       if (r.provider_refund_id) throw new SandboxPaymentError('refund_already_identified')
       const payment = await this.readPayment(saved.order)
       if (payment.status !== 'succeeded' || !payment.paid) throw new SandboxPaymentError('payment_not_refundable')
-      if (beforeRefundSend) await beforeRefundSend(structuredClone(saved))
       const age = now() - Date.parse(r.first_sent_at)
       if (!Number.isFinite(age) || age < 0 || age >= 23 * 3600000) throw new SandboxPaymentError('refund_reconciliation_required')
-      const body = { payment_id: r.payment_id, amount: { value: `${Math.floor(r.amount_minor / 100)}.${String(r.amount_minor % 100).padStart(2, '0')}`, currency: 'RUB' } }
-      return validateRefund(await request('refunds', 'POST', body, { 'Idempotence-Key': r.id, 'Content-Type': 'application/json' }), saved)
+      let body = { payment_id: r.payment_id, amount: { value: `${Math.floor(r.amount_minor / 100)}.${String(r.amount_minor % 100).padStart(2, '0')}`, currency: 'RUB' } }
+      if (refundReceipts) body = await refundReceipts.prepare(saved, body)
+      if (beforeRefundSend) await beforeRefundSend(structuredClone(saved))
+      const finalAge = now() - Date.parse(r.first_sent_at)
+      if (!Number.isFinite(finalAge) || finalAge < 0 || finalAge >= 23 * 3600000) throw new SandboxPaymentError('refund_reconciliation_required')
+      return verifiedRefund(await request('refunds', 'POST', body, { 'Idempotence-Key': r.id, 'Content-Type': 'application/json' }), saved)
     },
     async readRefund(value) {
       const saved = refundSnapshot(value), r = saved.refund
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.provider_refund_id)) throw new SandboxPaymentError('invalid_refund')
       const payment = await this.readPayment(saved.order)
       if (payment.status !== 'succeeded' || !payment.paid) throw new SandboxPaymentError('payment_not_refundable')
-      return validateRefund(await request(`refunds/${r.provider_refund_id}`), saved)
+      return verifiedRefund(await request(`refunds/${r.provider_refund_id}`), saved)
     },
     async findPayment(order) {
       const saved = snapshot(order)
@@ -90,7 +112,7 @@ export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, 
       await verifyShop()
       const start = Date.parse(saved.firstSentAt)
       const params = new URLSearchParams({ limit: '100', 'created_at.gte': new Date(start - 60000).toISOString(), 'created_at.lte': new Date(start + 24 * 3600000).toISOString() })
-      let match = null
+      let match = null, rawMatch = null
       const cursors = new Set()
       for (let page = 0; page < 10; page++) {
         const data = await request(`payments?${params}`)
@@ -99,9 +121,12 @@ export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, 
           if (payment.metadata?.order_id !== saved.id) continue
           const verified = validateSandboxPayment(payment, saved)
           if (match && match.paymentId !== verified.paymentId) throw new SandboxPaymentError('payment_order_mismatch')
-          match = verified
+          match = verified; rawMatch = payment
         }
-        if (!data.next_cursor) return match
+        if (!data.next_cursor) {
+          if (match && receipts) await receipts.record(saved, match, rawMatch)
+          return match
+        }
         if (typeof data.next_cursor !== 'string' || data.next_cursor.length > 200 || cursors.has(data.next_cursor)) throw new SandboxPaymentError('provider_read_failed')
         cursors.add(data.next_cursor); params.set('cursor', data.next_cursor)
       }
@@ -116,9 +141,9 @@ export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, 
       await verifyShop()
       // Серверный guard обязан проверить согласие и зафиксировать решение отправки.
       if (await beforeRecurringSend(structuredClone(saved)) !== true) throw new SandboxPaymentError('recurring_send_not_authorized')
-      const prepared = buildSandboxRecurringRequest(saved, now())
+      const prepared = await paymentRequest(saved, buildSandboxRecurringRequest)
       const payment = await request('payments', 'POST', prepared.body, prepared.headers)
-      return validateSandboxPayment(payment, saved)
+      return verifiedPayment(payment, saved)
     },
     async createPayment(order) {
       const saved = snapshot(order)
@@ -126,15 +151,15 @@ export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, 
       buildSandboxPaymentRequest(saved, now())
       await verifyShop()
       // Проверка окна повторяется после сетевого ожидания /me.
-      const prepared = buildSandboxPaymentRequest(saved, now())
+      const prepared = await paymentRequest(saved, buildSandboxPaymentRequest)
       const payment = await request('payments', 'POST', prepared.body, prepared.headers)
-      return validateSandboxPayment(payment, saved)
+      return verifiedPayment(payment, saved)
     },
     async readPayment(order) {
       const saved = snapshot(order)
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(saved.providerPaymentId)) throw new SandboxPaymentError('invalid_payment_id')
       await verifyShop()
-      return validateSandboxPayment(await request(`payments/${saved.providerPaymentId}`), saved)
+      return verifiedPayment(await request(`payments/${saved.providerPaymentId}`), saved)
     },
   }
 }
