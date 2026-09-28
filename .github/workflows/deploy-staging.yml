@@ -46,6 +46,7 @@ on:
           - public-tariffs-dry-run
           - public-tariffs-apply
           - receipt-probe-create-payment
+          - receipt-probe-inspect
           - receipt-probe-preflight
           - receipts-dry-run
           - receipts-apply
@@ -1297,5 +1298,34 @@ jobs:
           name: receipt-probe-65b56025-7260-40de-a54e-81a8d074f358-result-${{ github.run_id }}
           path: ${{ runner.temp }}/receipt-probe-result.json
           if-no-files-found: ignore
+          overwrite: false
+          retention-days: 90
+
+  receipt-probe-inspect:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-probe-inspect'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test read-only inspection without credentials
+        run: npm test -- scripts/inspect-receipt-probe.test.js --maxWorkers=2
+      - name: Read the fixed sandbox payment and receipts
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/run-receipt-probe-inspection.mjs
+      - name: Preserve sanitized inspection
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-inspection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/receipt-probe-inspection.json
+          if-no-files-found: error
           overwrite: false
           retention-days: 90
