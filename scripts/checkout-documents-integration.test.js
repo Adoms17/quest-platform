@@ -27,6 +27,9 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
   sql(followups.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
   sql('create extension if not exists pgtap with schema extensions; grant usage on schema extensions to anon,authenticated,service_role;')
 
+ const shortFixture=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/subscription_fiscal_acceptance_fixture.test.sql',import.meta.url),'utf8'))
+ expect(shortFixture).not.toMatch(/not ok|Looks like/)
+ expect(shortFixture).toContain('fixture order and receipt terms agree')
  const tariffPrices=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/tariff_monthly_prices.test.sql',import.meta.url),'utf8'))
  expect(tariffPrices).not.toMatch(/not ok|Looks like/)
  const suite=readFileSync(new URL('../supabase/tests/database/checkout_documents_atomic.test.sql',import.meta.url),'utf8')
