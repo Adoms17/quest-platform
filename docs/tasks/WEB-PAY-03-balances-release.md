@@ -149,3 +149,22 @@ Endpoint требует существующий worker-token, YOOKASSA_SANDBOX_
 - docs/tasks/WEB-PAY-03-balances-acceptance.md и этот отчёт.
 
 Предыдущие локальные изменения worker/SQL/smoke сохранены и входят в будущий общий PR. Commit/push/merge/deploy этой итерации не выполнялись. Следующий шаг — разрешённые commit/push/PR и CI, затем отдельное согласование выпуска выключенного пакета. Операторское разрешение конкретной fixture, включение и один тестовый платёж на 990 ₽ остаются отдельным этапом; allowlist ещё пуст.
+
+## Выпуск acceptance-пакета на stage — 28.09.2026
+
+По явному разрешению владельца PR #127 слит squash с проверкой HEAD ae6ca1891bd1d1e37cddc60dc5c493ffdd46fde0. Staging commit: fac4ec95a470215f3c257cd7f32b7e7cd5d6274d. Все три workflow выполнены на этом SHA:
+- dry-run: https://github.com/Adoms17/quest-platform/actions/runs/36468821962 — PASS, ожидаются ровно 20260928017000 и 20260928018000;
+- apply: https://github.com/Adoms17/quest-platform/actions/runs/36469012063 — PASS, обе миграции применены, pending: none;
+- functions-deploy: https://github.com/Adoms17/quest-platform/actions/runs/36469196282 — PASS, опубликованы sandbox-subscription-fiscal-order и admin-fiscal-acceptance-prepare.
+
+Apply и deploy подтвердили успешное выключение receipt/refund/dispatch/acceptance-флагов. После выпуска выполнен HTTP smoke: prepare OPTIONS 204 с ожидаемым CORS и no-store; POST без JWT 401; POST пустого объекта с публичным anon JWT stage 503 с точным sandbox_disabled, CORS и no-store. Worker POST без токена 401/no-store. Публичный anon JWT получен из опубликованного same-origin JS stage-admin только в памяти, проверены role/ref; пользовательские сессии, service-role и env-файлы не читались, ключ не записывался и не выводился.
+
+Приёмка выключенного пакета успешна. Включённые операции, платёж, возврат и зачёт в этой итерации не запускались; операторский allowlist не заполнялся, production не менялся. Следующий этап — подготовить точные параметры операторского разрешения отдельной Free-организации и владельца, окно включения/остановки, затем согласовать один sandbox-сценарий 990 ₽ / 30 минут. Изменён только этот локальный отчёт после выпуска; код опубликован в PR #127.
+
+## Операторская подготовка отдельной организации — 28.09.2026
+
+Локально добавлен scripts/stage-fiscal-acceptance-fixture.sql: отдельная фиксированная неперсональная организация, только один действующий platform owner, Pro v1/990 ₽, действующая modeled policy, атомарные членство/Free/scope/allowlist, срок разрешения два часа без продления на retry. Никаких заказов/платежей/новой схемы. Изменение Free относится только к новой организации в той же транзакции. Коллизия с прежней организацией, неоднозначный owner, изменённая подписка или отозванный scope вызывают отказ.
+
+Workflow дополнен preview с ROLLBACK и provision с выключением acceptance-флагов; оба только для staging с применённой схемой. Полный SQL-стенд 320 миграций PASS (66.63 s), включая семь проверок операторского сценария: коллизия, неоднозначный owner, повтор, сохранение личной подписки, отсутствие заказов, Free и отозванный scope. Release/workflow-набор 12 PASS; lint/build PASS с прежними предупреждениями; diff-check PASS. Предыдущий SQL-прогон до расширения отказов также PASS (65.82 s).
+
+Изменённые файлы: scripts/stage-fiscal-acceptance-fixture.sql (новый); scripts/checkout-documents-integration.test.js; scripts/check-subscription-acceptance-release.test.js; .github/workflows/deploy-staging.yml; docs/tasks/WEB-PAY-03-balances-acceptance.md; этот отчёт. Прежняя локальная запись об успешном stage-выпуске сохранена. Commit/push/PR и запуск новых workflow не выполнялись. Следующий шаг — публикация операторского пакета и preview, затем создание организации в согласованном окне. Точный UUID существующего владельца в документацию/логи не выводится; неоднозначность блокирует сценарий.

@@ -27,6 +27,41 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
   sql(followups.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
   sql('create extension if not exists pgtap with schema extensions; grant usage on schema extensions to anon,authenticated,service_role;')
 
+ const operatorBody=readFileSync(new URL('./stage-fiscal-acceptance-fixture.sql',import.meta.url),'utf8').replace(/^begin;\s*/,'').replace(/commit;\s*$/,'')
+ const operatorSetup=`begin; set search_path=public,extensions; select no_plan();
+ insert into auth.users(id,email) values(md5('operator-fixture-owner')::uuid,'operator@example.test');
+ insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('operator-fixture-owner')::uuid,'owner','platform');
+ select set_config('test.personal.before',(select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),true);
+ insert into public.billing_fiscal_policies(id,environment,shop_id,effective_at,vat_code,payment_subject,payment_mode)
+ values(md5('operator-policy')::uuid,'sandbox','1467641',clock_timestamp()+interval '1 second',1,'service','full_prepayment');
+ insert into public.billing_fiscal_policy_models(policy_id,product_kind,model_version,seller_tax_regime,settlement_basis)
+ values(md5('operator-policy')::uuid,'subscription','subscription_access_v1','ausn','period_end'); select pg_sleep(1.1);
+ `
+ const operatorFailures=`
+ savepoint operator_checks;
+ insert into public.organizations(id,name) values(md5('stage-fiscal-acceptance-org-20260928')::uuid,'existing organization');
+ select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','organization collision: preserve existing organization','operator refuses organization collision');
+ rollback to operator_checks;
+ insert into auth.users(id,email) values(md5('other-operator')::uuid,'other-operator@example.test');
+ insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('other-operator')::uuid,'owner','platform');
+ select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','exactly one active platform owner required','operator refuses ambiguous owner');
+ rollback to operator_checks;
+ `
+ const operatorResult=sql(operatorSetup+operatorFailures+operatorBody+`
+ select set_config('test.fixture.before',(select to_jsonb(f)::text from public.billing_fiscal_acceptance_fixtures f),true);
+ `+operatorBody+`
+ select is((select to_jsonb(f)::text from public.billing_fiscal_acceptance_fixtures f),current_setting('test.fixture.before'),'operator retry preserves fixture and expiry');
+ select is((select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),current_setting('test.personal.before'),'operator preserves personal subscription');
+ select is((select count(*) from public.billing_sandbox_orders),0::bigint,'operator creates no payment orders');
+ select is((select status from public.organization_subscriptions where organization_id=md5('stage-fiscal-acceptance-org-20260928')::uuid),'free','operator creates isolated Free organization');
+ savepoint operator_scope;
+ delete from public.billing_sandbox_application_scope where organization_id=md5('stage-fiscal-acceptance-org-20260928')::uuid;
+ select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','fixture organization changed: manual review required','operator does not restore revoked scope');
+ rollback to operator_scope;
+ select * from finish(); rollback;
+ `)
+ expect(operatorResult).not.toMatch(/not ok|Looks like/)
+ expect(operatorResult).toContain('operator retry preserves fixture and expiry')
  const shortFixture=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/subscription_fiscal_acceptance_fixture.test.sql',import.meta.url),'utf8'))
  expect(shortFixture).not.toMatch(/not ok|Looks like/)
  expect(shortFixture).toContain('fixture order and receipt terms agree')

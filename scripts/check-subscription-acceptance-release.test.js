@@ -48,7 +48,7 @@ test('refuses missing old receipt schema and out-of-order application',()=>{
 test('acceptance release deploys only isolated endpoints and keeps all send flags off',async()=>{
  const {readFileSync}=await import('node:fs')
  const workflow=readFileSync(new URL('../.github/workflows/deploy-staging.yml',import.meta.url),'utf8')
- const section=workflow.slice(workflow.indexOf('  subscription-acceptance-migrate:'),workflow.indexOf('  receipt-probe-preflight:'))
+ const section=workflow.slice(workflow.indexOf('  subscription-acceptance-migrate:'),workflow.indexOf('  subscription-acceptance-fixture:'))
  expect(section.match(/github.ref == 'refs\/heads\/staging'/g)).toHaveLength(2)
  expect(section.match(/--require-applied/g)).toHaveLength(2)
  expect([...section.matchAll(/functions deploy ([a-z-]+)/g)].map(m=>m[1])).toEqual(['sandbox-subscription-fiscal-order','admin-fiscal-acceptance-prepare'])
@@ -58,4 +58,18 @@ test('acceptance release deploys only isolated endpoints and keeps all send flag
   for(const flag of ['ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED','YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED','YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH','ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED','YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH'])expect(line).toContain(flag+'=false')
   expect(line).not.toContain('=true')
  }
+})
+
+test('operator workflow separates rollback preview from provisioning and never enables dispatch',async()=>{
+ const {readFileSync}=await import('node:fs')
+ const w=readFileSync(new URL('../.github/workflows/deploy-staging.yml',import.meta.url),'utf8')
+ const job=w.slice(w.indexOf('  subscription-acceptance-fixture:'),w.indexOf('  receipt-probe-preflight:'))
+ expect(job).toContain("github.ref == 'refs/heads/staging'")
+ expect(job).toContain('SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht')
+ expect(job).toContain('--require-applied')
+ expect(job).toContain('rollback;')
+ expect(job).toContain("if: inputs.operation == 'subscription-acceptance-fixture-provision'")
+ expect(job).not.toContain('=true')
+ expect(job).not.toContain('functions deploy')
+ for(const flag of ['ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED','YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED','YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH'])expect(job).toContain(flag+'=false')
 })
