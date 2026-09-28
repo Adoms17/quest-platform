@@ -358,3 +358,27 @@ POST выполняется максимум один раз. HTTP 400 с invali
 Проверки: 66 тестов в трёх файлах PASS; npm run lint PASS с прежними React-предупреждениями; npm run build PASS включая PWA; git diff --check PASS. Новая операция не выполнялась, CI/actionlint не запускались. Commit/push/PR/слияние и POST возврата A ещё не выполнены; для нового пакета нужно явное разрешение.
 
 Изменены восемь файлов: .github/workflows/deploy-staging.yml; scripts/receipt-refund-a-probe.mjs; scripts/receipt-refund-a-probe.test.js; scripts/run-receipt-refund-a-probe.mjs; scripts/run-receipt-refund-a-probe.test.js; scripts/inspect-receipt-probe.mjs; scripts/inspect-receipt-probe.test.js; этот отчёт.
+
+## Возврат A подтверждён провайдером — 28.09.2026
+
+По явному разрешению Алексея опубликован PR #120 https://github.com/Adoms17/quest-platform/pull/120 (head c2f2692a3a6f11d17b617a7786411670d8d2ab10). Полный CI/E2E и CodeQL успешны. PR слит в staging aa85c4329151c5621ef5fcad6b59c27311d99767. Выполнен один запуск receipt-probe-refund-a: https://github.com/Adoms17/quest-platform/actions/runs/36388115862 . Все шаги успешны; зашифрованный журнал 10954234694 сохранён до POST, безопасный результат 10955445223.
+
+Возврат 324c2110-0015-5001-a000-1404c9f12465: status=succeeded, amount=317.43 RUB, paymentId=324bffbc-000f-5001-a000-16b18fa2cc44. В первом ответе receiptRegistration=unknown, а первый список ещё содержал только исходный чек; повторная отправка не выполнялась.
+
+Отдельная GET-only сверка https://github.com/Adoms17/quest-platform/actions/runs/36388246648 успешна (артефакт 10955148112). Полный список содержит исходный чек и refund-чек ra-324c2110-0001-0050-602d-359cd7062f78 со status=succeeded и точным refundId=324c2110-0015-5001-a000-1404c9f12465. Строка сохранила quantity=0.320636 (JSON number), цену единицы 990.00 RUB, service/full_prepayment/vatCode=1; описание совпало. refundedAmount=317.43, refundable=true, расчётный остаток 672.57 RUB. initialRefundPreconditionsMet=false ожидаемо после первого возврата, не ошибка приёмки.
+
+Критерий A выполнен: sandbox принял шесть знаков количества именно в этом запросе, возврат и связанный чек успешны. Это не проверка всех дробных значений, не реальный фискальный чек и не подтверждение production. Следующий отдельный пакет — возврат B оставшихся 672.57 RUB с quantity=0.679364, только после подготовки и разрешения его публикации/запуска. Затем отдельный сценарий возврат → зачёт остатка → возврат. B в этом запуске не отправлялся. Операцию A не повторять, журнал не удалять.
+
+Флаги чеков приложения, активные политики и production не менялись. После выпуска изменён только этот отчёт; код повторно не редактировался, lint/build не перезапускались. Локальные 66 тестов, lint/build и обязательный CI ранее прошли; workflow дополнительно выполнил те же 66 проверок перед POST.
+
+## Возврат B: пакет подготовлен локально — 28.09.2026
+
+Ветка codex/receipt-probe-refund-b от staging aa85c432. Новая отдельная ручная операция receipt-probe-refund-b: один возврат оставшихся 672.57 RUB по прежнему платежу, quantity=0.679364 при цене единицы 990.00, service/full_prepayment/vat_code=1. Ключ d59fbe93-04cd-4b58-beb8-b52c8c310afa; отдельный зашифрованный журнал сохраняется до POST. Окно до 29.09.2026 05:00 UTC (08:00 МСК), попытки повторного workflow и повторные резервации запрещены. Пакет A не изменяется.
+
+Перед POST: свежая полная сверка магазина test=true/account_id=1467641; paid/succeeded/refundable-платёж, refundedAmount ровно 317.43, исходный succeeded-чек и ровно один succeeded-чек A ra-324c2110-0001-0050-602d-359cd7062f78 с точным refundId, количеством 0.320636 и прежними фискальными полями. Дополнительный GET /refunds/324c2110-0015-5001-a000-1404c9f12465 проверяет ID, payment_id, succeeded и сумму 317.43 RUB. Любой отказ/неопределённость до POST останавливает отправку; после POST неизвестный результат не повторяется. Во время эксперимента не выполнять другие операции с этим платежом через ЛК/иные инструменты.
+
+После попытки — GET-сверка платежа и чеков. Критерий B: успешный возврат 672.57, совокупно возвращено 990.00, денежный остаток ноль; отдельный succeeded-чек связан с ID B, строка 0.679364 × 990.00, service/full_prepayment/vat_code=1. При pending/unknown — последующая сверка, без нового POST. Этот сценарий не проверяет зачёт предоплаты; он требует другого платежа и отдельного разрешённого пакета.
+
+Проверки: 110 тестов в пяти файлах PASS (B и его runner, A и его runner, инспектор); lint PASS с прежними React-предупреждениями; build PASS включая PWA; git diff --check PASS. Первый тестовый прогон выявил устаревшее ожидание трёх GET вместо четырёх после добавления проверки A; ожидание исправлено, финальный набор прошёл. Workflow просмотрен вручную; CI/actionlint не запускались. Новых зависимостей нет.
+
+Изменены шесть файлов: .github/workflows/deploy-staging.yml; scripts/receipt-refund-b-probe.mjs; scripts/receipt-refund-b-probe.test.js; scripts/run-receipt-refund-b-probe.mjs; scripts/run-receipt-refund-b-probe.test.js; этот отчёт (включает результат A). Commit/push/PR/merge и возврат B пока не выполнялись; ожидается явное разрешение на публикацию и однократный запуск. Флаги приложения и production не менялись.
