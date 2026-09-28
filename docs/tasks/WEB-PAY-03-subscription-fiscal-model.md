@@ -326,3 +326,11 @@ initialRefundPreconditionsMet=true возможен только для опла
 Проверки: 26 тестов PASS; npm run lint PASS с прежними React-предупреждениями; npm run build PASS, включая PWA. CI и сетевой запуск новой операции ещё не выполнялись; YAML проверен вручную, actionlint не запускался. Публикация нового пакета ещё не разрешена, commit/push/PR не выполнялись.
 
 Изменены: .github/workflows/deploy-staging.yml; scripts/inspect-receipt-probe.mjs; scripts/inspect-receipt-probe.test.js; scripts/run-receipt-probe-inspection.mjs; этот отчёт. API-сверка не получает secret контакта, сохраняет только безопасный артефакт. После публикации и успешного CI — слияние и GET-сверка, затем по результатам подготовка возврата A 317.43 ₽ с quantity=0.320636. Возвраты не отправлялись.
+
+## PR #118: API-сверка выполнена, уточнение quantity — 28.09.2026
+
+PR #118 прошёл полный CI/E2E и CodeQL, слит в staging 982dfb106a4c4d41d325cb7beeb3bdfe7528039f. Запуск https://github.com/Adoms17/quest-platform/actions/runs/36384365512 успешен, безопасный артефакт 10953084610.
+
+Подтверждены: paymentStatus=succeeded, paid=true, test=true, receiptRegistration=succeeded, refundedAmount=0.00, refundable=true. Полный список содержит один исходный чек ra-324c0018-0001-0050-7972-5da070857c1a со status=succeeded, amount=990.00, vatCode=1, paymentSubject=service, paymentMode=full_prepayment, описание совпадает. Старый инспектор вывел quantity=null, initialRefundPreconditionsMet=false: он распознавал только строку, поэтому фактический формат ещё не установлен этим результатом.
+
+В рамках завершения той же сверки подготовлено исправление: допускается конечное неотрицательное числовое quantity в ограниченном диапазоне, сохраняется quantityEncoding; null/boolean/object/NaN/Infinity/отрицательные и небезопасные числа не приводятся к количеству. Исходное количество 1 проверяется точно; арифметика дробных возвратов не меняется. Прошли 37 тестов, lint и build. После CI требуется повторный GET; до него не утверждать, что API вернул число 1. Изменены инспектор, его тесты и этот отчёт. POST не выполнялись.
