@@ -46,6 +46,7 @@ on:
           - public-tariffs-dry-run
           - public-tariffs-apply
           - receipt-probe-create-payment
+          - receipt-settlement-create-payment
           - receipt-probe-refund-a
           - receipt-probe-refund-b
           - receipt-probe-inspect
@@ -1448,6 +1449,58 @@ jobs:
           path: |
             ${{ runner.temp }}/receipt-refund-b-result.json
             ${{ runner.temp }}/receipt-probe-inspection.json
+          if-no-files-found: ignore
+          overwrite: false
+          retention-days: 90
+
+  receipt-settlement-create-payment:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-settlement-create-payment'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test probe without credentials
+        run: npm test -- scripts/receipt-settlement-payment-probe.test.js scripts/run-receipt-settlement-payment-probe.test.js scripts/receipt-settlement-scenario.test.js --maxWorkers=2
+      - name: Prepare encrypted immutable request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-settlement-payment-probe.mjs prepare
+      - name: Persist request before any payment POST
+        id: journal
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-settlement-probe-b1489c5b-810e-450f-b8d0-56ab3bd2c568-request
+          path: ${{ runner.temp }}/receipt-settlement-probe-request.enc.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Verify sandbox and submit one test payment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_ARTIFACT_ID: ${{ steps.journal.outputs.artifact-id }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-settlement-payment-probe.mjs send
+      - name: Persist sanitized outcome
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-settlement-probe-b1489c5b-810e-450f-b8d0-56ab3bd2c568-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/receipt-settlement-probe-result.json
           if-no-files-found: ignore
           overwrite: false
           retention-days: 90
