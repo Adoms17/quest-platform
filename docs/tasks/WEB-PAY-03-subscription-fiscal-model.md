@@ -266,3 +266,31 @@ GitHub API подтвердил success для проверки manifest/history
 53 теста yookassaSandboxHttp/receiptQuantityProbe PASS, npm run lint PASS с прежними предупреждениями, npm run build PASS включая PWA, git diff --check PASS. YAML просмотрен вручную; отдельный actionlint не запускался. CI и запрос GET /me ещё не выполнялись. Нужны разрешённые commit/push/PR, затем отдельно слияние/dispatch по правилам репозитория. Отправку POST этот пакет не разрешает и не реализует. Локальная ускоренная приёмка активации остаётся следующим независимым этапом, в этом срезе не выполнялась.
 
 Файлы накопленного пакета: .github/workflows/deploy-staging.yml; supabase/functions/_shared/receiptQuantityProbe.js; supabase/functions/_shared/receiptQuantityProbe.test.js; docs/tasks/WEB-PAY-03-quantity-sandbox-probe.md; этот отчёт. Октябрьский заказ, серверные флаги и production не менялись.
+
+## PR #116 и проверка доступа завершены — 28.09.2026
+
+PR https://github.com/Adoms17/quest-platform/pull/116 прошёл все проверки, включая validate/E2E и CodeQL. Проверенный head: 00a4ea4474d89d27600c7dcaa6ef7deddd8d258e. После согласованного продолжения выполнено squash-слияние в staging: 9a7da48e562f7411c62370f63276cab47a7da8ec.
+
+Операция receipt-probe-preflight успешно завершилась на этом staging-коммите: https://github.com/Adoms17/quest-platform/actions/runs/36353878868. Шаг тестов и шаг GET /me имеют conclusion=success. Проверка подтвердила account_id=1467641, test=true и status=enabled. Полные ответы и секреты не выводились; результат подтверждён статусами шагов GitHub API.
+
+Это подтверждает доступ к активному тестовому магазину, но ещё не приём дробного quantity или успешную регистрацию чеков. POST платежей, возвратов и чеков этим запуском не выполнялись. Следующий этап — отдельный sandbox-пробник по WEB-PAY-03-quantity-sandbox-probe.md с сохранением тела и ключа идемпотентности перед отправкой. Ускоренная проверка активации остаётся открытой.
+
+В этом срезе локально дополнен только отчёт. Код после CI не менялся; повторные lint/build не требовались и не запускались.
+
+## Создание отдельного платежа с чеком: пакет подготовлен — 28.09.2026
+
+По разрешению владельца добавлен secret окружения staging YOOKASSA_SANDBOX_RECEIPT_EMAIL; значение не включено в файлы проекта. Подготовлена ветка codex/receipt-probe-payment от staging после PR #116. Новая ручная операция receipt-probe-create-payment пока не опубликована и не запускалась.
+
+Эксперимент фиксирован: магазин 1467641, 990.00 RUB, ЮMoney с redirect, capture=true, full_prepayment/service/vat_code=1, quantity=1.000. Идентификатор и ключ идемпотентности: 65b56025-7260-40de-a54e-81a8d074f358. В запросе используется отдельный metadata.receipt_probe_id, без order_id приложения и без согласия на сохранение способа оплаты. Возврат на billing не активирует подписку и не создаёт заказ приложения.
+
+Окно отправки: с 27.09.2026 22:00 UTC до 28.09.2026 21:00 UTC (29.09 00:00 МСК), всего 23 часа. Перенос окна или создание другого probeId требует предварительной сверки истории; нельзя продлевать окно старого ключа после неопределённой отправки. Любой повтор workflow (run_attempt > 1) запрещён. Shared concurrency supabase-staging последовательно выполняет запуски. Перед подготовкой проверяется отсутствие артефакта с постоянным именем; при существующем журнале запуск останавливается даже без результата POST. Артефакт не удалять для обхода этого ограничения.
+
+Полное тело с контактом и ключом операции шифруется AES-256-GCM (HKDF от существующего sandbox API secret, отдельная соль/IV/контекст). В runner пишется только ciphertext. Перед POST actions/upload-artifact сохраняет его на 90 дней; send дополнительно проверяет принадлежность артефакта текущему run. Незашифрованный контакт существует только в памяти процесса и запросе провайдеру. Для восстановления журнала нужен тот же sandbox secret: его ротация без отдельного сохранения возможности расшифрования делает журнал недоступным. Зашифрованный артефакт не является бессрочным архивом.
+
+Перед POST проверяются точное тело, срок, GET /me account_id/test/status. Выполняется максимум один POST; HTTP-ошибка, тайм-аут, неправильный ответ дают unknown без retry. Безопасный результат (ID, статусы, ссылка тестового подтверждения) сохраняется отдельным артефактом; при аварии без результата журнал означает необходимость GET/ЛК-сверки, а не разрешение повторить оплату. Оплата пользователем и GET-сверка статуса чека остаются следующими этапами. Автоматических возвратов в этом пакете нет.
+
+Проверки: 37 тестов двух новых файлов PASS; npm run lint PASS с прежними React-предупреждениями; npm run build PASS включая PWA; git diff --check PASS. Реальный POST не отправлен; GitHub upload/проверка артефакта в новом workflow ещё не проходили CI/сетевую приёмку. Новый workflow прочитан вручную; actionlint не запускался.
+
+Изменены: .github/workflows/deploy-staging.yml; scripts/receipt-payment-probe.mjs; scripts/receipt-payment-probe.test.js; scripts/run-receipt-payment-probe.mjs; scripts/run-receipt-payment-probe.test.js; этот отчёт. Основные builders/SQL, октябрьский заказ и флаги чеков не менялись. Commit/push/новый PR ещё не выполнялись.
+
+Источники формата и хранения: https://yookassa.ru/developers/payment-acceptance/receipts/54fz/yoomoney/payments ; https://github.com/actions/upload-artifact .
