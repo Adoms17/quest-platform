@@ -23,6 +23,7 @@ export default function RefundHistory({api,client,organizationId,orderId}) {
    <ul>{page.items.map(item=><li key={item.id}>
     <strong>{labels[item.state]||'Неизвестный статус'} · {(item.amount_minor/100).toLocaleString('ru-RU',{minimumFractionDigits:2})} ₽</strong>
     {item.refund_kind==='subscription'&&<p>Возврат подписки. {({applied:'Возвращаемый период прекращён.',applied_review_required:'Период прекращён; денежный результат требует проверки.',review_required:'Прекращение периода не подтверждено; требуется сверка.',not_applied:'Возвращаемый период пока не прекращён.'})[item.access_state]||'Состояние доступа требует проверки.'}</p>}
+    {item.fiscal&&<p>Чек возврата: {({succeeded:'подтверждён',pending:'обрабатывается',unknown:'ожидается подтверждение',canceled:'не сформирован'})[item.fiscal.receipt_status]||'нет подтверждения'}.{item.fiscal.requires_review&&' Требуется ручная сверка.'}</p>}
     <small>{item.id} · {new Date(item.created_at).toLocaleString('ru-RU')}</small>
     {item.can_resume&&item.refund_kind!=='subscription'&&<button type="button" onClick={()=>setSelected(item)}>Продолжить возврат</button>}
    </li>)}</ul>

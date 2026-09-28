@@ -1,3 +1,4 @@
+import { runSubscriptionFiscalWorker } from '../_shared/subscriptionFiscalWorker.js'
 import { runSandboxSettlementPhase } from '../_shared/sandboxSettlementPhase.js'
 import { createRefundReceiptTransport } from '../_shared/refundReceiptTransport.js'
 import { reconcileReceiptPayments } from '../_shared/receiptReconciliation.js'
@@ -28,12 +29,18 @@ Deno.serve(async request => {
       ? await reconcileReceiptPayments({ rpc: client.rpc.bind(client), shopId, refund: true,
         provider: createSandboxHttpClient({ enabled, shopId, secretKey }, { refundReceipts: createRefundReceiptTransport(client.rpc.bind(client)) }) })
       : null
+    const subscriptionFiscal = await runSubscriptionFiscalWorker({
+      reconciliationEnabled: Deno.env.get('YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_RECONCILIATION') === 'true',
+      dispatchEnabled: Deno.env.get('YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH') === 'true',
+      rpc: client.rpc.bind(client), shopId,
+      createProvider: options => createSandboxHttpClient({ enabled, shopId, secretKey }, options),
+    })
     const { settlements, dueSettlements } = await runSandboxSettlementPhase({
       reconciliationEnabled: Deno.env.get('YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION') === 'true',
       dispatchEnabled: Deno.env.get('YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH') === 'true',
       rpc: client.rpc.bind(client), shopId,
       createProvider: () => createSandboxHttpClient({ enabled, shopId, secretKey }),
     })
-    return { ...result, refunds, receipts, recurringReceipts, refundReceipts, settlements, dueSettlements }
+    return { ...result, refunds, receipts, recurringReceipts, refundReceipts, settlements, dueSettlements, subscriptionFiscal }
   } })(request)
 })

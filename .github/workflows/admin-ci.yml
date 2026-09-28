@@ -51,6 +51,10 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Build and browser tests with synthetic API
         run: npm run test:e2e -- --config admin/playwright.config.mjs
+      - name: Fiscal refund browser tests with synthetic API
+        env:
+          ADMIN_FISCAL_E2E: '1'
+        run: npm run test:e2e -- --config admin/playwright.config.mjs --grep "fiscal refund receipt status and repeat check"
       # Тестовая сборка не публикуется и не сохраняется как release artifact.
 
   admin-auth-integration:
