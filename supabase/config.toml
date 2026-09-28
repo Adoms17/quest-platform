@@ -427,3 +427,9 @@ verify_jwt = false
 
 [functions.sandbox-reconcile-order]
 verify_jwt = false
+
+[functions.sandbox-subscription-fiscal-order]
+verify_jwt = false
+
+[functions.admin-fiscal-acceptance-prepare]
+verify_jwt = true

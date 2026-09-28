@@ -1,0 +1,12 @@
+[
+  {
+    "version": "20260928017000",
+    "file": "20260928017000_subscription_fiscal_order_worker.sql",
+    "sha256": "5ae998733b82b4d0a2f6cf305465559c4fb2bad53177cf2d60289a6a63545434"
+  },
+  {
+    "version": "20260928018000",
+    "file": "20260928018000_subscription_fiscal_acceptance_fixture.sql",
+    "sha256": "29d7f787204c5ec8eada29d0e3c6f0370806e0675230b1d7a306cb3d53ae3964"
+  }
+]

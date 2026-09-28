@@ -65,3 +65,87 @@
 Полный состав реализации перечислен по этапам в WEB-PAY-03-fiscal-balances.md. Секреты, .env и package-lock не менялись.
 
 Проверка синтаксиса YAML отдельным парсером не выполнена: PyYAML отсутствует и в системном, и во встроенном Python; новые зависимости не устанавливались. Структура workflow сверена с существующими jobs, окончательная проверка GitHub Actions остаётся частью PR/CI.
+
+## Применение схемы на stage — 28.09.2026
+
+PR #126 слит по разрешению владельца: staging 4f129f7083f580f25a0887d54f6125392bf3fb7a (проверенный head 37ebeb325426296deaabb9c4028a4444c2f44ab9). Все CI/E2E, Admin CI и CodeQL прошли.
+
+Dry-run https://github.com/Adoms17/quest-platform/actions/runs/36452533827 успешен: ровно семь ожидающих миграций 20260928010000–20260928016000, manifest/checksums и prerequisites совпали.
+
+После отдельного согласования выполнен subscription-balances-apply: https://github.com/Adoms17/quest-platform/actions/runs/36452871345 . Workflow на том же staging SHA подтвердил выключение флагов, повторил проверку истории/preview и применил все семь миграций. Итоговая проверка: Receipt release pending: none; все шаги успешны.
+
+Новые функции и frontend этим запуском не публиковались. Production и реальные платежи не менялись. Следующий этап — согласованный subscription-balances-functions-deploy для sandbox-reconcile и admin-subscription-fiscal-refund с выключенными флагами, затем проверка выключенного маршрута и прежних сценариев. Этот статус добавлен локально после слияния; отдельного commit/push отчёта не выполнялось.
+
+## Выпуск функций на stage — 28.09.2026
+
+По отдельному разрешению владельца выполнен subscription-balances-functions-deploy на staging 4f129f7083f580f25a0887d54f6125392bf3fb7a: https://github.com/Adoms17/quest-platform/actions/runs/36453281221 . Workflow успешен: manifest/history pending:none, флаги повторно выключены, sandbox-reconcile и admin-subscription-fiscal-refund опубликованы.
+
+HTTP smoke без секретов: admin-subscription-fiscal-refund OPTIONS отвечает 204, разрешает Origin https://stage-admin.qvesta.ru и возвращает no-store. POST без токена получает 401 Missing authorization header от JWT gateway. sandbox-reconcile POST без токена получает 401/no-store. Ответ sandbox_disabled/503 для авторизованного запроса на stage этой проверкой не подтверждён; выключение флагов подтверждено workflow. Новые операции, реальные платежи и worker с авторизацией не запускались. Frontend и production не публиковались.
+
+Далее — авторизованная stage-приёмка выключенного endpoint и прежних сценариев. Локальное дополнение отчёта не закоммичено и не отправлено.
+
+## Браузерная совместимость stage — 28.09.2026
+
+В существующей авторизованной сессии https://stage-admin.qvesta.ru/ повторно загружены два прежних оплаченных sandbox-заказа по 2 рубля. Список платежей и блоки чеков обоих заказов ответили без ошибки. Для каждого показано отсутствие чеков в новом учёте с явным предупреждением, что это не подтверждает отсутствие чеков в ЮKassa. Визуально проверено раздельное отображение оплаты, выданного периода и фискальных статусов.
+
+Это проверка чтения прежних заказов после миграций; не проверка нового возврата, зачёта или строки ledger. Кнопки расчёта/подтверждения возврата не использовались. Авторизованный POST нового endpoint по-прежнему не проверен: действующий UI при выключенном новом маршруте не предоставляет отдельной диагностической команды. Следует подготовить безопасный smoke-сценарий без резервирования и включения отправки. Данные сессии/токены не извлекались. Изменён только этот локальный отчёт; Notion обновлён. Код, flags и платежи не менялись.
+
+## Безопасный smoke выключенного endpoint — 28.09.2026
+
+Добавлены scripts/verify-disabled-fiscal-refund.mjs и .test.js. Скрипт разрешает только фиксированный stage project, принимает JWT из QVESTA_SMOKE_JWT в окружении процесса и отправляет ровно один POST с пустым JSON {}. Это не payload reserve/execute: даже при включённом endpoint запрос не содержит команды/идентификаторов для создания возврата. Redirect запрещён, timeout 15 секунд, повторов нет. Успех требует одновременно 503, точный JSON sandbox_disabled, no-store и CORS stage-admin. 401 JWT gateway не считается успешной проверкой выключенного runtime. Исключения и ответы очищены от деталей, ключ не печатается.
+
+14 синтетических тестов PASS; lint и build PASS с прежними предупреждениями. На stage этот новый скрипт пока не запускался: действующий JWT не передан в окружение; сессия браузера и env-файлы не извлекались. В staging GitHub environment проверены только имена secrets: отдельного smoke JWT там нет. Не передавать токен в чат, командную строку или отчёт. Для реального запуска нужен защищённый runtime-инжект короткоживущего JWT, который принимает gateway, затем node scripts/verify-disabled-fiscal-refund.mjs с SUPABASE_PROJECT_ID=jeugfyaqzfgdvfhdxfht. Этот smoke проверяет выключенный runtime после gateway, не owner/MFA внутри включённого endpoint.
+
+Изменения этого среза: два новых файла smoke и этот отчёт. Commit/push/deploy и изменение серверных флагов не выполнялись.
+
+## Проверка выключенного endpoint на stage завершена — 28.09.2026
+
+Ранее указанная зависимость от пользовательского JWT снята. Для проверки выключенного runtime достаточно публичного anon JWT опубликованной stage-админки. Через HTTP прочитаны только index и указанный в нём same-origin /assets/*.js; единственный кандидат проверен по role=anon и ref stage. Ключ использован только в памяти процесса, без вывода и сохранения. Пользовательская сессия, env-файлы и service-role не читались.
+
+Реальный запуск verifyDisabledFiscalRefund на stage PASS: JWT gateway пропустил POST с пустым JSON {}, функция вернула ровно 503/{error:sandbox_disabled}, Cache-Control:no-store и Access-Control-Allow-Origin:https://stage-admin.qvesta.ru. Redirect запрещён, повторов нет. Это подтверждение выключенного runtime за JWT gateway, а не проверка owner/MFA включённого маршрута.
+
+Совместимость чтения двух прежних заказов уже подтверждена браузером. Минимальная приёмка выпуска функций с выключенными флагами завершена. Проверки включённой новой операции, очереди и полной цепочки MODEL-03 на отдельном sandbox-заказе остаются открытыми; для них нужен согласованный сценарий и отдельное включение. Автоматическое покрытие заказов без ledger также остаётся отдельной задачей. Флаги, платежи и production этой проверкой не менялись. Изменён только локальный отчёт; два smoke-файла предыдущего среза остаются незакоммиченными.
+
+## План следующей приёмки — 28.09.2026
+
+Подготовлен WEB-PAY-03-balances-acceptance.md. Проверка текущего кода выявила: один запрос возврата на заказ, расчёт после конца периода равен нулю, частичный возврат не ускоряет исходный срок зачёта. Основной продуктовый сценарий — один пропорциональный возврат → прекращение доступа → зачёт остатка по исходному сроку. Повторный возврат после зачёта через текущую админку не поддержан, несмотря на низкоуровневую поддержку ledger.
+
+Для ускоренной проверки нужен отдельный короткий тестовый период, созданный до оплаты, и ограничение worker одним приёмочным заказом; оба механизма ещё предстоит разработать. Обычные месячные даты и исторические операции не менять. План не разрешает создание платежа или включение флагов. Новые файлы этого среза: WEB-PAY-03-balances-acceptance.md; дополнен этот отчёт. Код и серверные настройки не менялись.
+
+## Изолированный worker одного заказа — 28.09.2026
+
+Локально подготовлен sandbox-subscription-fiscal-order. Он использует общий проверенный алгоритм MODEL-03, но вызывает только новую scoped-выборку и scoped-gateway. p_target_order_id обязателен, применяется в SQL до LIMIT; gateway проверяет принадлежность commandId целевому заказу перед read/record/review/poll/before_send и запрещает claim другого заказа. Существующие ограничения shop/scope и блокировки выполняются прежним gateway. Доступ к новым RPC — только service_role; browser/anon не получают execute. Рабочие миграции не редактировались, добавлена 20260928017000_subscription_fiscal_order_worker.sql.
+
+Endpoint требует существующий worker-token, YOOKASSA_SANDBOX_ENABLED=true и отдельный YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=true; точный ID берётся только из YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ORDER_ID. Без валидного ID/флага — закрыт. Дополнительный YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH разрешает зачёт; без него только GET-сверка. Параметры тела запроса не выбирают заказ/режим. Новый endpoint не запускает платежную, legacy-refund, recurring или legacy-settlement фазы sandbox-reconcile. Общую очередь и её флаги менять для приёмки не нужно.
+
+Проверки: 19 unit-тестов двух worker-модулей PASS (1.77 s); полносхемный SQL-стенд с 319 миграциями PASS (65.84 s), включая scoped-права, обязательный ID, межзаказную изоляцию и прежние конкурентные проверки; 4 Edge Runtime проверки PASS (38.49 s), включая новый выключенный endpoint. Lint/build PASS с прежними предупреждениями. Первые SQL-прогоны не прошли из-за dollar-quoting добавленных тестов; тестовый синтаксис исправлен, финальный прогон успешен.
+
+Изменённые файлы: новая миграция; новые supabase/functions/_shared/subscriptionFiscalOrderWorker.js и .test.js; новый supabase/functions/sandbox-subscription-fiscal-order/index.ts; supabase/config.toml; supabase/tests/database/subscription_fiscal_worker.test.sql; scripts/recurring-runtime.test.js; этот отчёт. Прежние незакоммиченные smoke-файлы/документы сохранены. Пакет семи опубликованных миграций и его manifest не расширялись задним числом; следующему выпуску нужен отдельный manifest.
+
+Проверка короткого периода выявила явный CHECK sandbox_offer_month_period и требование period_months в обычном checkout. Поэтому короткую fixture нельзя получить простым изменением предложения: требуется отдельный согласованный серверный путь до оплаты с проверкой всех снимков и доступа. Он ещё не реализован. Следующий этап — короткая fixture и её проверки, затем общий PR/CI для этого локального дополнения. Commit/push/deploy, stage, флаги и платежи не менялись.
+
+## Короткая acceptance-фикстура — 28.09.2026
+
+Локально добавлена миграция 20260928018000_subscription_fiscal_acceptance_fixture.sql: закрытый операторский allowlist без seed, RLS/revoke, неизменяемая связь с единственным заказом и service RPC prepare_fiscal_acceptance_fixture с owner/MFA/billing.manage. Подготовка разрешена только для пустой Free-организации в sandbox scope; фиксированы test shop 1467641, 990 ₽ и 30 минут. Заказ, receipt snapshot и fiscal terms создаются атомарно через существующие функции. Отправки оплаты и выдачи доступа при подготовке нет. Повтор сохраняет ID/даты и требует тот же контакт.
+
+Новый subscription_fiscal_acceptance_fixture.test.sql включён в scripts/checkout-documents-integration.test.js. 23 SQL-проверки: ограничения доступа, модель, откат, retry, неизменяемость, отсутствие отправки/выдачи доступа, privacy ответа, MFA/scope и совместимость с существующими confirmation/refund binding. Финальный полный стенд с 320 миграциями PASS (64.92 s), предыдущие проверки/гонки сохранены. Lint/build PASS с прежними предупреждениями; diff-check без ошибок. Первый прогон выявил неверное начальное состояние тестовой организации (автоматический trial); тестовая подготовка исправлена на требуемый Free только в одноразовой БД.
+
+Изменены: новая миграция, новый SQL-тест, scripts/checkout-documents-integration.test.js, WEB-PAY-03-balances-acceptance.md и этот отчёт. Ранее подготовленный изолированный worker и smoke-файлы сохранены. Короткая fixture готова на уровне SQL; доверенный JWT-маршрут подготовки и операторский способ одноразового разрешения/запуска ещё нужны, они описаны в плане приёмки. Следующая итерация — подключение этого пути и подготовка единого PR/CI с отдельным manifest для новых миграций. Commit/push/deploy, stage, активные флаги и реальные платежи не менялись.
+
+## JWT-подготовка и отдельный пакет выпуска — 28.09.2026
+
+Локально реализован admin-fiscal-acceptance-prepare: подпись JWT (getClaims), актуальный пользователь (getUser), свежее MFA; принимает только fixtureId/email, отклоняет подмену суммы/организации/дат/личности. Ответ не раскрывает контакт или тело чека. Runtime ограничен stage URL и отдельным выключенным флагом. Новый prepare_fiscal_acceptance_from_gateway получает только проверенную сервером личность, повторно проверяет полномочия и восстанавливает прежний SQL-контекст. Прямой вызов внутреннего prepare_fiscal_acceptance_fixture закрыт и для service_role.
+
+Создан отдельный WEB-PAY-03-acceptance-migrations.json для 17000/18000: контрольные суммы, обязательная применённая схема предыдущего выпуска, запрет посторонних миграций и сверка dry-run. В deploy-staging добавлены subscription-acceptance-dry-run/apply/functions-deploy. Применение и публикация принудительно выключают прежние receipt/refund/dispatch и все новые acceptance-флаги. Публикация включает только два новых маршрута. Старые manifest/миграции опубликованного выпуска не изменены.
+
+Проверки: 26 endpoint unit PASS; 43 ранее подготовленных worker/smoke/release unit PASS; после добавления отдельного ограничения workflow release-набор 11 PASS (70 уникальных unit в совокупности). Полный SQL-стенд с 320 миграциями PASS (65.28 s), включая запрет прямого обхода шлюза, просроченное MFA/JWT, восстановление контекста и прежние конкурентные сценарии. Пять Edge Runtime проверок PASS (46.51 s). Lint PASS с прежними предупреждениями, build PASS, diff-check PASS. Unit Auth использует моки SDK; включённый маршрут с настоящей сессией и провайдером на stage пока не проверен.
+
+Изменённые/добавленные файлы этой итерации:
+- supabase/functions/_shared/fiscalAcceptanceEndpoint.js и fiscalAcceptanceEndpoint.test.js;
+- supabase/functions/admin-fiscal-acceptance-prepare/index.ts; supabase/config.toml;
+- supabase/migrations/20260928018000_subscription_fiscal_acceptance_fixture.sql; supabase/tests/database/subscription_fiscal_acceptance_fixture.test.sql;
+- scripts/recurring-runtime.test.js; scripts/check-subscription-acceptance-release.mjs и .test.js;
+- .github/workflows/deploy-staging.yml; docs/tasks/WEB-PAY-03-acceptance-migrations.json;
+- docs/tasks/WEB-PAY-03-balances-acceptance.md и этот отчёт.
+
+Предыдущие локальные изменения worker/SQL/smoke сохранены и входят в будущий общий PR. Commit/push/merge/deploy этой итерации не выполнялись. Следующий шаг — разрешённые commit/push/PR и CI, затем отдельное согласование выпуска выключенного пакета. Операторское разрешение конкретной fixture, включение и один тестовый платёж на 990 ₽ остаются отдельным этапом; allowlist ещё пуст.
