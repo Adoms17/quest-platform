@@ -6,10 +6,17 @@ const description = 'Тест точности частичного возвра
 const status = value => ['pending','succeeded','canceled'].includes(value) ? value : 'unknown'
 const amount = value => value?.currency === 'RUB' && /^\d{1,12}\.\d{2}$/.test(value?.value) ? value.value : null
 const fail = () => { throw new Error('receipt_probe_inspection_failed') }
+function quantity(value) {
+  // JSON may encode quantity as a decimal string or a number. Preserve its type.
+  const numeric = typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER
+  const text = typeof value === 'string' ? value : numeric ? String(value) : ''
+  return /^\d{1,12}(\.\d{1,12})?$/.test(text) ? text : null
+}
 function line(item) {
   return {
     descriptionMatches: item?.description === description,
-    quantity: typeof item?.quantity === 'string' && /^\d{1,12}(\.\d{1,12})?$/.test(item.quantity) ? item.quantity : null,
+    quantity: quantity(item?.quantity),
+    quantityEncoding: typeof item?.quantity === 'number' ? 'number' : typeof item?.quantity === 'string' ? 'string' : 'unsupported',
     amount: amount(item?.amount),
     vatCode: Number.isInteger(item?.vat_code) && item.vat_code >= 1 && item.vat_code <= 12 ? item.vat_code : null,
     paymentSubject: item?.payment_subject === 'service' ? 'service' : 'other',

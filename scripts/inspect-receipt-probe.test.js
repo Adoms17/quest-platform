@@ -65,3 +65,16 @@ it('sanitizes network exceptions and does not retry',async()=>{
  await expect(inspectReceiptProbe(config,{fetchImpl})).rejects.toThrow(/^receipt_probe_inspection_failed$/)
  expect(fetchImpl).toHaveBeenCalledTimes(1)
 })
+
+it.each([[1,'1'],[0.320636,'0.320636'],['1.000','1.000'],['0.320636','0.320636']])('reads provider quantity %s preserving its JSON representation type',async(value,expected)=>{
+ const changed={...receipt,items:[{...receipt.items[0],quantity:value}]}
+ const result=await inspectReceiptProbe(config,{fetchImpl:fake(shop,payment,{items:[changed]})})
+ expect(result.receipts[0].items[0]).toMatchObject({quantity:expected,quantityEncoding:typeof value})
+ expect(result.initialRefundPreconditionsMet).toBe(Number(value)===1)
+})
+it.each([null,true,{},NaN,Infinity,-1,Number.MAX_SAFE_INTEGER+1])('does not coerce an invalid quantity %s',async value=>{
+ const changed={...receipt,items:[{...receipt.items[0],quantity:value}]}
+ const result=await inspectReceiptProbe(config,{fetchImpl:fake(shop,payment,{items:[changed]})})
+ expect(result.receipts[0].items[0].quantity).toBeNull()
+ expect(result.initialRefundPreconditionsMet).toBe(false)
+})
