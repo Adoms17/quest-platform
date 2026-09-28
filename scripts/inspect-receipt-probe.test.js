@@ -78,3 +78,11 @@ it.each([null,true,{},NaN,Infinity,-1,Number.MAX_SAFE_INTEGER+1])('does not coer
  expect(result.receipts[0].items[0].quantity).toBeNull()
  expect(result.initialRefundPreconditionsMet).toBe(false)
 })
+
+it('preserves only a valid refund ID for matching the receipt to the actual operation',async()=>{
+ const refundId='11111111-1111-1111-1111-111111111111'
+ const refundReceipt={...receipt,type:'refund',refund_id:refundId}
+ const result=await inspectReceiptProbe(config,{fetchImpl:fake(shop,payment,{items:[refundReceipt]})})
+ expect(result.receipts[0].refundId).toBe(refundId)
+ expect(result.initialRefundPreconditionsMet).toBe(false)
+})

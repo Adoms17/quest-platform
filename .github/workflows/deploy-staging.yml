@@ -46,6 +46,7 @@ on:
           - public-tariffs-dry-run
           - public-tariffs-apply
           - receipt-probe-create-payment
+          - receipt-probe-refund-a
           - receipt-probe-inspect
           - receipt-probe-preflight
           - receipts-dry-run
@@ -1327,5 +1328,65 @@ jobs:
           name: receipt-probe-inspection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/receipt-probe-inspection.json
           if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+
+  receipt-probe-refund-a:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-probe-refund-a'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test probe without credentials
+        run: npm test -- scripts/receipt-refund-a-probe.test.js scripts/run-receipt-refund-a-probe.test.js scripts/inspect-receipt-probe.test.js --maxWorkers=2
+      - name: Prepare encrypted immutable request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-refund-a-probe.mjs prepare
+      - name: Persist request before any refund POST
+        id: journal
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-7b33467b-e94f-45b8-baa7-382ed5d97378-refund-a-request
+          path: ${{ runner.temp }}/receipt-refund-a-request.enc.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Verify current sandbox state and submit refund A
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_ARTIFACT_ID: ${{ steps.journal.outputs.artifact-id }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-refund-a-probe.mjs send
+      - name: Inspect payment and receipts after the attempt
+        if: always() && steps.journal.outcome == 'success'
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/run-receipt-probe-inspection.mjs
+      - name: Persist sanitized outcome
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-7b33467b-e94f-45b8-baa7-382ed5d97378-refund-a-result-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/receipt-refund-a-result.json
+            ${{ runner.temp }}/receipt-probe-inspection.json
+          if-no-files-found: ignore
           overwrite: false
           retention-days: 90
