@@ -51,7 +51,8 @@ export async function inspectReceiptProbe(config, { fetchImpl = fetch } = {}) {
       for (const receipt of data.items) {
         if (receipt?.payment_id !== PAYMENT_ID || !/^r[at]-[0-9a-f-]{36}$/i.test(receipt.id)
           || !['payment','refund'].includes(receipt.type) || !Array.isArray(receipt.items) || receipt.items.length > 100) fail()
-        const safe = { id: receipt.id, type: receipt.type, status: status(receipt.status), items: receipt.items.map(line) }
+        const refundId = receipt.type === 'refund' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receipt.refund_id) ? receipt.refund_id : null
+        const safe = { id: receipt.id, type: receipt.type, refundId, status: status(receipt.status), items: receipt.items.map(line) }
         if (receipts.has(safe.id) && JSON.stringify(receipts.get(safe.id)) !== JSON.stringify(safe)) fail()
         receipts.set(safe.id, safe)
       }
