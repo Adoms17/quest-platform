@@ -1,9 +1,10 @@
+import { subscriptionFiscalHttpMethods } from './subscriptionFiscalHttp.js'
 import { settlementHttpMethods } from './settlementHttp.js'
 import { buildSandboxPaymentRequest, buildSandboxRecurringRequest, validateSandboxPayment, validateOrder, SandboxPaymentError } from './yookassaSandbox.js'
 
 // Только для серверного вызывающего слоя с заказом, загруженным из БД.
 // Ответ нужно сохранить до передачи confirmationUrl клиенту. Здесь нет выдачи прав.
-export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000, beforeRefundSend, beforeRecurringSend, receipts, refundReceipts } = {}) {
+export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000, beforeRefundSend, beforeFiscalSend, beforeRecurringSend, receipts, refundReceipts } = {}) {
   if (enabled !== true || typeof shopId !== 'string' || !/^\d+$/.test(shopId)
     || typeof secretKey !== 'string' || !/^[\x21-\x7e]+$/.test(secretKey)
     || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30000) throw new SandboxPaymentError('sandbox_configuration_unavailable')
@@ -84,6 +85,7 @@ export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, 
   }
   return {
     ...settlementHttpMethods({ request, verifyShop, shopId, now }),
+    ...subscriptionFiscalHttpMethods({ request, verifyShop, shopId, now, beforeFiscalSend }),
     verifyShop,
     async createRefund(value) {
       const saved = refundSnapshot(value), r = saved.refund

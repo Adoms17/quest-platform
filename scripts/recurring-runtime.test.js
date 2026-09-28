@@ -9,7 +9,7 @@ function docker(args){
  if(result.status!==0)throw Error('isolated runtime Docker command failed')
  return (args[0]==='logs'?result.stdout+result.stderr:result.stdout).trim()
 }
-test.skipIf(!enabled).each(['sandbox-recurring','sandbox-reconcile'])('%s loads in Edge Runtime and fails closed',async endpoint=>{
+test.skipIf(!enabled).each(['sandbox-recurring','sandbox-reconcile','admin-subscription-fiscal-refund'])('%s loads in Edge Runtime and fails closed',async endpoint=>{
  const name='qvesta-recurring-runtime-'+randomUUID().replaceAll('-','')
  const token='ab'.repeat(32)
  let created=false
@@ -26,6 +26,13 @@ test.skipIf(!enabled).each(['sandbox-recurring','sandbox-reconcile'])('%s loads 
    await new Promise(resolve=>setTimeout(resolve,500))
   }
   if(!ready)throw Error('Edge Runtime startup timed out: '+docker(['logs','--tail','25',name]).replaceAll(token,'[synthetic-token]'))
+  if(endpoint==='admin-subscription-fiscal-refund'){
+   const response=await fetch(url,{method:'POST',signal:AbortSignal.timeout(5000)})
+   expect(response.status).toBe(503)
+   expect(response.headers.get('cache-control')).toBe('no-store')
+   expect(await response.json()).toEqual({error:'sandbox_disabled'})
+   return
+  }
   for(const [method,headers,status] of [
    ['GET',{},405],['POST',{},401],
    ['POST',{'x-qvesta-worker-token':'cd'.repeat(32)},401],

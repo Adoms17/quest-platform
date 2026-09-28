@@ -1,0 +1,37 @@
+[
+  {
+    "version": "20260928010000",
+    "file": "20260928010000_subscription_fiscal_reservations.sql",
+    "sha256": "d1d13190a6793c6e07452c1c9e7aaad5c133570ecbd7986818d89b7b5359d14b"
+  },
+  {
+    "version": "20260928011000",
+    "file": "20260928011000_subscription_fiscal_results.sql",
+    "sha256": "6003a9f2789326f0735065ff812add79cb689cdc102f0b023a4c89088c53b097"
+  },
+  {
+    "version": "20260928012000",
+    "file": "20260928012000_subscription_fiscal_refund_binding.sql",
+    "sha256": "bc585f484d2e4046161dd3b370493a4b274a81cea629f004fe8f20640e074560"
+  },
+  {
+    "version": "20260928013000",
+    "file": "20260928013000_subscription_fiscal_refund_lifecycle.sql",
+    "sha256": "b4a147655ecd810e55d8bf92dc8b8bbe729a75e84d5540abb612a83362f70cba"
+  },
+  {
+    "version": "20260928014000",
+    "file": "20260928014000_subscription_fiscal_refund_endpoint.sql",
+    "sha256": "15246a80bc4183a5b59734313ad4e99a250a75cfd83ea98dd0fcafd64990770c"
+  },
+  {
+    "version": "20260928015000",
+    "file": "20260928015000_subscription_fiscal_worker.sql",
+    "sha256": "08fa2ca722f2b4334d31d4d861918c7a682e64bac7301bc6741962f3437dce76"
+  },
+  {
+    "version": "20260928016000",
+    "file": "20260928016000_subscription_fiscal_history.sql",
+    "sha256": "960f121d7233105de0e28a4ff7821aef471cf9f4d52368338685bd958d672269"
+  }
+]
