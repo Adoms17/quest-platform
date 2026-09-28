@@ -100,3 +100,19 @@ it('does not treat the old experiment receipt as this original',async()=>{
  const result=await inspectReceiptProbe(config,{fetchImpl:fake(shop,payment,{items:[old]})})
  expect(result.initialRefundPreconditionsMet).toBe(false)
 })
+
+it('projects settlement amounts and types without provider private fields',async()=>{
+ const changed={...receipt,settlements:[{type:'prepayment',amount:{value:'672.57',currency:'RUB'},contact:'private@example.test'},{type:'private@example.test',amount:{value:'secret',currency:'USD'}}]}
+ const result=await inspectReceiptProbe(config,{fetchImpl:fake(shop,payment,{items:[changed]})})
+ expect(result.receipts[0].settlements).toEqual([{type:'prepayment',amount:'672.57'},{type:'unknown',amount:null}])
+ expect(JSON.stringify(result)).not.toContain('private@example.test')
+})
+it.each([undefined,null,{},Array(101).fill({})].map(settlements=>({settlements})))('represents missing or invalid settlements as unknown',async ({settlements})=>{
+ const result=await inspectReceiptProbe(config,{fetchImpl:fake(shop,payment,{items:[{...receipt,settlements}]})})
+ expect(result.receipts[0].settlements).toBeNull()
+})
+it('rejects conflicting settlement information for the same receipt across pages',async()=>{
+ const changed={...receipt,settlements:[{type:'prepayment',amount:{value:'672.57',currency:'RUB'}}]}
+ const other={...changed,settlements:[{type:'cashless',amount:{value:'672.57',currency:'RUB'}}]}
+ await expect(inspectReceiptProbe(config,{fetchImpl:fake(shop,payment,{items:[changed],next_cursor:'next'},{items:[other]})})).rejects.toThrow('receipt_probe_inspection_failed')
+})
