@@ -10,8 +10,8 @@ begin
   select 1 from public.billing_fiscal_acceptance_fixtures f
   join public.billing_sandbox_orders o on o.id=f.order_id and o.organization_id=f.organization_id
   join public.billing_sandbox_payment_results p on p.order_id=o.id
-  where f.id='bd7f9ad7-8eed-1d55-d392-7fd29effc502'
-   and f.organization_id='18bcefa4-9ee0-a427-ebf3-0ac0d789ee0a'
+  where f.id='b504e302-e2c8-9b96-edb0-8ff83476a935'
+   and f.organization_id='dcc2e33b-108a-d22f-7409-162fa76447f3'
    and o.id='${orderId}' and o.shop_id='1467641' and o.amount_minor=99000
    and p.status='succeeded' and p.paid and p.shop_id=o.shop_id and not p.requires_review
  ) then raise exception 'fiscal acceptance target denied'; end if;

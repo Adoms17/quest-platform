@@ -12,6 +12,7 @@ export default function FiscalAcceptance({client}){
  const [email,setEmail]=useState(''),[factors,setFactors]=useState([]),[factor,setFactor]=useState('')
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[result,setResult]=useState(null)
  const [attempted,setAttempted]=useState(false)
+ const [mfaReady,setMfaReady]=useState(false),[appReady,setAppReady]=useState(false)
  const locked=useRef(false),alive=useRef(false),savedEmail=useRef(null)
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  if(!isFiscalPolicyStage(client))return null
@@ -40,6 +41,14 @@ export default function FiscalAcceptance({client}){
    if(failure){if(alive.current)setError('Код не принят. Введите новый код.');return}
    if(!alive.current)return
    savedEmail.current??=acceptanceEmail(email)
+   setMfaReady(true);setAppReady(false)
+  }catch(failure){if(alive.current)setError(messages[failure.message]||messages.preparation_unconfirmed)}
+  finally{locked.current=false;if(alive.current)setBusy(false)}
+ }
+ async function startOrder(){
+  if(locked.current||result||!mfaReady||!appReady)return
+  locked.current=true;setBusy(true);setError('')
+  try{
    setAttempted(true)
    const value=await createFiscalAcceptanceApi(client).prepare(savedEmail.current)
    if(alive.current)setResult(value)
@@ -47,7 +56,7 @@ export default function FiscalAcceptance({client}){
   finally{locked.current=false;if(alive.current)setBusy(false)}
  }
  return <section className="narrow"><h1>Подготовка тестового заказа</h1>
-  <p>Тестовый магазин 1467641 · организация sandbox-fiscal-acceptance-20260929-evening.</p>
+  <p>Тестовый магазин 1467641 · организация sandbox-fiscal-acceptance-20260929-session-ready.</p>
   <p>Pro · 990 ₽ · 30 минут. Период начинается сразу при подготовке заказа, до оплаты. Подготовка не списывает деньги и не выдаёт доступ.</p>
   <p>Допуск выдаётся оператором на два часа. Истёкший допуск нельзя продлить этой формой.</p>
   <p>Запускайте подготовку только когда готовы продолжить тест оплаты. После сетевого сбоя повторите с тем же адресом: сервер вернёт прежний заказ. После перезагрузки введите прежний адрес заново.</p>
@@ -56,11 +65,11 @@ export default function FiscalAcceptance({client}){
    <p>Окончание: {new Date(result.periodEnd).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'})} МСК</p>
    <p>Далее требуется отдельный согласованный запуск оплаты.</p></div>:<>
    <label>Адрес для тестового чека<input type="email" maxLength={254} autoComplete="off" value={email} disabled={busy||factors.length>0||attempted} onChange={event=>setEmail(event.target.value)}/></label>
-   {!factors.length?<button disabled={busy} onClick={prepare}>Подтвердить подготовку через MFA</button>:<form onSubmit={confirm}><fieldset disabled={busy}>
+   {mfaReady?<div><p>MFA подтверждён. Заказ ещё не создан, период не начался. Проверьте сессию в приложении; при необходимости войдите заново. Сервер принимает подтверждение MFA в течение пяти минут.</p><label><input type="checkbox" checked={appReady} disabled={busy} onChange={event=>setAppReady(event.target.checked)}/>Сессия приложения проверена после MFA, готов продолжить оплату</label><button disabled={busy||!appReady} onClick={()=>void startOrder()}>{attempted?'Повторить подготовку того же заказа':'Начать тестовый период'}</button><button disabled={busy} onClick={()=>{setMfaReady(false);setAppReady(false);setError('')}}>Подтвердить MFA заново</button></div>:!factors.length?<button disabled={busy} onClick={prepare}>Подтвердить подготовку через MFA</button>:<form onSubmit={confirm}><fieldset disabled={busy}>
     {factors.length>1&&<label>Аутентификатор<select value={factor} onChange={event=>setFactor(event.target.value)}>{factors.map(item=><option key={item.id} value={item.id}>{item.friendly_name||'Аутентификатор'}</option>)}</select></label>}
     <label>Код MFA для заказа<input name="code" required pattern="[0-9]{6}" maxLength={6} inputMode="numeric" autoComplete="one-time-code"/></label>
-    <button type="submit">{attempted?'Повторить подготовку того же заказа':'Подготовить тестовый заказ'}</button>
-   </fieldset>{!attempted&&<button type="button" disabled={busy} onClick={()=>{setFactors([]);setError('')}}>Изменить адрес</button>}</form>}
+    <button type="submit">Подтвердить MFA без создания заказа</button>
+   </fieldset>{!attempted&&<button type="button" disabled={busy} onClick={()=>{savedEmail.current=null;setFactors([]);setError('')}}>Изменить адрес</button>}</form>}
   </>}
   {error&&<p role="alert">{error}</p>}
  </section>

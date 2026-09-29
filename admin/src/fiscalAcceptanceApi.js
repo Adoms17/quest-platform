@@ -1,6 +1,6 @@
 import {isFiscalPolicyStage} from './fiscalPolicyApi'
-export const acceptanceFixtureId='bd7f9ad7-8eed-1d55-d392-7fd29effc502'
-export const acceptanceOrganizationId='18bcefa4-9ee0-a427-ebf3-0ac0d789ee0a'
+export const acceptanceFixtureId='b504e302-e2c8-9b96-edb0-8ff83476a935'
+export const acceptanceOrganizationId='dcc2e33b-108a-d22f-7409-162fa76447f3'
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export function acceptanceEmail(value){
  if(typeof value!=='string')throw Error('invalid_email')

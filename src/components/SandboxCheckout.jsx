@@ -3,6 +3,7 @@ import { readSandboxCheckout, recoverSandboxCheckout, loadSandboxOffer, checkSan
 import SandboxOfferPicker from './SandboxOfferPicker'
 import RecurringConsent from './RecurringConsent'
 import ReceiptContact from './ReceiptContact'
+import SandboxSessionCheck from './SandboxSessionCheck'
 
 export default function SandboxCheckout({ actorId, organizationId }) {
   const [state, setState] = useState({ loading: true })
@@ -59,8 +60,8 @@ export default function SandboxCheckout({ actorId, organizationId }) {
     finally { running.current = false; setBusy(false) }
   }
   if (state.loading) return <p role="status">Загружаем условия заказа…</p>
-  if (!state.offer && !state.failed) return <SandboxOfferPicker actorId={actorId} organizationId={organizationId} offers={state.offers} onCreated={reload} />
-  return <section aria-label="Тестовая оплата" className="space-y-3 rounded-xl border bg-white p-4">
+  if (!state.offer && !state.failed) return <><SandboxSessionCheck key={actorId} actorId={actorId}/><SandboxOfferPicker actorId={actorId} organizationId={organizationId} offers={state.offers} onCreated={reload} /></>
+  return <><SandboxSessionCheck key={actorId} actorId={actorId}/><section aria-label="Тестовая оплата" className="space-y-3 rounded-xl border bg-white p-4">
     <h2 className="text-lg font-semibold">Тестовая оплата</h2>
     {state.failed ? <><p role="alert">Не удалось загрузить условия заказа.</p><button type="button" className="rounded-lg border px-4 py-3 text-blue-700" onClick={reload}>Повторить загрузку</button></> : <>
       <p>{state.offer.plan_name}</p>
@@ -93,5 +94,5 @@ export default function SandboxCheckout({ actorId, organizationId }) {
         {result.confirmationUrl && <a href={result.confirmationUrl} className="inline-block py-3 text-blue-700 underline">Перейти к тестовой оплате</a>}
       </div>}
     </>}
-  </section>
+  </section></>
 }
