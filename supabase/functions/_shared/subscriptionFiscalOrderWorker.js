@@ -17,12 +17,13 @@ export function createSubscriptionFiscalOrderRuntime(getEnv,createClient,createP
  const targetOrderId=getEnv('YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ORDER_ID')
  const enabled=getEnv('YOOKASSA_SANDBOX_ENABLED')==='true'&&getEnv('YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED')==='true'
   &&typeof targetOrderId==='string'&&uuid.test(targetOrderId)
- return createSandboxWorkerHandler({enabled,token:getEnv('YOOKASSA_SANDBOX_WORKER_TOKEN'),run:async()=>{
+ return request=>createSandboxWorkerHandler({enabled,token:getEnv('YOOKASSA_SANDBOX_WORKER_TOKEN'),run:async()=>{
+  if(request.headers.get('x-qvesta-order-id')!==targetOrderId||request.headers.get('x-qvesta-fiscal-mode')!==(getEnv('YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH')==='true'?'dispatch':'reconcile'))throw Error('acceptance_configuration_mismatch')
   const url=getEnv('SUPABASE_URL'),key=getEnv('SUPABASE_SERVICE_ROLE_KEY'),shopId=getEnv('YOOKASSA_SANDBOX_SHOP_ID'),secretKey=getEnv('YOOKASSA_SANDBOX_SECRET_KEY')
   if(!url||!key||!shopId||!secretKey)throw Error('missing_config')
   const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}})
   return runSubscriptionFiscalOrderWorker({targetOrderId,rpc:client.rpc.bind(client),shopId,reconciliationEnabled:true,
    dispatchEnabled:getEnv('YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH')==='true',
    createProvider:options=>createProvider({enabled:true,shopId,secretKey},options)})
- }})
+ }})(request)
 }

@@ -2,7 +2,7 @@
 import {test,expect,vi} from 'vitest'
 import {runSubscriptionFiscalOrderWorker as run,createSubscriptionFiscalOrderRuntime as runtime} from './subscriptionFiscalOrderWorker.js'
 const target='11111111-1111-4111-8111-111111111111',command='22222222-2222-4222-8222-222222222222',token='a'.repeat(64)
-const post=(body='{}',supplied=token)=>new Request('https://example.test',{method:'POST',headers:{'x-qvesta-worker-token':supplied},body})
+const post=(body='{}',supplied=token)=>new Request('https://example.test',{method:'POST',headers:{'x-qvesta-worker-token':supplied,'x-qvesta-order-id':target,'x-qvesta-fiscal-mode':'reconcile'},body})
 test('invalid target stops before any RPC',async()=>{const rpc=vi.fn();await expect(run({targetOrderId:'',rpc})).rejects.toThrow();expect(rpc).not.toHaveBeenCalled()})
 test('target is sent to SQL before pagination and unrelated items stop provider construction',async()=>{
  const rpc=vi.fn(async()=>({data:[{commandId:command,shopId:'123',orderId:command}]})),createProvider=vi.fn()
@@ -45,4 +45,10 @@ test('dispatch keeps claim, before-send and result inside the same target',async
  expect((await run({targetOrderId:target,rpc,createProvider,shopId:'123',reconciliationEnabled:true,dispatchEnabled:true})).dispatched).toBe(1)
  expect(rpc.mock.calls.every(([,a])=>a.p_target_order_id===target)).toBe(true)
  expect(rpc.mock.calls.filter(([,a])=>a.p_action==='before_send')).toHaveLength(1)
+})
+
+test.each([{}, {'x-qvesta-order-id':command,'x-qvesta-fiscal-mode':'reconcile'}, {'x-qvesta-order-id':target,'x-qvesta-fiscal-mode':'dispatch'}])('stale target or dispatch configuration fails before clients %j',headers=>{
+ const env={YOOKASSA_SANDBOX_ENABLED:'true',YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED:'true',YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ORDER_ID:target,YOOKASSA_SANDBOX_WORKER_TOKEN:token}
+ const create=vi.fn(),handler=runtime(n=>env[n],create)
+ return handler(new Request('https://example.test',{method:'POST',headers:{'x-qvesta-worker-token':token,...headers}})).then(r=>{expect(r.status).toBe(503);expect(create).not.toHaveBeenCalled()})
 })

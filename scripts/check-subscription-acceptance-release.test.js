@@ -63,7 +63,7 @@ test('acceptance release deploys only isolated endpoints and keeps all send flag
 test('operator workflow separates rollback preview from provisioning and never enables dispatch',async()=>{
  const {readFileSync}=await import('node:fs')
  const w=readFileSync(new URL('../.github/workflows/deploy-staging.yml',import.meta.url),'utf8')
- const job=w.slice(w.indexOf('  subscription-acceptance-fixture:'),w.indexOf('  receipt-probe-preflight:'))
+ const job=w.slice(w.indexOf('  subscription-acceptance-fixture:'),w.indexOf('  subscription-acceptance-fiscal-run:'))
  expect(job).toContain("github.ref == 'refs/heads/staging'")
  expect(job).toContain('SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht')
  expect(job).toContain('--require-applied')

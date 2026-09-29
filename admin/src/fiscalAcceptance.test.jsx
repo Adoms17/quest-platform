@@ -73,3 +73,12 @@ it.each([{organizationId:'other'},{fixtureId:'other'},{shopId:'other'},{amountMi
  const c=setup();c.functions.invoke.mockResolvedValue({data:{...response,...change}})
  await expect(createFiscalAcceptanceApi(c).prepare(email)).rejects.toThrow('preparation_unconfirmed')
 })
+
+it('scoped fiscal mode applies only to the acceptance organization on stage',async()=>{
+ const {isAcceptanceOrganization}=await import('./fiscalAcceptanceApi')
+ const c=setup()
+ expect(isAcceptanceOrganization(c,acceptanceOrganizationId)).toBe(true)
+ expect(isAcceptanceOrganization(c,'other')).toBe(false)
+ vi.stubGlobal('location',{origin:'https://admin.qvesta.ru'})
+ expect(isAcceptanceOrganization(c,acceptanceOrganizationId)).toBe(false)
+})

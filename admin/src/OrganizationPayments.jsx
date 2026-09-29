@@ -1,3 +1,4 @@
+import {isAcceptanceOrganization} from './fiscalAcceptanceApi'
 import OrderFiscalReceipts from './OrderFiscalReceipts'
 import OrderPurchaseDocuments from './OrderPurchaseDocuments'
 import SubscriptionRefund from './SubscriptionRefund'
@@ -60,7 +61,7 @@ function PaymentList({ api, client, organizationId }) {
     <PaymentReviewStatus item={item} />
     {client && <OrderFiscalReceipts client={client} workspace={organizationId} order={item.id} />}
     {client && <OrderPurchaseDocuments client={client} workspace={organizationId} order={item.id} />}
-    {client && import.meta.env.VITE_ADMIN_SUBSCRIPTION_REFUNDS === 'true' && item.payment_status === 'succeeded' && !item.payment_requires_review && <SubscriptionRefund key={organizationId+':'+item.id} api={api} client={client} organizationId={organizationId} orderId={item.id} />}
+    {client && (import.meta.env.VITE_ADMIN_SUBSCRIPTION_REFUNDS === 'true' || isAcceptanceOrganization(client,organizationId)) && item.payment_status === 'succeeded' && !item.payment_requires_review && <SubscriptionRefund key={organizationId+':'+item.id} api={isAcceptanceOrganization(client,organizationId)?{...api,subscriptionFiscalRefundsEnabled:true}:api} client={client} organizationId={organizationId} orderId={item.id} />}
     {item.payment_status === 'succeeded' && !item.payment_requires_review && <RefundPreview api={api} client={client} organizationId={organizationId} orderId={item.id} />}
     {client && import.meta.env.VITE_ADMIN_SANDBOX_REFUNDS === 'true' && <RefundHistory api={api} client={client} organizationId={organizationId} orderId={item.id} />}
    </li>)}</ul>
