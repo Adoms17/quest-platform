@@ -28,7 +28,7 @@ function harness({p=payment,receipts=[original,first,settlement],post=refund,sho
   else if(path.startsWith('payments/'))value=p
   else if(path.startsWith('refunds/'))value=refund
   else if(path.startsWith('receipts/'))value=readReceipt
-  else if(path.startsWith('receipts?'))value=typeof receipts==='function'?receipts(path):{items:receipts}
+  else if(path.startsWith('receipts?'))value=typeof receipts==='function'?receipts(path):{items:new URLSearchParams(path.split('?')[1]).has('refund_id')?receipts.filter(r=>r.refund_id===new URLSearchParams(path.split('?')[1]).get('refund_id')):receipts}
   else throw Error('unexpected path')
   return {ok:true,json:async()=>value}
  })
@@ -148,4 +148,48 @@ it('leaves a missing settlement for later GET reconciliation without another POS
  const storage={claim:async()=>o,record:vi.fn(),markReview:vi.fn()}
  expect(await run({enabled:true,commandId:o.commandId,shopId:o.shopId,storage,provider:h.client})).toEqual({state:'reconciliation_unconfirmed'})
  expect(h.posts()).toHaveLength(0);expect(storage.markReview).not.toHaveBeenCalled()
+})
+
+it('finds the refund receipt through refund_id when the payment list contains only the original receipt',async()=>{
+ const refundReceipt={...final};delete refundReceipt.payment_id
+ const h=harness({receipts:path=>{
+  const query=new URLSearchParams(path.split('?')[1])
+  return {items:query.get('refund_id')===refund.id?[refundReceipt]:[original]}
+ }})
+ expect(await h.client.readFiscalOperation({...operation(),action:'reconcile',refundId:refund.id}))
+  .toMatchObject({receiptId:final.id,receiptStatus:'succeeded',state:'succeeded'})
+ const queries=h.fetchImpl.mock.calls.map(([url])=>url).filter(url=>url.includes('receipts?'))
+ expect(queries).toEqual([`https://api.yookassa.ru/v3/receipts?refund_id=${refund.id}&limit=100`])
+ expect(h.posts()).toHaveLength(0)
+})
+it('reads a known refund receipt without payment_id after restart using GET only',async()=>{
+ const refundReceipt={...final};delete refundReceipt.payment_id
+ const h=harness({readReceipt:refundReceipt})
+ expect(await h.client.readFiscalOperation({...operation(),action:'reconcile',refundId:refund.id,receiptId:final.id}))
+  .toMatchObject({receiptId:final.id,receiptStatus:'succeeded'})
+ expect(h.posts()).toHaveLength(0)
+})
+it.each([{refund_id:uid(90)},{refund_id:undefined},{payment_id:uid(90)},{type:'payment'}])('rejects a foreign or unbound receipt returned by refund filter %j',async patch=>{
+ const h=harness({receipts:()=>({items:[{...final,...patch}]})})
+ await expect(h.client.readFiscalOperation({...operation(),action:'reconcile',refundId:refund.id})).rejects.toThrow('fiscal_provider_mismatch')
+ expect(h.posts()).toHaveLength(0)
+})
+it('keeps a missing refund receipt unknown without another POST',async()=>{
+ const h=harness({receipts:()=>({items:[]})})
+ expect(await h.client.readFiscalOperation({...operation(),action:'reconcile',refundId:refund.id}))
+  .toMatchObject({receiptId:null,receiptStatus:'unknown',state:'succeeded'})
+ expect(h.posts()).toHaveLength(0)
+})
+it('preserves the refund filter across receipt pagination',async()=>{
+ const h=harness({receipts:path=>path.includes('cursor=next')?{items:[final]}:{items:[],next_cursor:'next'}})
+ expect(await h.client.readFiscalOperation({...operation(),action:'reconcile',refundId:refund.id})).toMatchObject({receiptId:final.id})
+ const queries=h.fetchImpl.mock.calls.map(([url])=>url).filter(url=>url.includes('receipts?'))
+ expect(queries).toHaveLength(2)
+ for(const url of queries){const query=new URL(url).searchParams;expect(query.get('refund_id')).toBe(refund.id);expect(query.has('payment_id')).toBe(false)}
+ expect(h.posts()).toHaveLength(0)
+})
+it('rejects ambiguous refund receipts instead of choosing by matching amount',async()=>{
+ const h=harness({receipts:()=>({items:[final,{...final,id:rid(90)}]})})
+ await expect(h.client.readFiscalOperation({...operation(),action:'reconcile',refundId:refund.id})).rejects.toThrow('fiscal_provider_mismatch')
+ expect(h.posts()).toHaveLength(0)
 })

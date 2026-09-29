@@ -18,7 +18,7 @@ function line(actual,expected){
  if(units(actual.quantity)!==units(expected.quantity)||minor(actual.amount)!==minor(expected.amount))fail()
 }
 function receipt(raw,expected,paymentId){
- if(!receiptId.test(raw?.id)||(expected.id&&raw.id!==expected.id)||raw.payment_id!==paymentId
+ if(!receiptId.test(raw?.id)||(expected.id&&raw.id!==expected.id)||(expected.type==='refund'?raw.payment_id!=null&&raw.payment_id!==paymentId:raw.payment_id!==paymentId)
   ||raw.type!==expected.type||!['pending','succeeded','canceled'].includes(raw.status)
   ||!Array.isArray(raw.items)||raw.items.length!==1)fail()
  if(expected.type==='refund'&&raw.refund_id!==expected.refundId)fail()
@@ -69,13 +69,15 @@ export function subscriptionFiscalHttpMethods({request,verifyShop,shopId,now,bef
   if(refunded>price)fail()
   if(sending&&(refunded!==BigInt(s.expectedRefundedMinor)||p.receipt_registration!=='succeeded'||p.refundable!==true))fail()
  }
- async function list(paymentId){
-  const params=new URLSearchParams({payment_id:paymentId,limit:'100'}),cursors=new Set(),all=new Map()
+ async function list(paymentId,refundId=null){
+  const params=new URLSearchParams(refundId?{refund_id:refundId,limit:'100'}:{payment_id:paymentId,limit:'100'}),cursors=new Set(),all=new Map()
   for(let page=0;page<10;page++){
    const data=await request(`receipts?${params}`)
    if(!Array.isArray(data?.items)||data.items.length>100)fail()
    for(const r of data.items){
-    if(!receiptId.test(r?.id)||r.payment_id!==paymentId||all.has(r.id))fail()
+    if(!receiptId.test(r?.id)||all.has(r.id))fail()
+    if(refundId){if(r.type!=='refund'||r.refund_id!==refundId||(r.payment_id!=null&&r.payment_id!==paymentId))fail()}
+    else if(r.payment_id!==paymentId)fail()
     all.set(r.id,r)
    }
    if(data.next_cursor==null||data.next_cursor==='')return [...all.values()]
@@ -136,8 +138,9 @@ export function subscriptionFiscalHttpMethods({request,verifyShop,shopId,now,bef
    const result=refundResult(await request(`refunds/${s.refundId}`),s)
    if(result.state!=='succeeded')return result
    const expected={id:s.receiptId,type:'refund',refundId:s.refundId,items:s.body.receipt.items}
+   // Refund receipts are listed by refund_id; the refund GET above binds that ID to this payment.
    const candidates=s.receiptId?[await request(`receipts/${s.receiptId}`)]
-    :(await list(s.paymentId)).filter(r=>r.type==='refund'&&r.refund_id===s.refundId)
+    :await list(s.paymentId,s.refundId)
    if(!candidates.length)return result
    if(candidates.length!==1)fail()
    const found=receipt(candidates[0],expected,s.paymentId)
