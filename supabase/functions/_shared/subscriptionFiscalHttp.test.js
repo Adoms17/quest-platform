@@ -19,16 +19,16 @@ function operation(kind='refund_after'){
 const payment={id:uid(1),test:true,status:'succeeded',paid:true,recipient:{account_id:'123'},amount:{value:'990.00',currency:'RUB'},refunded_amount:{value:'317.43',currency:'RUB'},refundable:true,receipt_registration:'succeeded'}
 const refund={id:uid(13),payment_id:uid(1),status:'succeeded',amount:{value:'672.57',currency:'RUB'}}
 const final={id:rid(13),payment_id:uid(1),type:'refund',refund_id:uid(13),status:'succeeded',items:[{...item,quantity:0.679364}]}
-function harness({p=payment,receipts=[original,first,settlement],post=refund,shop={account_id:'123',test:true,status:'enabled'},clock=()=>now,readReceipt=final}={}){
+function harness({p=payment,receipts=[original,first,settlement],post=refund,shop={account_id:'123',test:true,status:'enabled'},clock=()=>now,readReceipt=final,priorRefund={id:first.refund_id,payment_id:payment.id,status:'succeeded',amount:{value:'317.43',currency:'RUB'}}}={}){
  const fetchImpl=vi.fn(async(url,options)=>{
   const path=url.replace('https://api.yookassa.ru/v3/','')
   let value
   if(options.method==='POST'){if(post instanceof Error)throw post;value=post}
   else if(path==='me')value=shop
   else if(path.startsWith('payments/'))value=p
-  else if(path.startsWith('refunds/'))value=refund
+  else if(path.startsWith('refunds/'))value=path===`refunds/${first.refund_id}`?priorRefund:refund
   else if(path.startsWith('receipts/'))value=readReceipt
-  else if(path.startsWith('receipts?'))value=typeof receipts==='function'?receipts(path):{items:new URLSearchParams(path.split('?')[1]).has('refund_id')?receipts.filter(r=>r.refund_id===new URLSearchParams(path.split('?')[1]).get('refund_id')):receipts}
+  else if(path.startsWith('receipts?'))value=typeof receipts==='function'?receipts(path):{items:new URLSearchParams(path.split('?')[1]).has('refund_id')?receipts.filter(r=>r.refund_id===new URLSearchParams(path.split('?')[1]).get('refund_id')):receipts.filter(r=>r.type==='payment')}
   else throw Error('unexpected path')
   return {ok:true,json:async()=>value}
  })
@@ -53,7 +53,7 @@ it.each([{test:false},{refunded_amount:{value:'990.00',currency:'RUB'}},{refunda
  const h=harness({p:{...payment,...p}})
  await expect(h.client.createFiscalOperation(operation())).rejects.toThrow();expect(h.posts()).toHaveLength(0)
 })
-it.each([[original,first],[original,first,settlement,final],[original,first,{...settlement,status:'pending'}],
+it.each([[original,first],[original,first,settlement,{...original,id:rid(90)}],[original,first,{...settlement,status:'pending'}],
  [original,first,{...settlement,settlements:[{type:'cashless',amount:{value:'672.57',currency:'RUB'}}]}]].map(receipts=>({receipts})))('requires complete exact predecessor receipts',async({receipts})=>{
  const h=harness({receipts});await expect(h.client.createFiscalOperation(operation())).rejects.toThrow('fiscal_provider_mismatch');expect(h.posts()).toHaveLength(0)
 })
@@ -191,5 +191,63 @@ it('preserves the refund filter across receipt pagination',async()=>{
 it('rejects ambiguous refund receipts instead of choosing by matching amount',async()=>{
  const h=harness({receipts:()=>({items:[final,{...final,id:rid(90)}]})})
  await expect(h.client.readFiscalOperation({...operation(),action:'reconcile',refundId:refund.id})).rejects.toThrow('fiscal_provider_mismatch')
+ expect(h.posts()).toHaveLength(0)
+})
+it('verifies the prior refund through separate lists before sending the settlement',async()=>{
+ const receiptWithoutPayment={...first};delete receiptWithoutPayment.payment_id
+ const h=harness({receipts:[original,receiptWithoutPayment],post:settlement})
+ expect(await h.client.createFiscalOperation(operation('settlement'))).toMatchObject({receiptId:settlement.id})
+ const urls=h.fetchImpl.mock.calls.map(([url])=>url)
+ expect(urls).toContain(`https://api.yookassa.ru/v3/refunds/${first.refund_id}`)
+ expect(urls).toContain(`https://api.yookassa.ru/v3/receipts?refund_id=${first.refund_id}&limit=100`)
+ expect(urls.indexOf(`https://api.yookassa.ru/v3/receipts?refund_id=${first.refund_id}&limit=100`)).toBeLessThan(urls.indexOf('https://api.yookassa.ru/v3/receipts'))
+ expect(h.posts()).toHaveLength(1)
+})
+it.each([{id:uid(90)},{payment_id:uid(90)},{status:'pending'},{status:'canceled'},{amount:{value:'317.44',currency:'RUB'}}])('blocks sending when the prior monetary refund contradicts saved receipts %j',async patch=>{
+ const h=harness({priorRefund:{id:first.refund_id,payment_id:payment.id,status:'succeeded',amount:{value:'317.43',currency:'RUB'},...patch}})
+ await expect(h.client.createFiscalOperation(operation())).rejects.toThrow('fiscal_provider_mismatch')
+ expect(h.posts()).toHaveLength(0)
+})
+it.each(['missing','ambiguous','foreign','pending','wrong-line','wrong-id','loop'])('blocks sending for invalid prior refund receipts: %s',async mode=>{
+ const h=harness({receipts:path=>{
+  const q=new URLSearchParams(path.split('?')[1])
+  if(!q.has('refund_id'))return {items:[original,settlement]}
+  if(mode==='loop')return {items:[],next_cursor:'same'}
+  const bad=mode==='foreign'?{...first,refund_id:uid(90)}:mode==='pending'?{...first,status:'pending'}:mode==='wrong-line'?{...first,items:[{...first.items[0],quantity:1}]}:mode==='wrong-id'?{...first,id:rid(90)}:first
+  return {items:mode==='missing'?[]:mode==='ambiguous'?[first,{...first,id:rid(90)}]:[bad]}
+ }})
+ await expect(h.client.createFiscalOperation(operation())).rejects.toThrow('fiscal_provider_mismatch')
+ expect(h.posts()).toHaveLength(0)
+})
+it('does not replace a contradictory payment-list receipt with the refund-list receipt',async()=>{
+ const h=harness({receipts:path=>new URLSearchParams(path.split('?')[1]).has('refund_id')?{items:[first]}:{items:[original,{...first,status:'pending'},settlement]}})
+ await expect(h.client.createFiscalOperation(operation())).rejects.toThrow('fiscal_provider_mismatch')
+ expect(h.posts()).toHaveLength(0)
+})
+it('accepts the same verified receipt in both lists without counting it twice',async()=>{
+ const h=harness({receipts:path=>new URLSearchParams(path.split('?')[1]).has('refund_id')?{items:[first]}:{items:[original,first,settlement]}})
+ expect(await h.client.createFiscalOperation(operation())).toMatchObject({state:'succeeded'})
+ expect(h.posts()).toHaveLength(1)
+})
+it('preserves the prior refund filter when its receipt appears on a later page',async()=>{
+ const h=harness({receipts:path=>{
+  const q=new URLSearchParams(path.split('?')[1])
+  if(!q.has('refund_id'))return {items:[original,settlement]}
+  return q.has('cursor')?{items:[first]}:{items:[],next_cursor:'next'}
+ }})
+ expect(await h.client.createFiscalOperation(operation())).toMatchObject({state:'succeeded'})
+ expect(h.fetchImpl.mock.calls.some(([url])=>url.endsWith(`refund_id=${first.refund_id}&limit=100&cursor=next`))).toBe(true)
+ expect(h.posts()).toHaveLength(1)
+})
+it('blocks a prior refund total that differs from the verified payment balance',async()=>{
+ const o=operation('settlement');o.expectedRefundedMinor=31744
+ const h=harness({p:{...payment,refunded_amount:{value:'317.44',currency:'RUB'}},receipts:[original,first],post:settlement})
+ await expect(h.client.createFiscalOperation(o)).rejects.toThrow('fiscal_provider_mismatch')
+ expect(h.posts()).toHaveLength(0)
+})
+it('rejects two prior receipt identities for the same monetary refund',async()=>{
+ const o=operation();o.priorReceipts.push({...expected(first),id:rid(91)})
+ const h=harness()
+ await expect(h.client.createFiscalOperation(o)).rejects.toThrow('fiscal_provider_mismatch')
  expect(h.posts()).toHaveLength(0)
 })

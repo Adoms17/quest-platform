@@ -88,7 +88,25 @@ export function subscriptionFiscalHttpMethods({request,verifyShop,shopId,now,bef
  }
  async function prerequisites(ctx){
   const {s,item}=ctx,all=await list(s.paymentId),prior=new Map(s.priorReceipts.map(r=>[r.id,r]))
-  if(all.length!==prior.size+1)fail()
+  const refundIds=new Set(),seen=new Set(all.map(r=>r.id))
+  let refunded=0n
+  // Payment and refund receipt lists are separate provider resources.
+  for(const e of s.priorReceipts){
+   if(e.type!=='refund')continue
+   if(refundIds.has(e.refundId))fail()
+   refundIds.add(e.refundId)
+   const raw=await request(`refunds/${e.refundId}`)
+   const expectedAmount=(2n*minor(e.items[0]?.amount)*units(e.items[0]?.quantity)+1000000n)/2000000n
+   if(raw?.id!==e.refundId||raw.payment_id!==s.paymentId||raw.status!=='succeeded'
+    ||minor(raw.amount)!==expectedAmount)fail()
+   refunded+=expectedAmount
+   const matches=await list(s.paymentId,e.refundId)
+   if(matches.length!==1)fail()
+   const r=receipt(matches[0],e,s.paymentId)
+   if(r.status!=='succeeded')fail()
+   if(!seen.has(r.id)){all.push(r);seen.add(r.id)}
+  }
+  if(refunded!==BigInt(s.expectedRefundedMinor)||all.length!==prior.size+1)fail()
   let originals=0
   for(const r of all){
    const e=prior.get(r.id)
