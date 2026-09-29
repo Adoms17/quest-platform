@@ -30,7 +30,7 @@ function setup(){
   else if(url.includes('/payments/'))value={id:id(4),test:true,status:'succeeded',paid:true,recipient:{account_id:'123'},amount:{value:'10.00',currency:'RUB'},refunded_amount:{value:paidBack?'10.00':'0.00',currency:'RUB'},refundable:!paidBack,receipt_registration:'succeeded'}
   else if(url.includes('/refunds/'))value=refund
   else if(url.includes('/receipts/'))value=receipt
-  else value={items:paidBack?[original,receipt]:[original]}
+  else value={items:new URL(url).searchParams.get('refund_id')===id(6)?(paidBack?[receipt]:[]):[original]}
   return {ok:true,json:async()=>value}
  })
  const options={enabled:true,allowedOrigins:['https://stage-admin.qvesta.ru'],auth,service,providerConfig:{enabled:true,shopId:'123',secretKey:'synthetic'},transport:{fetchImpl}}
