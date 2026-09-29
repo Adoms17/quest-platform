@@ -20,14 +20,22 @@ function submit(code='123456'){
  fireEvent.change(screen.getByLabelText('Код MFA для заказа'),{target:{value:code}})
  fireEvent.submit(screen.getByLabelText('Код MFA для заказа').closest('form'))
 }
+async function start(){
+ const button=await screen.findByRole('button',{name:'Начать тестовый период'})
+ expect(button).toBeDisabled()
+ fireEvent.click(screen.getByRole('checkbox'))
+ fireEvent.click(button)
+}
 it('requires fresh MFA, invokes only preparation and never persists email or code',async()=>{
  const c=setup();render(<FiscalAcceptance client={c}/>);await prepare()
  expect(c.functions.invoke).not.toHaveBeenCalled();submit()
+ await screen.findByRole('button',{name:'Начать тестовый период'})
+ expect(c.functions.invoke).not.toHaveBeenCalled();await start()
  await screen.findByRole('status')
  expect(c.auth.mfa.challengeAndVerify).toHaveBeenCalledWith({factorId:'test-factor',code:'123456'})
  expect(c.functions.invoke).toHaveBeenCalledExactlyOnceWith('admin-fiscal-acceptance-prepare',{body:{fixtureId:acceptanceFixtureId,email}})
  expect(localStorage.length).toBe(0);expect(sessionStorage.length).toBe(0)
- expect(screen.queryByText('Подготовить тестовый заказ')).toBeNull()
+ expect(screen.queryByText('Начать тестовый период')).toBeNull()
 })
 it('rejects bad email and absent verified factors without invoking endpoint',async()=>{
  const c=setup();render(<FiscalAcceptance client={c}/>)
@@ -47,12 +55,12 @@ it('MFA rejection and malformed code prevent preparation',async()=>{
 })
 it('serializes double submission and preserves request across uncertain result and remount',async()=>{
  const c=setup();c.functions.invoke.mockRejectedValueOnce(Error('network'))
- const view=render(<FiscalAcceptance client={c}/>);await prepare();submit();submit()
+ const view=render(<FiscalAcceptance client={c}/>);await prepare();submit();await start();fireEvent.click(screen.getByRole('button',{name:'Повторить подготовку того же заказа'}))
  await screen.findByRole('alert');expect(c.functions.invoke).toHaveBeenCalledTimes(1)
  expect(screen.getByLabelText('Адрес для тестового чека')).toBeDisabled()
- submit();await screen.findByRole('status')
+ fireEvent.click(screen.getByRole('button',{name:'Повторить подготовку того же заказа'}));await screen.findByRole('status')
  expect(c.functions.invoke.mock.calls[1]).toEqual(c.functions.invoke.mock.calls[0])
- view.unmount();render(<FiscalAcceptance client={c}/>);await prepare();submit();await screen.findByRole('status')
+ view.unmount();render(<FiscalAcceptance client={c}/>);await prepare();submit();await start();await screen.findByRole('status')
  expect(c.functions.invoke.mock.calls[2]).toEqual(c.functions.invoke.mock.calls[0])
 })
 it('unmount during MFA prevents mutation',async()=>{
