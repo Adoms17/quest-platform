@@ -14,6 +14,16 @@ begin
    and f.organization_id='dcc2e33b-108a-d22f-7409-162fa76447f3'
    and o.id='${orderId}' and o.shop_id='1467641' and o.amount_minor=99000
    and p.status='succeeded' and p.paid and p.shop_id=o.shop_id and not p.requires_review
+ ) and not exists (
+  select 1 from public.billing_sandbox_orders o
+  join public.billing_trial_paid_periods t on t.order_id=o.id and t.organization_id=o.organization_id
+  join public.billing_sandbox_payment_results p on p.order_id=o.id
+  join public.billing_subscription_fiscal_terms ft on ft.order_id=o.id
+  where o.organization_id='64701955-543c-b77b-23ba-ede86feb8728' and o.id='${orderId}'
+   and o.shop_id='1467641' and o.amount_minor=99000
+   and t.period_start=o.period_start and t.period_end=o.period_end and t.plan_version_id=o.plan_version_id
+   and ft.period_start=o.period_start and ft.period_end=o.period_end
+   and p.status='succeeded' and p.paid and p.shop_id=o.shop_id and not p.requires_review
  ) then raise exception 'fiscal acceptance target denied'; end if;
 end; $guard$;
 rollback;
