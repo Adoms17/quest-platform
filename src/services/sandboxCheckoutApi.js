@@ -117,6 +117,11 @@ export async function checkSandboxCheckout(actor, org) {
   try { response = await supabase.functions.invoke('sandbox-checkout', { body: { orderId } }) }
   catch { throw uncertain() }
   const { data, error } = response ?? {}
+  if (error?.context?.status === 401) {
+    const authError = new Error('Войдите в аккаунт заново, затем проверьте этот же заказ. Не создавайте повторную оплату.')
+    authError.code = 'checkout_authentication_required'
+    throw authError
+  }
   if (error || data?.orderId !== orderId || !uuid.test(data.paymentId)
     || !['pending', 'waiting_for_capture', 'succeeded', 'canceled'].includes(data.status)
     || typeof data.requiresReview !== 'boolean') throw uncertain()

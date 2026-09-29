@@ -117,3 +117,20 @@ test.each([
  expect(screen.queryByText('Тестовая оплата подтверждена.')).toBeNull()
  expect(screen.queryByText('Тестовая оплата прошла. Активация подписки проверяется отдельно.')).toBeNull()
 })
+test('отказ авторизации предлагает повторный вход без раскрытия деталей', async () => {
+ mocks.checkSandboxCheckout.mockRejectedValue(Object.assign(new Error('private detail'), { code: 'checkout_authentication_required' }))
+ render(<SandboxCheckout actorId="a" organizationId="o" />)
+ fireEvent.click(await screen.findByRole('checkbox'))
+ fireEvent.click(screen.getByRole('button', { name: 'Подтвердить тестовую оплату' }))
+ expect(await screen.findByRole('alert')).toHaveTextContent('Войдите в аккаунт заново, затем проверьте этот же заказ')
+ expect(screen.queryByText('private detail')).toBeNull()
+ expect(mocks.checkSandboxCheckout).toHaveBeenCalledTimes(1)
+})
+
+test.each([false, true])('предупреждение об истёкшем периоде учитывает старт после оплаты: %s', async (period_starts_on_confirmation) => {
+ mocks.loadSandboxOffer.mockResolvedValue({ order_id: 'order', plan_name: 'Pro', amount_minor: 100, period_start: '2000-01-01', period_end: '2000-02-01', state: 'reserved', period_starts_on_confirmation })
+ render(<SandboxCheckout actorId="a" organizationId="o" />)
+ await screen.findByRole('button', { name: 'Подтвердить тестовую оплату' })
+ expect(Boolean(screen.queryByText(/Период заказа завершился по времени устройства/))).toBe(!period_starts_on_confirmation)
+ expect(mocks.checkSandboxCheckout).not.toHaveBeenCalled()
+})
