@@ -26,3 +26,7 @@ export function createFiscalAcceptanceApi(client){
   return {orderId:data.orderId,periodStart:data.periodStart,periodEnd:data.periodEnd}
  }}
 }
+
+export function isAcceptanceOrganization(client,organizationId){
+ return isFiscalPolicyStage(client)&&organizationId===acceptanceOrganizationId
+}

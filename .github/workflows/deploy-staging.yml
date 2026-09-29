@@ -69,6 +69,8 @@ on:
           - subscription-acceptance-functions-deploy
           - subscription-acceptance-fixture-preview
           - subscription-acceptance-fixture-provision
+          - subscription-acceptance-fiscal-reconcile
+          - subscription-acceptance-fiscal-dispatch
           - purchase-documents-dry-run
           - purchase-documents-apply
           - purchase-documents-fixture
@@ -1462,6 +1464,44 @@ jobs:
       - name: Provision fixture without preparing payment
         if: inputs.operation == 'subscription-acceptance-fixture-provision'
         run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-fiscal-acceptance-fixture.sql
+
+
+  subscription-acceptance-fiscal-run:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-acceptance-fiscal-reconcile' || inputs.operation == 'subscription-acceptance-fiscal-dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+      SANDBOX_ORDER_ID: ${{ inputs.sandbox_order_id }}
+      FISCAL_DISPATCH: ${{ inputs.operation == 'subscription-acceptance-fiscal-dispatch' && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Verify exact paid acceptance order before enabling
+        run: |
+          node scripts/run-stage-fiscal-order.mjs --preflight "$RUNNER_TEMP/fiscal-target.sql"
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/fiscal-target.sql"
+      - name: Enable only isolated fiscal worker
+        run: |
+          npx supabase secrets set YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ORDER_ID="$SANDBOX_ORDER_ID" YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=true YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH="$FISCAL_DISPATCH" --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Run once without automatic retry
+        env:
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+        run: node scripts/run-stage-fiscal-order.mjs
+      - name: Close isolated worker even after failure
+        if: always()
+        run: npx supabase secrets set YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
 
   receipt-probe-preflight:
     if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-probe-preflight'
