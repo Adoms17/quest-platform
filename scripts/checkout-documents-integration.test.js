@@ -39,9 +39,26 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  insert into public.billing_fiscal_policy_models(policy_id,product_kind,model_version,seller_tax_regime,settlement_basis)
  values(md5('operator-policy')::uuid,'subscription','subscription_access_v1','ausn','period_end'); select pg_sleep(1.1);
  `
+ // Reproduce stage: a newer current Pro version retains the agreed price.
+ const tariffSetup=`
+ insert into public.billing_plan_versions
+ select (jsonb_populate_record(null::public.billing_plan_versions,to_jsonb(p)||jsonb_build_object('id',md5('operator-current-pro')::uuid,'version',2))).*
+ from public.billing_plan_versions p where p.plan_key='pro' and p.version=1;
+ insert into public.billing_tariff_timeline(version_id,catalog_version_id,plan_key,effective_at)
+ values(md5('operator-current-pro')::uuid,md5('operator-current-pro')::uuid,'pro',clock_timestamp());
+ select ok(not platform_private.tariff_allows_renewal((select id from public.billing_plan_versions where plan_key='pro' and version=1),clock_timestamp(),false),'superseded Pro v1 cannot create a new order');
+ `
  const operatorFailures=`
  savepoint operator_checks;
- insert into public.organizations(id,name) values(md5('stage-fiscal-acceptance-org-20260928')::uuid,'existing organization');
+ insert into public.billing_plan_versions
+ select (jsonb_populate_record(null::public.billing_plan_versions,to_jsonb(p)||jsonb_build_object('id',md5('operator-wrong-price')::uuid,'version',3,'monthly_price_minor',120000))).*
+ from public.billing_plan_versions p where p.plan_key='pro' and p.version=1;
+ insert into public.billing_tariff_timeline(version_id,catalog_version_id,plan_key,effective_at)
+ values(md5('operator-wrong-price')::uuid,md5('operator-wrong-price')::uuid,'pro',clock_timestamp());
+ select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','current Pro tariff at 990 RUB required','operator refuses a current tariff with a different price');
+ select is((select count(*) from public.billing_fiscal_acceptance_fixtures),0::bigint,'price mismatch creates no fixture');
+ rollback to operator_checks;
+ insert into public.organizations(id,name) values(md5('stage-fiscal-acceptance-org-20260929')::uuid,'existing organization');
  select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','organization collision: preserve existing organization','operator refuses organization collision');
  rollback to operator_checks;
  insert into auth.users(id,email) values(md5('other-operator')::uuid,'other-operator@example.test');
@@ -49,18 +66,19 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','exactly one active platform owner required','operator refuses ambiguous owner');
  rollback to operator_checks;
  `
- const operatorResult=sql(operatorSetup+operatorFailures+operatorBody+`
+ const operatorResult=sql(operatorSetup+tariffSetup+operatorFailures+operatorBody+`
+ select is((select plan_version_id from public.billing_fiscal_acceptance_fixtures),md5('operator-current-pro')::uuid,'operator selects current Pro instead of v1');
  select set_config('test.fixture.before',(select to_jsonb(f)::text from public.billing_fiscal_acceptance_fixtures f),true);
  `+operatorBody+`
  select is((select to_jsonb(f)::text from public.billing_fiscal_acceptance_fixtures f),current_setting('test.fixture.before'),'operator retry preserves fixture and expiry');
  select is((select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),current_setting('test.personal.before'),'operator preserves personal subscription');
  select is((select count(*) from public.billing_sandbox_orders),0::bigint,'operator creates no payment orders');
- select is((select status from public.organization_subscriptions where organization_id=md5('stage-fiscal-acceptance-org-20260928')::uuid),'free','operator creates isolated Free organization');
+ select is((select status from public.organization_subscriptions where organization_id=md5('stage-fiscal-acceptance-org-20260929')::uuid),'free','operator creates isolated Free organization');
 
  savepoint fiscal_runner_test;
  select set_config('request.jwt.claim.sub',md5('operator-fixture-owner')::uuid::text,true);
  select set_config('request.jwt.claims',jsonb_build_object('aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from clock_timestamp())))))::text,true);
- select set_config('test.worker.order',(public.prepare_fiscal_acceptance_fixture(md5('stage-fiscal-acceptance-fixture-20260928')::uuid,'runner@example.test')->>'orderId'),true);
+ select set_config('test.worker.order',(public.prepare_fiscal_acceptance_fixture(md5('stage-fiscal-acceptance-fixture-20260929')::uuid,'runner@example.test')->>'orderId'),true);
  select throws_ok(replace($runner_guard$${fiscalGuard}$runner_guard$,'11111111-1111-4111-8111-111111111111',current_setting('test.worker.order')),'P0001','fiscal acceptance target denied','runner rejects unpaid order');
  insert into public.billing_sandbox_payment_results(order_id,shop_id,payment_id,status,paid)
  values(current_setting('test.worker.order')::uuid,'1467641',md5('runner-payment')::uuid,'succeeded',true);
@@ -70,13 +88,15 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  select throws_ok(replace($runner_guard$${fiscalGuard}$runner_guard$,'11111111-1111-4111-8111-111111111111',current_setting('test.worker.order')),'P0001','fiscal acceptance target denied','runner rejects review');
  rollback to fiscal_runner_test;
 savepoint operator_scope;
- delete from public.billing_sandbox_application_scope where organization_id=md5('stage-fiscal-acceptance-org-20260928')::uuid;
+ delete from public.billing_sandbox_application_scope where organization_id=md5('stage-fiscal-acceptance-org-20260929')::uuid;
  select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','fixture organization changed: manual review required','operator does not restore revoked scope');
  rollback to operator_scope;
  select * from finish(); rollback;
  `)
  expect(operatorResult).not.toMatch(/not ok|Looks like/)
  expect(operatorResult).toContain('operator retry preserves fixture and expiry')
+ expect(operatorResult).toContain('operator selects current Pro instead of v1')
+ expect(operatorResult).toContain('operator refuses a current tariff with a different price')
  const shortFixture=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/subscription_fiscal_acceptance_fixture.test.sql',import.meta.url),'utf8'))
  expect(shortFixture).not.toMatch(/not ok|Looks like/)
  expect(shortFixture).toContain('fixture order and receipt terms agree')
