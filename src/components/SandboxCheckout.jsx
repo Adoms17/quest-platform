@@ -11,6 +11,13 @@ export default function SandboxCheckout({ actorId, organizationId }) {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(false)
   const [retry, setRetry] = useState(0)
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const update = () => setNow(Date.now())
+    const timer = setInterval(update, 60000)
+    window.addEventListener('focus', update)
+    return () => { clearInterval(timer); window.removeEventListener('focus', update) }
+  }, [])
   const receiptsEnabled = import.meta.env.VITE_SANDBOX_RECEIPTS === 'true'
   const [receiptReady, setReceiptReady] = useState(false)
   const running = useRef(false)
@@ -36,7 +43,7 @@ export default function SandboxCheckout({ actorId, organizationId }) {
       const offer = await loadSandboxOffer(organizationId, state.offer.order_id)
       setState({ offer, offers: [] })
     }
-    catch { setError(true); setResult(null) }
+    catch (failure) { setError(failure?.code === 'checkout_authentication_required' ? 'authentication' : true); setResult(null) }
     finally { running.current = false; setBusy(false) }
   }
   function reload() { setState({ loading: true }); setAccepted(false); setResult(null); setError(false); setRetry(n => n + 1) }
@@ -61,6 +68,7 @@ export default function SandboxCheckout({ actorId, organizationId }) {
       {state.offer.discount && <p>Без скидки: {(state.offer.discount.base_amount_minor / 100).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}. Скидка: {(state.offer.discount.discount_bps / 100).toLocaleString('ru-RU')}% — {(state.offer.discount.discount_amount_minor / 100).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}.</p>}
       {state.offer.period_starts_on_confirmation ? <p>Период начнётся после подтверждения оплаты. Точные даты появятся после применения платежа.</p> : <p>Период: {new Date(state.offer.period_start).toLocaleString('ru-RU')} — {new Date(state.offer.period_end).toLocaleString('ru-RU')}. Время устройства.</p>}
       <p>Это sandbox: используйте тестовую карту. Автоматические списания не подключаются.</p>
+      {!state.offer.period_starts_on_confirmation && Date.parse(state.offer.period_end) <= now && state.offer.state === 'reserved' && <p role="status">Период заказа завершился по времени устройства. Не начинайте оплату этого заказа. Если платёж уже отправлен, проверяйте его статус.</p>}
       {state.offer.refunded_minor > 0 && <p role="status">Возвращено: {(state.offer.refunded_minor / 100).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}. Возврат не изменяет доступ по подписке.</p>}
       {state.offer.refund_pending_minor > 0 && <p role="status">Возврат обрабатывается. Доступ по подписке не изменён.</p>}
       {state.offer.refund_requires_review && <p role="status">Возврат требует сверки. Доступ по подписке не изменён.</p>}
@@ -73,7 +81,7 @@ export default function SandboxCheckout({ actorId, organizationId }) {
       {receiptsEnabled && <ReceiptContact key={`${actorId}:${state.offer.order_id}`} orderId={state.offer.order_id} onReady={setReceiptReady} disabled={busy} revision={result} />}
       <label className="flex items-start gap-3 py-3"><input type="checkbox" checked={accepted} disabled={busy} onChange={event => setAccepted(event.target.checked)} className="mt-1" />Подтверждаю условия тестового заказа</label>
       <button type="button" disabled={!accepted || busy || (receiptsEnabled && !receiptReady)} onClick={() => void submit()} className="rounded-lg bg-blue-600 px-4 py-3 text-white disabled:opacity-50">{busy ? 'Проверяем…' : result || error || state.offer.state !== 'reserved' ? 'Проверить платёж' : 'Подтвердить тестовую оплату'}</button>
-      {error && <p role="alert">Не удалось подтвердить состояние платежа. Повторите проверку этого заказа.</p>}
+      {error && <p role="alert">{error === 'authentication' ? 'Войдите в аккаунт заново, затем проверьте этот же заказ. Не создавайте повторную оплату.' : 'Не удалось подтвердить состояние платежа. Повторите проверку этого заказа.'}</p>}
       {state.offer.state === 'reserved' && !result && <button type="button" disabled={busy} onClick={() => void dismiss(true)} className="px-4 py-3 text-blue-700">Отменить неотправленный заказ</button>}
       {(state.offer.state === 'finished' || result?.status === 'canceled') && !state.offer.payment_requires_review && !result?.requiresReview && <button type="button" disabled={busy} onClick={() => void dismiss()} className="px-4 py-3 text-blue-700">Закрыть завершённый заказ</button>}
       {state.offer.state === 'finished' && state.offer.fulfillment_state === 'not_paid' && state.offer.refunded_minor === state.offer.amount_minor && state.offer.amount_minor > 0 && !state.offer.payment_requires_review && <p role="status">Заказ закрыт после полного возврата. Новый период по этому заказу не предоставлен; действующая подписка сохранена.</p>}

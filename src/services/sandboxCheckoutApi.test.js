@@ -108,3 +108,19 @@ test.each([
  if (patch.discount?.discount_bps === 5000 && patch.discount?.discount_amount_minor === 100 || patch.discount?.discount_bps === 0 && patch.discount?.discount_amount_minor === 0) await expect(loadSandboxOffer(org, orderId)).resolves.toEqual(data)
  else await expect(loadSandboxOffer(org, orderId)).rejects.toThrow()
 })
+
+test('401 requires a new login and preserves the same order for recovery', async () => {
+  rememberSandboxCheckout(actor, org, orderId)
+  invoke.mockResolvedValueOnce({ error: { context: { status: 401 }, message: 'private detail' } }).mockResolvedValueOnce({ data: result })
+  await expect(checkSandboxCheckout(actor, org)).rejects.toMatchObject({ code: 'checkout_authentication_required' })
+  expect(readSandboxCheckout(actor, org)).toBe(orderId)
+  await expect(checkSandboxCheckout(actor, org)).resolves.toEqual(result)
+  expect(invoke).toHaveBeenNthCalledWith(2, 'sandbox-checkout', { body: { orderId } })
+})
+
+test('503 remains uncertain and is not misreported as expired authentication', async () => {
+  rememberSandboxCheckout(actor, org, orderId)
+  invoke.mockResolvedValue({ error: { context: { status: 503 }, message: 'private detail' } })
+  await expect(checkSandboxCheckout(actor, org)).rejects.toThrow('Повторите проверку')
+  expect(readSandboxCheckout(actor, org)).toBe(orderId)
+})
