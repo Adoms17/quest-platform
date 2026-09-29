@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,it,expect,vi} from 'vitest'
 import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react'
 import FiscalAcceptance from './FiscalAcceptance'
-import {acceptanceFixtureId,acceptanceOrganizationId,createFiscalAcceptanceApi} from './fiscalAcceptanceApi'
+import {acceptanceFixtureId,acceptanceOrganizationId,fullRefundOrganizationId,createFiscalAcceptanceApi} from './fiscalAcceptanceApi'
 const email='tester@example.test'
 const response={fixtureId:acceptanceFixtureId,organizationId:acceptanceOrganizationId,orderId:'11111111-1111-4111-8111-111111111111',amountMinor:99000,environment:'sandbox',shopId:'1467641',periodStart:'2026-09-29T05:00:00Z',periodEnd:'2026-09-29T05:30:00Z'}
 function setup(){
@@ -86,6 +86,7 @@ it('scoped fiscal mode applies only to the acceptance organization on stage',asy
  const {isAcceptanceOrganization}=await import('./fiscalAcceptanceApi')
  const c=setup()
  expect(isAcceptanceOrganization(c,acceptanceOrganizationId)).toBe(true)
+ expect(isAcceptanceOrganization(c,fullRefundOrganizationId)).toBe(true)
  expect(isAcceptanceOrganization(c,'other')).toBe(false)
  vi.stubGlobal('location',{origin:'https://admin.qvesta.ru'})
  expect(isAcceptanceOrganization(c,acceptanceOrganizationId)).toBe(false)

@@ -73,3 +73,16 @@ test('operator workflow separates rollback preview from provisioning and never e
  expect(job).not.toContain('functions deploy')
  for(const flag of ['ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED','YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED','YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH'])expect(job).toContain(flag+'=false')
 })
+
+test('full refund provisioning is isolated, preview rolls back and starts no trial or payment',async()=>{
+ const {readFileSync}=await import('node:fs')
+ const w=readFileSync(new URL('../.github/workflows/deploy-staging.yml',import.meta.url),'utf8')
+ const job=w.slice(w.indexOf('  subscription-full-refund:'),w.indexOf('  subscription-acceptance-fiscal-run:'))
+ expect(job).toContain("github.ref == 'refs/heads/staging'")
+ expect(job).toContain('scripts/stage-full-refund-organization.sql')
+ expect(job).toContain('rollback;')
+ expect(job).not.toContain('=true')
+ expect(job).not.toContain('functions deploy')
+ expect(job).toContain('ADMIN_SUBSCRIPTION_REFUNDS_ENABLED=false')
+ expect(job).toContain('ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false')
+})

@@ -97,9 +97,22 @@ savepoint operator_scope;
  expect(operatorResult).toContain('operator retry preserves fixture and expiry')
  expect(operatorResult).toContain('operator selects current Pro instead of v1')
  expect(operatorResult).toContain('operator refuses a current tariff with a different price')
+ const fullOperatorBody=readFileSync(new URL('./stage-full-refund-organization.sql',import.meta.url),'utf8').replace(/^begin;\s*/,'').replace(/commit;\s*$/,'')
+ const fullOperator=sql(operatorSetup+tariffSetup+fullOperatorBody+fullOperatorBody+`
+ select is((select count(*) from public.billing_sandbox_orders),0::bigint,'full refund provisioning creates no payment');
+ select is((select count(*) from public.billing_trial_access),0::bigint,'full refund provisioning starts no trial');
+ select is((select count(*) from public.billing_fiscal_acceptance_fixtures),0::bigint,'full refund provisioning does not reuse timed fixture');
+ select is((select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),current_setting('test.personal.before'),'full refund provisioning preserves personal subscription');
+ delete from public.billing_sandbox_application_scope where organization_id='64701955-543c-b77b-23ba-ede86feb8728';
+ select throws_ok($full_operator$${fullOperatorBody}$full_operator$,'P0001','full refund organization changed: manual review required','full refund retry preserves revoked scope');
+ select * from finish(); rollback;`)
+ expect(fullOperator).not.toMatch(/not ok|Looks like/)
  const shortFixture=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/subscription_fiscal_acceptance_fixture.test.sql',import.meta.url),'utf8'))
  expect(shortFixture).not.toMatch(/not ok|Looks like/)
  expect(shortFixture).toContain('fixture order and receipt terms agree')
+ const fullRefund=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/subscription_fiscal_full_refund.test.sql',import.meta.url),'utf8').replace('-- FULL_REFUND_TARGET_CHECK',()=>`select lives_ok(replace($full_guard$${fiscalGuard}$full_guard$,'11111111-1111-4111-8111-111111111111',current_setting('test.order')),'runner accepts exact paid after-trial target'); select throws_ok($full_guard$${fiscalGuard}$full_guard$,'P0001','fiscal acceptance target denied','runner rejects foreign full-refund target');`))
+ expect(fullRefund).not.toMatch(/not ok|Looks like/)
+ expect(fullRefund).toContain('fully refunded order never becomes due after period end')
  const tariffPrices=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/tariff_monthly_prices.test.sql',import.meta.url),'utf8'))
  expect(tariffPrices).not.toMatch(/not ok|Looks like/)
  const suite=readFileSync(new URL('../supabase/tests/database/checkout_documents_atomic.test.sql',import.meta.url),'utf8')
