@@ -2,13 +2,13 @@ begin;
 set local lock_timeout='5s';
 set local statement_timeout='20s';
 do $fixture$
-declare actor uuid; owner_count integer; org constant uuid:=md5('stage-fiscal-acceptance-org-20260929')::uuid;
- fixture constant uuid:=md5('stage-fiscal-acceptance-fixture-20260929')::uuid;
+declare actor uuid; owner_count integer; org constant uuid:=md5('stage-fiscal-acceptance-org-20260929-evening')::uuid;
+ fixture constant uuid:=md5('stage-fiscal-acceptance-fixture-20260929-evening')::uuid;
  membership uuid; free_plan uuid; paid_plan uuid; policy uuid;
  saved public.billing_fiscal_acceptance_fixtures%rowtype;
  subscription public.organization_subscriptions%rowtype;
 begin
- perform pg_advisory_xact_lock(hashtextextended('stage-fiscal-acceptance-fixture-20260929',0));
+ perform pg_advisory_xact_lock(hashtextextended('stage-fiscal-acceptance-fixture-20260929-evening',0));
  select count(distinct user_id) into owner_count from public.platform_access_assignments
  where role_key='owner' and scope_kind='platform' and revoked_at is null and valid_from<=clock_timestamp();
  if owner_count<>1 then raise exception 'exactly one active platform owner required'; end if;
@@ -29,9 +29,9 @@ begin
   if saved.organization_id<>org or saved.actor_id<>actor or saved.plan_version_id<>paid_plan
    or saved.order_id is not null or saved.expires_at<=clock_timestamp() then raise exception 'fixture already used, expired or mismatched'; end if;
  else
-  if exists(select 1 from public.organizations where id=org or name='sandbox-fiscal-acceptance-20260929') then
+  if exists(select 1 from public.organizations where id=org or name='sandbox-fiscal-acceptance-20260929-evening') then
    raise exception 'organization collision: preserve existing organization'; end if;
-  insert into public.organizations(id,name) values(org,'sandbox-fiscal-acceptance-20260929');
+  insert into public.organizations(id,name) values(org,'sandbox-fiscal-acceptance-20260929-evening');
   insert into public.organization_memberships(organization_id,user_id,status) values(org,actor,'active') returning id into membership;
   insert into public.membership_roles(membership_id,role_id) select membership,id from public.roles where key='owner';
   -- This row belongs exclusively to the organization inserted in this transaction.
@@ -55,5 +55,5 @@ begin
 end; $fixture$;
 select id as fixture_id,organization_id,plan_version_id,expected_revision,expires_at,
  'sandbox' as environment,'1467641' as shop_id,99000 as amount_minor,30 as period_minutes
- from public.billing_fiscal_acceptance_fixtures where id=md5('stage-fiscal-acceptance-fixture-20260929')::uuid;
+ from public.billing_fiscal_acceptance_fixtures where id=md5('stage-fiscal-acceptance-fixture-20260929-evening')::uuid;
 commit;

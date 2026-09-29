@@ -58,7 +58,7 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','current Pro tariff at 990 RUB required','operator refuses a current tariff with a different price');
  select is((select count(*) from public.billing_fiscal_acceptance_fixtures),0::bigint,'price mismatch creates no fixture');
  rollback to operator_checks;
- insert into public.organizations(id,name) values(md5('stage-fiscal-acceptance-org-20260929')::uuid,'existing organization');
+ insert into public.organizations(id,name) values(md5('stage-fiscal-acceptance-org-20260929-evening')::uuid,'existing organization');
  select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','organization collision: preserve existing organization','operator refuses organization collision');
  rollback to operator_checks;
  insert into auth.users(id,email) values(md5('other-operator')::uuid,'other-operator@example.test');
@@ -73,12 +73,12 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  select is((select to_jsonb(f)::text from public.billing_fiscal_acceptance_fixtures f),current_setting('test.fixture.before'),'operator retry preserves fixture and expiry');
  select is((select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),current_setting('test.personal.before'),'operator preserves personal subscription');
  select is((select count(*) from public.billing_sandbox_orders),0::bigint,'operator creates no payment orders');
- select is((select status from public.organization_subscriptions where organization_id=md5('stage-fiscal-acceptance-org-20260929')::uuid),'free','operator creates isolated Free organization');
+ select is((select status from public.organization_subscriptions where organization_id=md5('stage-fiscal-acceptance-org-20260929-evening')::uuid),'free','operator creates isolated Free organization');
 
  savepoint fiscal_runner_test;
  select set_config('request.jwt.claim.sub',md5('operator-fixture-owner')::uuid::text,true);
  select set_config('request.jwt.claims',jsonb_build_object('aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from clock_timestamp())))))::text,true);
- select set_config('test.worker.order',(public.prepare_fiscal_acceptance_fixture(md5('stage-fiscal-acceptance-fixture-20260929')::uuid,'runner@example.test')->>'orderId'),true);
+ select set_config('test.worker.order',(public.prepare_fiscal_acceptance_fixture(md5('stage-fiscal-acceptance-fixture-20260929-evening')::uuid,'runner@example.test')->>'orderId'),true);
  select throws_ok(replace($runner_guard$${fiscalGuard}$runner_guard$,'11111111-1111-4111-8111-111111111111',current_setting('test.worker.order')),'P0001','fiscal acceptance target denied','runner rejects unpaid order');
  insert into public.billing_sandbox_payment_results(order_id,shop_id,payment_id,status,paid)
  values(current_setting('test.worker.order')::uuid,'1467641',md5('runner-payment')::uuid,'succeeded',true);
@@ -88,7 +88,7 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  select throws_ok(replace($runner_guard$${fiscalGuard}$runner_guard$,'11111111-1111-4111-8111-111111111111',current_setting('test.worker.order')),'P0001','fiscal acceptance target denied','runner rejects review');
  rollback to fiscal_runner_test;
 savepoint operator_scope;
- delete from public.billing_sandbox_application_scope where organization_id=md5('stage-fiscal-acceptance-org-20260929')::uuid;
+ delete from public.billing_sandbox_application_scope where organization_id=md5('stage-fiscal-acceptance-org-20260929-evening')::uuid;
  select throws_ok($operator_test$`+operatorBody+`$operator_test$,'P0001','fixture organization changed: manual review required','operator does not restore revoked scope');
  rollback to operator_scope;
  select * from finish(); rollback;
