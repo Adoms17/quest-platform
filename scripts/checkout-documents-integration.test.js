@@ -115,7 +115,7 @@ savepoint operator_scope;
  select is((select status from public.organization_subscriptions where organization_id='64701955-543c-b77b-23ba-ede86feb8728'),'free','new format fixture preserves old organization');
  select throws_ok($new_offer$${bodyOffer}$new_offer$,'P0001','full refund offer preflight failed','new offer requires active trial');
  select set_config('request.jwt.claim.sub',md5('operator-fixture-owner')::uuid::text,true);
- select public.request_organization_trial('e129101e-0878-5585-d3e8-207d76ef15c1',md5('operator-current-pro')::uuid,repeat('c',64),md5('new-body-trial')::uuid,(select revision from public.organization_subscriptions where organization_id='e129101e-0878-5585-d3e8-207d76ef15c1'));
+ select public.request_organization_trial('e129101e-0878-5585-d3e8-207d76ef15c1',(select id from public.billing_plan_versions where plan_key='business' and version=1),repeat('c',64),md5('new-body-trial')::uuid,(select revision from public.organization_subscriptions where organization_id='e129101e-0878-5585-d3e8-207d76ef15c1'));
  select throws_ok($new_org$${bodyOrg}$new_org$,'P0001','full refund organization changed: manual review required','provision retry cannot reset active trial');
  select throws_ok($new_offer$${bodyOffer}$new_offer$,'P0001','expected stage test documents required','new offer requires test documents');
  insert into public.purchase_document_versions(id,kind,body,status) values
@@ -129,6 +129,7 @@ savepoint operator_scope;
  select is((select count(*) from public.billing_sandbox_orders),0::bigint,'new offer creates no payment');
  select is((select count(*) from public.checkout_document_acceptances),0::bigint,'new offer never accepts documents');
  select is((select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),current_setting('test.personal.before'),'new fixture preserves personal subscription');
+ select is((select amount_minor from public.billing_sandbox_offers where organization_id='e129101e-0878-5585-d3e8-207d76ef15c1'),249000::bigint,'Business full refund offer uses 2490 RUB');
  select * from finish(); rollback;`)
  expect(bodyFixture).not.toMatch(/not ok|Looks like/)
  const shortFixture=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/subscription_fiscal_acceptance_fixture.test.sql',import.meta.url),'utf8'))
@@ -137,6 +138,18 @@ savepoint operator_scope;
  const fullRefund=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/subscription_fiscal_full_refund.test.sql',import.meta.url),'utf8').replace('-- FULL_REFUND_BODY_COMPATIBILITY',()=>readFileSync(new URL('../supabase/tests/database/subscription_full_refund_body.test.sql',import.meta.url),'utf8')).replace('-- FULL_REFUND_TARGET_CHECK',()=>`select lives_ok(replace($full_guard$${fiscalGuard}$full_guard$,'11111111-1111-4111-8111-111111111111',current_setting('test.order')),'runner accepts exact paid after-trial target'); select throws_ok($full_guard$${fiscalGuard}$full_guard$,'P0001','fiscal acceptance target denied','runner rejects foreign full-refund target');`))
  expect(fullRefund).not.toMatch(/not ok|Looks like/)
  expect(fullRefund).toContain('fully refunded order never becomes due after period end')
+ const businessSource=readFileSync(new URL('../supabase/tests/database/subscription_fiscal_full_refund.test.sql',import.meta.url),'utf8')
+  .replaceAll('64701955-543c-b77b-23ba-ede86feb8728','e129101e-0878-5585-d3e8-207d76ef15c1')
+  .replaceAll("'purchase_trial',1", "'business',101").replaceAll("'purchase_trial',2", "'business',102").replaceAll("'purchase_trial'", "'business'")
+  .replaceAll('99000','249000').replaceAll('990.00','2490.00')
+  .replaceAll("now()-interval '2 days'", 'clock_timestamp()').replaceAll("now()-interval '1 day'", 'clock_timestamp()')
+  .replace('-- FULL_REFUND_BODY_COMPATIBILITY',()=>readFileSync(new URL('../supabase/tests/database/subscription_full_refund_body.test.sql',import.meta.url),'utf8').replaceAll('99000','249000').replaceAll('990.00','2490.00'))
+  .replace('-- FULL_REFUND_TARGET_CHECK',()=>`select lives_ok(replace($business_guard$${fiscalGuard}$business_guard$,'11111111-1111-4111-8111-111111111111',current_setting('test.order')),'runner accepts exact Business at 2490');
+  select throws_ok(replace(replace($business_guard$${fiscalGuard}$business_guard$,'11111111-1111-4111-8111-111111111111',current_setting('test.order')),'o.amount_minor=249000','o.amount_minor=99000'),'P0001','fiscal acceptance target denied','Business cannot use old price');
+  select throws_ok(replace(replace($business_guard$${fiscalGuard}$business_guard$,'11111111-1111-4111-8111-111111111111',current_setting('test.order')),'bp.plan_key=''business''','bp.plan_key=''pro'''),'P0001','fiscal acceptance target denied','Business cannot use another plan');`)
+ const businessRefund=sql('set search_path=public,extensions;'+businessSource)
+ expect(businessRefund).not.toMatch(/not ok|Looks like/)
+ expect(businessRefund).toContain('runner accepts exact Business at 2490')
  const tariffPrices=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/tariff_monthly_prices.test.sql',import.meta.url),'utf8'))
  expect(tariffPrices).not.toMatch(/not ok|Looks like/)
  const suite=readFileSync(new URL('../supabase/tests/database/checkout_documents_atomic.test.sql',import.meta.url),'utf8')
