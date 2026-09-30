@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react'
 import {isFiscalPolicyStage} from './fiscalPolicyApi'
-import {acceptanceEmail,createFiscalAcceptanceApi} from './fiscalAcceptanceApi'
+import {acceptanceEmail,createFiscalAcceptanceApi,acceptanceScenarios} from './fiscalAcceptanceApi'
 const messages={
  sandbox_disabled:'Подготовка выключена на сервере. Дождитесь согласованного окна теста.',
  authentication_required:'Сессия не подтверждена. Повторите вход с MFA.',
@@ -9,6 +9,7 @@ const messages={
  invalid_email:'Введите корректный адрес электронной почты.'
 }
 export default function FiscalAcceptance({client}){
+ const [scenario,setScenario]=useState('legacy')
  const [email,setEmail]=useState(''),[factors,setFactors]=useState([]),[factor,setFactor]=useState('')
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[result,setResult]=useState(null)
  const [attempted,setAttempted]=useState(false)
@@ -50,13 +51,16 @@ export default function FiscalAcceptance({client}){
   locked.current=true;setBusy(true);setError('')
   try{
    setAttempted(true)
-   const value=await createFiscalAcceptanceApi(client).prepare(savedEmail.current)
+   const value=await createFiscalAcceptanceApi(client,scenario).prepare(savedEmail.current)
    if(alive.current)setResult(value)
   }catch(failure){if(alive.current)setError(messages[failure.message]||messages.preparation_unconfirmed)}
   finally{locked.current=false;if(alive.current)setBusy(false)}
  }
  return <section className="narrow"><h1>Подготовка тестового заказа</h1>
-  <p>Тестовый магазин 1467641 · организация sandbox-fiscal-acceptance-20260929-session-ready.</p>
+  <label>Сценарий проверки<select value={scenario} disabled={busy||factors.length>0||attempted||mfaReady||Boolean(result)} onChange={event=>setScenario(event.target.value)}>
+   {Object.entries(acceptanceScenarios).map(([key,value])=><option key={key} value={key}>{value.label}</option>)}
+  </select></label>
+  <p>Тестовый магазин 1467641 · организация {acceptanceScenarios[scenario].name}.</p>
   <p>Pro · 990 ₽ · 30 минут. Период начинается сразу при подготовке заказа, до оплаты. Подготовка не списывает деньги и не выдаёт доступ.</p>
   <p>Допуск выдаётся оператором на два часа. Истёкший допуск нельзя продлить этой формой.</p>
   <p>Запускайте подготовку только когда готовы продолжить тест оплаты. После сетевого сбоя повторите с тем же адресом: сервер вернёт прежний заказ. После перезагрузки введите прежний адрес заново.</p>

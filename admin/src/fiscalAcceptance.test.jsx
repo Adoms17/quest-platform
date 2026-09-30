@@ -92,3 +92,24 @@ it('scoped fiscal mode applies only to the acceptance organization on stage',asy
  vi.stubGlobal('location',{origin:'https://admin.qvesta.ru'})
  expect(isAcceptanceOrganization(c,acceptanceOrganizationId)).toBe(false)
 })
+
+it('prepares settlement fixture and locks selection before MFA and uncertain retry',async()=>{
+ const {settlementFixtureId,settlementOrganizationId}=await import('./fiscalAcceptanceApi')
+ const c=setup();c.functions.invoke.mockRejectedValueOnce(Error('network')).mockResolvedValue({data:{...response,fixtureId:settlementFixtureId,organizationId:settlementOrganizationId}})
+ render(<FiscalAcceptance client={c}/>);
+ fireEvent.change(screen.getByLabelText('Сценарий проверки'),{target:{value:'settlement'}})
+ expect(screen.getByText(/sandbox-subscription-settlement-20260930/)).toBeInTheDocument()
+ await prepare();expect(screen.getByLabelText('Сценарий проверки')).toBeDisabled()
+ submit();await start();await screen.findByRole('alert')
+ expect(screen.getByLabelText('Сценарий проверки')).toBeDisabled()
+ fireEvent.click(screen.getByRole('button',{name:'Повторить подготовку того же заказа'}))
+ await screen.findByRole('status')
+ expect(c.functions.invoke).toHaveBeenCalledTimes(2)
+ expect(c.functions.invoke.mock.calls[0]).toEqual(c.functions.invoke.mock.calls[1])
+ expect(c.functions.invoke.mock.calls[0][1].body.fixtureId).toBe(settlementFixtureId)
+})
+it('settlement selection rejects legacy response and unknown scenario',async()=>{
+ const c=setup()
+ await expect(createFiscalAcceptanceApi(c,'settlement').prepare(email)).rejects.toThrow('preparation_unconfirmed')
+ expect(()=>createFiscalAcceptanceApi(c,'unknown')).toThrow('invalid_scenario')
+})

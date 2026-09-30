@@ -1,3 +1,4 @@
+import {scheduleSql} from './subscription-settlement-schedule.mjs'
 import {fiscalTargetCheck} from './run-stage-fiscal-order.mjs'
 // @vitest-environment node
 import { test,expect } from 'vitest'
@@ -48,6 +49,52 @@ test.skipIf(process.env.QVESTA_TEST_CHECKOUT_DOCUMENTS!=='1')('atomic checkout d
  values(md5('operator-current-pro')::uuid,md5('operator-current-pro')::uuid,'pro',clock_timestamp());
  select ok(not platform_private.tariff_allows_renewal((select id from public.billing_plan_versions where plan_key='pro' and version=1),clock_timestamp(),false),'superseded Pro v1 cannot create a new order');
  `
+ const settlementFixtureBody=readFileSync(new URL('./stage-subscription-settlement-fixture.sql',import.meta.url),'utf8').replace(/^begin;\s*/,'').replace(/commit;\s*$/,'')
+ const settlementFixtureOut=sql(operatorSetup+tariffSetup+settlementFixtureBody+settlementFixtureBody+`
+ select is((select count(*) from public.billing_fiscal_acceptance_fixtures),1::bigint,'settlement fixture repeated without duplicates');
+ select is((select count(*) from public.billing_sandbox_orders),0::bigint,'settlement fixture does not start period or payment');
+ select is((select count(*) from public.billing_sandbox_settlement_schedule),0::bigint,'settlement fixture does not authorize dispatch');
+ select is((select name from public.organizations where id=md5('stage-settlement-org-20260930')::uuid),'sandbox-subscription-settlement-20260930','separate settlement organization');
+ select is((select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),current_setting('test.personal.before'),'settlement fixture preserves personal subscription');
+ select * from finish();rollback;`)
+ expect(settlementFixtureOut).not.toMatch(/not ok|Looks like/)
+ expect(settlementFixtureOut).toContain('settlement fixture preserves personal subscription')
+ const admissionBody=readFileSync(new URL('./stage-subscription-settlement-admission.sql',import.meta.url),'utf8').replace(/^\uFEFF?/,'').replace(/^begin;\s*/,'').replace(/rollback;\s*$/,'')
+ const enableBody=scheduleSql('enable','11111111-1111-4111-8111-111111111111').replace(/^begin;/,'').replace(/commit;\s*$/,'').replaceAll('11111111-1111-4111-8111-111111111111',"$activation$ || current_setting('qvesta.settlement_order_id') || $activation$")
+ const admissionOut=sql(operatorSetup+tariffSetup+settlementFixtureBody+`
+ select set_config('request.jwt.claim.sub',md5('operator-fixture-owner')::uuid::text,true);
+ select set_config('request.jwt.claims',jsonb_build_object('aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from clock_timestamp())))))::text,true);
+ select set_config('qvesta.settlement_order_id',public.prepare_fiscal_acceptance_fixture(md5('stage-settlement-fixture-20260930')::uuid,'schedule@example.test')->>'orderId',true);
+ select set_config('qvesta.settlement_schedule_mode','preview',true);
+ select throws_ok($admit$${admissionBody}$admit$,'P0001','schedule admission denied','unpaid order denied');
+ insert into public.billing_sandbox_payment_results(order_id,shop_id,payment_id,status,paid)
+ values(current_setting('qvesta.settlement_order_id')::uuid,'1467641',md5('admission-payment')::uuid,'succeeded',true);
+ select throws_ok($admit$${admissionBody}$admit$,'P0001','schedule admission denied','missing receipt denied');
+ insert into public.billing_receipt_payment_requests(order_id,idempotency_key,body,body_sha256)
+ values(current_setting('qvesta.settlement_order_id')::uuid,md5('admission-request')::uuid,'{}',repeat('0',64));
+ insert into public.billing_receipt_payment_status(order_id,payment_id,status)
+ values(current_setting('qvesta.settlement_order_id')::uuid,md5('admission-payment')::uuid,'succeeded');
+ ${admissionBody}
+ select set_config('test.schedule.before',(select to_jsonb(q)::text from public.billing_sandbox_settlement_schedule q),true);
+ ${admissionBody}
+ select is((select to_jsonb(q)::text from public.billing_sandbox_settlement_schedule q),current_setting('test.schedule.before'),'admission retry preserves entire schedule');
+ select ok((select not enabled and attempts=0 and expires_at=period_end+interval '1 hour' from public.billing_sandbox_settlement_schedule),'admission remains disabled with bounded expiry');
+ savepoint used_schedule;
+ update public.billing_sandbox_settlement_schedule set attempts=1;
+ select throws_ok($admit$${admissionBody}$admit$,'P0001','existing schedule changed: manual review required','admission cannot reset attempts');
+ rollback to savepoint used_schedule;
+ select throws_ok($activation$`+enableBody+`$activation$,'P0001','scheduler credential missing','activation requires scheduler credential');
+ select ok((select not enabled from public.billing_sandbox_settlement_schedule),'failed activation preserves disabled target');
+ select vault.create_secret(repeat('ab',32),'qvesta_stage_reconcile_worker_token');
+ select lives_ok($activation$`+enableBody+`$activation$,'valid target activates atomically');
+ select ok((select enabled from public.billing_sandbox_settlement_schedule),'target enabled');
+ select ok((select active from cron.job where jobname='quest-stage-subscription-settlement'),'cron enabled');
+ `+scheduleSql('disable').replace(/^begin;/,'').replace(/commit;\s*$/,'')+`
+ select ok((select not enabled and attempts=0 from public.billing_sandbox_settlement_schedule),'disable preserves counters');
+ select ok((select not active from cron.job where jobname='quest-stage-subscription-settlement'),'cron disabled');
+ select * from finish();rollback;`)
+ expect(admissionOut).not.toMatch(/not ok|Looks like/)
+ expect(admissionOut).toContain('admission cannot reset attempts')
  const operatorFailures=`
  savepoint operator_checks;
  insert into public.billing_plan_versions
@@ -178,6 +225,13 @@ savepoint operator_scope;
  values(md5('receipt-initial-policy')::uuid,'subscription','subscription_access_v1','ausn','period_end');
  select pg_sleep(2.1);`)
  expect(modeledPrefix).not.toBe(receiptPrefix)
+ const scheduleOut=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/subscription_settlement_schedule.test.sql',import.meta.url),'utf8'))
+ expect(scheduleOut).not.toMatch(/not ok|Looks like/)
+ expect(scheduleOut).toContain('repeat empty schedule sends nothing')
+ const scheduleLifecycle=readFileSync(new URL('../supabase/tests/database/subscription_settlement_schedule_lifecycle.test.sql',import.meta.url),'utf8')
+ const scheduleLifecycleOut=sql('set search_path=public,extensions;'+paid.replace('select * from finish();rollback;',()=>orderChecks+'\n'+modeledPrefix+'\n'+scheduleLifecycle+'\nselect * from finish();rollback;').replaceAll("'123'","'1467641'"))
+ expect(scheduleLifecycleOut).not.toMatch(/not ok|Looks like/)
+ expect(scheduleLifecycleOut).toContain('one durable settlement after repeats')
  const dueChecks=readFileSync(new URL('../supabase/tests/database/subscription_settlement_due.test.sql',import.meta.url),'utf8')
  const dueOut=sql('set search_path=public,extensions;'+paid.replace('select * from finish();rollback;',()=>orderChecks+'\n'+modeledPrefix+'\n'+dueChecks+'\nselect * from finish();rollback;'))
  expect(dueOut).not.toMatch(/not ok|Looks like/)
