@@ -69,6 +69,10 @@ on:
           - subscription-acceptance-functions-deploy
           - subscription-full-refund-body-dry-run
           - subscription-full-refund-body-apply
+          - subscription-full-refund-body-fixture-preview
+          - subscription-full-refund-body-fixture-provision
+          - subscription-full-refund-body-offer-preview
+          - subscription-full-refund-body-offer-provision
           - subscription-full-refund-preview
           - subscription-full-refund-provision
           - subscription-acceptance-fixture-preview
@@ -1566,6 +1570,82 @@ jobs:
       - name: Provision fixture without preparing payment
         if: inputs.operation == 'subscription-full-refund-provision'
         run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-full-refund-organization.sql
+
+
+  subscription-full-refund-body-fixture:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-full-refund-body-fixture-preview' || inputs.operation == 'subscription-full-refund-body-fixture-provision')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate stage target
+        run: test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require complete acceptance schema
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-full-refund-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable preparation before provisioning
+        if: inputs.operation == 'subscription-full-refund-body-fixture-provision'
+        run: npx supabase secrets set ADMIN_SUBSCRIPTION_REFUNDS_ENABLED=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Preview fixture with rollback
+        if: inputs.operation == 'subscription-full-refund-body-fixture-preview'
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("scripts/stage-full-refund-body-organization.sql","utf8"); if(!/commit;\s*$/.test(s))throw Error("Missing transaction end"); fs.writeFileSync(process.env.RUNNER_TEMP+"/fiscal-fixture-preview.sql",s.replace(/commit;\s*$/,"rollback;\n"));'
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/fiscal-fixture-preview.sql"
+      - name: Provision fixture without preparing payment
+        if: inputs.operation == 'subscription-full-refund-body-fixture-provision'
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-full-refund-body-organization.sql
+
+
+  subscription-full-refund-body-offer:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-full-refund-body-offer-preview' || inputs.operation == 'subscription-full-refund-body-offer-provision')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate stage target
+        run: test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require complete acceptance schema
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-full-refund-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable preparation before provisioning
+        if: inputs.operation == 'subscription-full-refund-body-offer-provision'
+        run: npx supabase secrets set ADMIN_SUBSCRIPTION_REFUNDS_ENABLED=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Preview fixture with rollback
+        if: inputs.operation == 'subscription-full-refund-body-offer-preview'
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("scripts/stage-full-refund-body-offer.sql","utf8"); if(!/commit;\s*$/.test(s))throw Error("Missing transaction end"); fs.writeFileSync(process.env.RUNNER_TEMP+"/fiscal-fixture-preview.sql",s.replace(/commit;\s*$/,"rollback;\n"));'
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/fiscal-fixture-preview.sql"
+      - name: Provision fixture without preparing payment
+        if: inputs.operation == 'subscription-full-refund-body-offer-provision'
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-full-refund-body-offer.sql
 
 
   subscription-acceptance-fiscal-run:

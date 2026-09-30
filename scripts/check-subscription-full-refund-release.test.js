@@ -41,3 +41,21 @@ test('stage apply disables dispatch and deploys compatible readers before migrat
  expect(job.match(/--preview/g)).toHaveLength(2)
  expect(job).not.toContain('fiscal-dispatch')
 })
+
+test('new format fixture and offer workflows never start payment or enable dispatch',()=>{
+ const w=readFileSync(new URL('../.github/workflows/deploy-staging.yml',import.meta.url),'utf8')
+ for(const kind of ['fixture','offer']){
+  const start=w.indexOf('  subscription-full-refund-body-'+kind+':')
+  const end=w.indexOf('\n  subscription-',start+3)
+  const job=w.slice(start,end)
+  expect(start).toBeGreaterThan(0)
+  expect(job).toContain("github.ref == 'refs/heads/staging'")
+  expect(job).toContain('SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht')
+  expect(job).toContain('check-subscription-full-refund-release.mjs')
+  expect(job).toContain('--require-applied')
+  expect(job).toContain('rollback;')
+  expect(job).toContain('scripts/stage-full-refund-body-'+(kind==='fixture'?'organization':'offer')+'.sql')
+  expect(job).not.toContain('=true')
+  expect(job).not.toContain('functions deploy')
+ }
+})
