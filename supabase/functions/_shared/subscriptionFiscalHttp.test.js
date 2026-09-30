@@ -19,14 +19,14 @@ function operation(kind='refund_after'){
 const payment={id:uid(1),test:true,status:'succeeded',paid:true,recipient:{account_id:'123'},amount:{value:'990.00',currency:'RUB'},refunded_amount:{value:'317.43',currency:'RUB'},refundable:true,receipt_registration:'succeeded'}
 const refund={id:uid(13),payment_id:uid(1),status:'succeeded',amount:{value:'672.57',currency:'RUB'}}
 const final={id:rid(13),payment_id:uid(1),type:'refund',refund_id:uid(13),status:'succeeded',items:[{...item,quantity:0.679364}]}
-function harness({p=payment,receipts=[original,first,settlement],post=refund,shop={account_id:'123',test:true,status:'enabled'},clock=()=>now,readReceipt=final,priorRefund={id:first.refund_id,payment_id:payment.id,status:'succeeded',amount:{value:'317.43',currency:'RUB'}}}={}){
+function harness({p=payment,receipts=[original,first,settlement],post=refund,shop={account_id:'123',test:true,status:'enabled'},clock=()=>now,readReceipt=final,readRefund=refund,priorRefund={id:first.refund_id,payment_id:payment.id,status:'succeeded',amount:{value:'317.43',currency:'RUB'}}}={}){
  const fetchImpl=vi.fn(async(url,options)=>{
   const path=url.replace('https://api.yookassa.ru/v3/','')
   let value
   if(options.method==='POST'){if(post instanceof Error)throw post;value=post}
   else if(path==='me')value=shop
   else if(path.startsWith('payments/'))value=p
-  else if(path.startsWith('refunds/'))value=path===`refunds/${first.refund_id}`?priorRefund:refund
+  else if(path.startsWith('refunds/'))value=path===`refunds/${first.refund_id}`?priorRefund:readRefund
   else if(path.startsWith('receipts/'))value=readReceipt
   else if(path.startsWith('receipts?'))value=typeof receipts==='function'?receipts(path):{items:new URLSearchParams(path.split('?')[1]).has('refund_id')?receipts.filter(r=>r.refund_id===new URLSearchParams(path.split('?')[1]).get('refund_id')):receipts.filter(r=>r.type==='payment')}
   else throw Error('unexpected path')
@@ -250,4 +250,49 @@ it('rejects two prior receipt identities for the same monetary refund',async()=>
  const h=harness()
  await expect(h.client.createFiscalOperation(o)).rejects.toThrow('fiscal_provider_mismatch')
  expect(h.posts()).toHaveLength(0)
+})
+function fullOperation(){
+ const o=operation('refund_before')
+ return {...o,amountMinor:99000,expectedRefundedMinor:0,priorReceipts:[],
+ body:{payment_id:payment.id,amount:{value:'990.00',currency:'RUB'}},expectedItems:original.items}
+}
+const fullRefund={...refund,amount:{value:'990.00',currency:'RUB'}}
+it('sends the exact stored full-refund body without receipt or customer data',async()=>{
+ const o=fullOperation(),before=structuredClone(o)
+ const h=harness({p:{...payment,refunded_amount:{value:'0.00',currency:'RUB'}},receipts:[original],post:fullRefund})
+ expect(await h.client.createFiscalOperation(o)).toMatchObject({state:'succeeded',receiptStatus:'unknown'})
+ expect(JSON.parse(h.posts()[0][1].body)).toEqual(before.body)
+ expect(h.posts()[0][1].body).not.toContain('receipt')
+ expect(h.posts()).toHaveLength(1);expect(o).toEqual(before)
+})
+it('reconciles a full refund without receipt in its saved body after restart',async()=>{
+ const o={...fullOperation(),action:'reconcile',refundId:refund.id}
+ const h=harness({p:{...payment,refunded_amount:{value:'990.00',currency:'RUB'},refundable:false},readRefund:fullRefund,
+ receipts:[{...final,items:original.items}]})
+ expect(await h.client.readFiscalOperation(o)).toMatchObject({receiptId:final.id,receiptStatus:'succeeded'})
+ expect(h.posts()).toHaveLength(0)
+})
+it('preserves a historical full-refund body including receipt exactly',async()=>{
+ const o=fullOperation();o.body.receipt={customer:{email:'buyer@example.test'},items:original.items};delete o.expectedItems
+ const h=harness({p:{...payment,refunded_amount:{value:'0.00',currency:'RUB'}},receipts:[original],post:fullRefund})
+ await h.client.createFiscalOperation(o)
+ expect(JSON.parse(h.posts()[0][1].body)).toEqual(o.body)
+})
+it.each(['missing','partial','previous-refund','null-receipt','wrong-mode'])('rejects invalid automatic receipt claims before provider access: %s',mode=>{
+ const o=fullOperation()
+ if(mode==='missing')delete o.expectedItems
+ if(mode==='partial'){o.amountMinor=31743;o.body.amount.value='317.43';o.expectedItems=[{...original.items[0],quantity:'0.320636'}]}
+ if(mode==='previous-refund')o.expectedRefundedMinor=1
+ if(mode==='null-receipt')o.body.receipt=null
+ if(mode==='wrong-mode')o.expectedItems=[{...original.items[0],payment_mode:'full_payment'}]
+ const h=harness()
+ return expect(h.client.createFiscalOperation(o)).rejects.toThrow('fiscal_provider_mismatch').then(()=>expect(h.fetchImpl).not.toHaveBeenCalled())
+})
+it('supports full refund after a verified full settlement without a receipt request field',async()=>{
+ const o={...fullOperation(),kind:'refund_after',expectedItems:[{...original.items[0],payment_mode:'full_payment'}]}
+ const settled={...settlement,items:o.expectedItems,settlements:[{type:'prepayment',amount:{value:'990.00',currency:'RUB'}}]}
+ o.priorReceipts=[expected(settled)]
+ const h=harness({p:{...payment,refunded_amount:{value:'0.00',currency:'RUB'}},receipts:[original,settled],post:fullRefund})
+ expect(await h.client.createFiscalOperation(o)).toMatchObject({state:'succeeded'})
+ expect(JSON.parse(h.posts()[0][1].body)).toEqual(o.body)
 })

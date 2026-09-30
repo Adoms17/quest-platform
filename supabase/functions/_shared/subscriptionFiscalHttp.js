@@ -36,7 +36,8 @@ export function subscriptionFiscalHttpMethods({request,verifyShop,shopId,now,bef
    ||!['refund_before','refund_after','settlement'].includes(s.kind)||b?.payment_id!==s.paymentId
    ||!Number.isSafeInteger(s.amountMinor)||s.amountMinor<=0||!Number.isSafeInteger(s.expectedRefundedMinor)||s.expectedRefundedMinor<0
    ||!Array.isArray(s.priorReceipts)||s.priorReceipts.length>1000||! /^[0-9a-f]{64}$/.test(s.sha256))fail()
-  const items=settle?b.items:b.receipt?.items
+  const automatic=!settle&&!Object.hasOwn(b,'receipt')
+  const items=settle?b.items:automatic?s.expectedItems:b.receipt?.items
   if(!Array.isArray(items)||items.length!==1)fail()
   const item=items[0],price=minor(item.amount),count=units(item.quantity)
   if(price<=0n||typeof item.description!=='string'||!item.description.trim()||item.payment_subject!=='service'
@@ -47,8 +48,9 @@ export function subscriptionFiscalHttpMethods({request,verifyShop,shopId,now,bef
    if(b.type!=='payment'||b.send!==true||!Array.isArray(b.settlements)||b.settlements.length!==1
     ||b.settlements[0]?.type!=='prepayment'||minor(b.settlements[0].amount)!==BigInt(s.amountMinor))fail()
   }else if(minor(b.amount)!==BigInt(s.amountMinor))fail()
-  const contact=(settle?b.customer:b.receipt.customer)?.email
-  if(typeof contact!=='string'||contact.length>254||! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact))fail()
+  if(automatic&&(s.expectedRefundedMinor!==0||BigInt(s.amountMinor)!==price||count!==1000000n))fail()
+  const contact=(settle?b.customer:b.receipt?.customer)?.email
+  if(!automatic&&(typeof contact!=='string'||contact.length>254||! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)))fail()
   if(BigInt(s.expectedRefundedMinor)+BigInt(s.amountMinor)>price)fail()
   const ids=new Set()
   for(const p of s.priorReceipts){
@@ -155,7 +157,7 @@ export function subscriptionFiscalHttpMethods({request,verifyShop,shopId,now,bef
    if(!s.refundId)return null
    const result=refundResult(await request(`refunds/${s.refundId}`),s)
    if(result.state!=='succeeded')return result
-   const expected={id:s.receiptId,type:'refund',refundId:s.refundId,items:s.body.receipt.items}
+   const expected={id:s.receiptId,type:'refund',refundId:s.refundId,items:s.body.receipt?.items??s.expectedItems}
    // Refund receipts are listed by refund_id; the refund GET above binds that ID to this payment.
    const candidates=s.receiptId?[await request(`receipts/${s.receiptId}`)]
     :await list(s.paymentId,s.refundId)
