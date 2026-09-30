@@ -17,7 +17,7 @@ export async function reconcilePrepaymentSettlements({ rpc, provider, shopId, li
         ? await provider.readSettlement(operation)
         : await provider.findSettlement(operation)
       if (!result) { unresolved++ } else {
-      if (!/^rt-[a-zA-Z0-9-]{1,100}$/.test(result.id)
+      if (!/^r[at]-[a-zA-Z0-9-]{1,100}$/.test(result.id)
         || !['pending','succeeded','canceled'].includes(result.status)
         || (operation.receiptId && result.id !== operation.receiptId)) throw new ReceiptDataError('invalid_settlement_result')
       const saved = await rpc('record_prepayment_settlement', { p_order_id: operation.orderId, p_receipt_id: result.id, p_status: result.status })

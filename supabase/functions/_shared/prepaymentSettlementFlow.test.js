@@ -45,10 +45,10 @@ it('rejects a different receipt returned by GET',async()=>{
 
 it('persists a recovered receipt without repeating creation',async()=>{
  const ctx=setup({action:'reconcile',receiptId:null})
- ctx.provider.findSettlement.mockResolvedValue({id:'rt-recovered',status:'succeeded'})
+ ctx.provider.findSettlement.mockResolvedValue({id:'ra-recovered',status:'succeeded'})
  expect(await runPrepaymentSettlement(ctx)).toEqual({state:'succeeded'})
  expect(ctx.provider.createSettlement).not.toHaveBeenCalled()
- expect(ctx.rpc).toHaveBeenLastCalledWith('record_prepayment_settlement',{p_order_id:ctx.orderId,p_receipt_id:'rt-recovered',p_status:'succeeded'})
+ expect(ctx.rpc).toHaveBeenLastCalledWith('record_prepayment_settlement',{p_order_id:ctx.orderId,p_receipt_id:'ra-recovered',p_status:'succeeded'})
 })
 it('does not automatically recover a flagged conflict',async()=>{
  const ctx=setup({action:'reconcile',requiresReview:true,receiptId:'rt-test'})

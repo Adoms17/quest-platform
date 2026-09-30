@@ -3,5 +3,10 @@
     "sha256": "6fcbc12bb4334ea06c0b8a5403ba3cf578ebdf06b72c77b29844c24aa6717fd4",
     "file": "20260930020000_subscription_settlement_schedule.sql",
     "version": "20260930020000"
+  },
+  {
+    "sha256": "eccc341c29693accfaca526f1adc0ee77f6bae29efcccf46010a6711aa5e9b8c",
+    "file": "20260930030000_settlement_receipt_identifier.sql",
+    "version": "20260930030000"
   }
 ]

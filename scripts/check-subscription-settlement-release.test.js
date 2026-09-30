@@ -4,10 +4,10 @@ import { test, expect } from 'vitest'
 import { manifest, prerequisites, validateReceiptRelease, validateReceiptPreview, verifyReceiptFiles } from './check-subscription-settlement-release.mjs'
 const history=()=>({migrations:[...prerequisites.map(local=>({local,remote:local})),...manifest.map(m=>({local:m.version,remote:''}))]})
 test('only the settlement schedule migration is allowed and its bytes are pinned',()=>{
- expect(manifest.map(m=>m.version)).toEqual(['20260930020000'])
+ expect(manifest.map(m=>m.version)).toEqual(['20260930020000','20260930030000'])
  verifyReceiptFiles()
- expect(validateReceiptRelease(history())).toEqual(['20260930020000'])
- const applied=history();applied.migrations.at(-1).remote='20260930020000'
+ expect(validateReceiptRelease(history())).toEqual(['20260930020000','20260930030000'])
+ const applied=history();for(const row of applied.migrations)row.remote=row.local
  expect(validateReceiptRelease(applied)).toEqual([])
 })
 test.each(['missing','unrelated','remote','duplicate','prerequisite'])('blocks %s migration history',kind=>{
