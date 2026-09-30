@@ -110,10 +110,11 @@ export function prepareSubscriptionFiscalOperation(snapshot, payment, ledger, co
   const item = {...receipt.items[0],quantity:quantity(count),payment_mode:mode}
   const body = settle
     ? {type:'payment',payment_id:payment.id,send:true,customer:receipt.customer,items:[item],settlements:[{type:'prepayment',amount:amount(target)}]}
+    : target===price ? {payment_id:payment.id,amount:amount(target)}
     : {payment_id:payment.id,amount:amount(target),receipt:{customer:receipt.customer,items:[item]}}
   // Persist under the same order lock with version CAS, command ID uniqueness,
   // immutable body and an idempotency key BEFORE allowing any provider request.
   return {commandId:command.id,expectedVersion:ledger.version,
     kind:settle?'settlement':mode==='full_payment'?'refund_after':'refund_before',
-    amountMinor:Number(target),quantity:item.quantity,body}
+    amountMinor:Number(target),quantity:item.quantity,body,expectedItems:[item]}
 }

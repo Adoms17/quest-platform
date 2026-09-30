@@ -58,11 +58,20 @@ select o.id,o.idempotency_key,jsonb_build_object('receipt',jsonb_build_object('c
 from public.billing_sandbox_orders o join public.billing_receipt_snapshots r on r.order_id=o.id where o.id=current_setting('test.order')::uuid;
 insert into public.billing_receipt_payment_status(order_id,payment_id,status)
 values(current_setting('test.order')::uuid,md5('trial-refund-payment')::uuid,'succeeded');
+-- FULL_REFUND_BODY_COMPATIBILITY
 select set_config('test.future.reserve',platform_private.reserve_linked_subscription_fiscal_refund(current_setting('test.request')::uuid)::text,true);
 select is(platform_private.reserve_linked_subscription_fiscal_refund(current_setting('test.request')::uuid)::text,current_setting('test.future.reserve'),'full refund reserve retry preserves pair');
 select is((select quantity_units from public.billing_subscription_fiscal_operations where command_id=current_setting('test.request')::uuid),1000000::bigint,'full refund consumes whole receipt quantity');
 select is(platform_private.claim_linked_subscription_fiscal_refund(current_setting('test.request')::uuid)->>'action','send','full refund first claim sends');
 select is(platform_private.claim_linked_subscription_fiscal_refund(current_setting('test.request')::uuid)->>'action','reconcile','full refund retry never resends');
+select ok(not ((select body from public.billing_subscription_fiscal_operations where command_id=current_setting('test.request')::uuid) ? 'receipt'),'new full refund stores no receipt');
+select is((select body_sha256 from public.billing_subscription_fiscal_operations where command_id=current_setting('test.request')::uuid),
+ (select encode(extensions.digest(convert_to(body::text,'UTF8'),'sha256'),'hex') from public.billing_subscription_fiscal_operations where command_id=current_setting('test.request')::uuid),'new full refund hashes exact provider body');
+select set_config('test.full.new.claim',platform_private.claim_linked_subscription_fiscal_refund(current_setting('test.request')::uuid)::text,true);
+select is(current_setting('test.full.new.claim')::jsonb#>>'{expectedItems,0,quantity}','1.000000','new full refund retains expected quantity outside request');
+select is(current_setting('test.full.new.claim')::jsonb#>>'{expectedItems,0,payment_mode}','full_prepayment','new full refund retains expected payment mode');
+select is(current_setting('test.full.new.claim')::jsonb#>>'{expectedItems,0,amount,value}','990.00','new full refund retains original unit price');
+select is(current_setting('test.full.new.claim')::jsonb->'body',(select body from public.billing_subscription_fiscal_operations where command_id=current_setting('test.request')::uuid),'claim never rewrites new provider body');
 select set_config('test.future.result',jsonb_build_object('commandId',x.command_id,'paymentId',l.payment_id,'shopId','1467641','bodySha256',x.body_sha256,
  'amountMinor',x.amount_minor,'state','succeeded','refundId',md5('future-refund')::uuid,'receiptId','ra-'||md5('future-receipt')::uuid::text,'receiptStatus','succeeded')::text,true)
 from public.billing_subscription_fiscal_operations x join public.billing_subscription_fiscal_ledgers l on l.order_id=x.order_id where x.command_id=current_setting('test.request')::uuid;

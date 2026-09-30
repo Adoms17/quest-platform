@@ -124,3 +124,16 @@ it('retains the reservation for an unknown refund after settlement',()=>{
  const l=ledger(first(),settlement(),{...last(),state:'unknown',receiptStatus:null})
  expect(inspect(l)).toMatchObject({settledMinor:67257,remainingMinor:67257,reservedRefundMinor:67257,availableRefundMinor:0,canRefund:false,refundMode:'full_payment'})
 })
+
+it('omits receipt for the entire original payment, before and after settlement',()=>{
+ const before=prepare(snapshot,payment,empty(),command('refund',99000))
+ expect(before.body).toEqual({payment_id:payment.id,amount:{value:'990.00',currency:'RUB'}})
+ expect(before.expectedItems[0]).toMatchObject({quantity:'1.000000',payment_mode:'full_prepayment'})
+ const after=prepare(snapshot,payment,ledger(op(1,'settlement',99000,'1.000000')),command('refund',99000,1,2))
+ expect(after.body).toEqual(before.body)
+ expect(after.expectedItems[0].payment_mode).toBe('full_payment')
+})
+it('retains receipt when returning the complete residual of a partial refund',()=>{
+ const draft=prepare(snapshot,{...payment,refundedAmountMinor:31743},ledger(first()),command('refund',67257,1,2))
+ expect(draft.body.receipt.items[0]).toMatchObject({quantity:'0.679364',payment_mode:'full_prepayment'})
+})
