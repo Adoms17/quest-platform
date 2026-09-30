@@ -71,7 +71,7 @@ jobs:
         run: |
           docker pull supabase/postgres:17.6.1.165
           docker pull supabase/gotrue:v2.196.0
-          docker pull public.ecr.aws/supabase/postgrest:v16.1
+          docker pull postgrest/postgrest:v16.1
       - name: Install browser
         run: npx playwright install --with-deps chromium
       - name: Real Auth, TOTP, administrative RPC and browser flow
