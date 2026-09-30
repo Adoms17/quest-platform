@@ -9,6 +9,12 @@ const project = 'jeugfyaqzfgdvfhdxfht'
 const order = '80fac987-e40e-4521-8f94-ffbc3193ca32'
 const payment = '324f7174-000f-5001-a000-179c65421768'
 const exec = promisify(execFile)
+export function parseQueryRows(stdout) {
+ const data = JSON.parse(stdout)
+ const rows = Array.isArray(data) ? data : data?.rows
+ if (!Array.isArray(rows)) throw Error('recovery query format denied')
+ return rows
+}
 export const guard = `
 do $guard$ begin
  if not exists(select 1 from public.billing_sandbox_orders o
@@ -32,7 +38,7 @@ async function query(sql) {
   const file = join(dir, 'query.sql')
   await writeFile(file, sql, { mode: 0o600 })
   const { stdout } = await exec('node_modules/.bin/supabase', ['db','query','--linked','--project-ref',project,'--output','json','--file',file], { timeout:60000,maxBuffer:1024*1024 })
-  return JSON.parse(stdout).rows
+  return parseQueryRows(stdout)
  } finally { await rm(dir, {recursive:true,force:true}) }
 }
 export async function recoverStageSettlement(env, execute = query, createProvider = createSandboxHttpClient) {

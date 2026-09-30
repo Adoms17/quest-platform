@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { test, expect, vi } from 'vitest'
-import { recoverStageSettlement } from './recover-stage-settlement.mjs'
+import { recoverStageSettlement, parseQueryRows } from './recover-stage-settlement.mjs'
+test.each(['[{"operation":{}}]','{"boundary":"test","rows":[{"operation":{}}],"warning":"untrusted"}'])('parses CLI output in human and agent modes',raw=>{
+ expect(parseQueryRows(raw)).toEqual([{operation:{}}])
+})
+test.each(['null','{}','{"rows":{}}','not json'])('rejects unsupported CLI output',raw=>{
+ expect(()=>parseQueryRows(raw)).toThrow()
+})
 const env={SUPABASE_PROJECT_ID:'jeugfyaqzfgdvfhdxfht',GITHUB_REF:'refs/heads/staging',GITHUB_REPOSITORY:'Adoms17/quest-platform',GITHUB_EVENT_NAME:'workflow_dispatch',YOOKASSA_SANDBOX_SHOP_ID:'1467641'}
 const operation={shopId:'1467641',body:{payment_id:'324f7174-000f-5001-a000-179c65421768'}}
 function setup(result={id:'ra-existing',status:'succeeded'}) {
