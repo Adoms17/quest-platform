@@ -22,7 +22,9 @@ export async function verifySubscriptionRefundPostgrest(container,sql){
   expect(request('anon','subscription_refund_from_gateway',args).status).toBe(401)
   await verifySubscriptionRefundHttpDatabase(sql,{rpc:async(name,args)=>{
    const response=request('service_role',name,args)
-   expect(response.status,JSON.stringify(response.data)).toBe(200)
+   const expectedStatus=name==='record_refund_receipt_status'?204:200
+   if(response.status!==expectedStatus)console.error('refund_test_rpc_failed',name,response.status,response.data?.code)
+   expect(response.status,JSON.stringify(response.data)).toBe(expectedStatus)
    return {data:response.data}
   }})
   await verifySubscriptionRefundEdge(container,sql,docker,token('service_role'),secret)

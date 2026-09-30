@@ -73,3 +73,30 @@ it('unresolved lookup leaves the operation for review', async () => {
   expect(await runSubscriptionSettlementOrder(ctx)).toEqual({ state: 'review_required' })
   expect(ctx.provider.createSettlement).toHaveBeenCalledTimes(1)
 })
+
+it.each(['before_commit', 'lost_commit_response'])('recovers after receipt storage failure %s without resending', async failure => {
+  const ctx = setup()
+  const rpc = ctx.rpc.getMockImplementation()
+  let failRecord = true
+  const receipt = { id: 'ra-existing', status: 'succeeded' }
+  ctx.provider.createSettlement.mockResolvedValue(receipt)
+  ctx.provider.findSettlement.mockResolvedValue(receipt)
+  ctx.provider.readSettlement.mockResolvedValue(receipt)
+  ctx.rpc.mockImplementation(async (name, args) => {
+    if (name === 'record_prepayment_settlement' && failRecord) {
+      failRecord = false
+      if (failure === 'lost_commit_response') await rpc(name, args)
+      return { error: { code: 'storage_unavailable' } }
+    }
+    return rpc(name, args)
+  })
+  await expect(runSubscriptionSettlementOrder(ctx)).rejects.toThrow('settlement_storage_unavailable')
+  expect(await runSubscriptionSettlementOrder(ctx)).toEqual({ state: 'succeeded' })
+  expect(await runSubscriptionSettlementOrder(ctx)).toEqual({ state: 'succeeded' })
+  expect(ctx.provider.createSettlement).toHaveBeenCalledTimes(1)
+  expect(ctx.provider.findSettlement).toHaveBeenCalledTimes(failure === 'before_commit' ? 1 : 0)
+  expect(ctx.provider.readSettlement).toHaveBeenCalledTimes(failure === 'before_commit' ? 1 : 2)
+  expect(ctx.rpc).toHaveBeenLastCalledWith('record_prepayment_settlement', {
+    p_order_id: orderId, p_receipt_id: receipt.id, p_status: 'succeeded',
+  })
+})
