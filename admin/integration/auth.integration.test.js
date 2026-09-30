@@ -205,7 +205,7 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
       PGRST_DB_SCHEMAS: 'public', PGRST_DB_ANON_ROLE: 'anon',
       PGRST_JWT_SECRET: environment.GOTRUE_JWT_SECRET,
     }
-    await command(['run', '-d', '--name', rest, '--network', network, '-p', '127.0.0.1::3000', ...Object.keys(restEnvironment).flatMap(key => ['-e', key]), 'public.ecr.aws/supabase/postgrest:v16.1'], restEnvironment)
+    await command(['run', '-d', '--name', rest, '--network', network, '-p', '127.0.0.1::3000', ...Object.keys(restEnvironment).flatMap(key => ['-e', key]), 'postgrest/postgrest:v16.1'], restEnvironment)
     owned.push(rest)
     const restBinding = await command(['port', rest, '3000/tcp'])
     if (!/^127\.0\.0\.1:\d+$/.test(restBinding)) throw new Error('Небезопасный адрес тестового API')
