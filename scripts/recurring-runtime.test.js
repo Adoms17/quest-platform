@@ -9,7 +9,7 @@ function docker(args){
  if(result.status!==0)throw Error('isolated runtime Docker command failed')
  return (args[0]==='logs'?result.stdout+result.stderr:result.stdout).trim()
 }
-test.skipIf(!enabled).each(['sandbox-recurring','sandbox-reconcile','admin-subscription-fiscal-refund','sandbox-subscription-fiscal-order','admin-fiscal-acceptance-prepare'])('%s loads in Edge Runtime and fails closed',async endpoint=>{
+test.skipIf(!enabled).each(['sandbox-recurring','sandbox-reconcile','admin-subscription-fiscal-refund','sandbox-subscription-fiscal-order','sandbox-subscription-settlement-order','admin-fiscal-acceptance-prepare'])('%s loads in Edge Runtime and fails closed',async endpoint=>{
  const name='qvesta-recurring-runtime-'+randomUUID().replaceAll('-','')
  const token='ab'.repeat(32)
  let created=false

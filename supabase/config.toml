@@ -433,3 +433,6 @@ verify_jwt = false
 
 [functions.admin-fiscal-acceptance-prepare]
 verify_jwt = true
+
+[functions.sandbox-subscription-settlement-order]
+verify_jwt = false
