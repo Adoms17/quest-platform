@@ -36,11 +36,11 @@ export default function App({ client }) {
     {failed ? <p role="alert">Не удалось обновить сессию. Перезагрузите страницу и повторите вход.</p>
       : session === undefined ? <p role="status">Проверяем сессию…</p>
         : !session ? <Login auth={client.auth} />
-          : <SessionGate key={sessionViewKey(session)} client={client} />}
+          : <SessionGate key={sessionViewKey(session)} client={client} userId={session.user?.id} />}
   </main>
 }
 
-function SessionGate({ client }) {
+function SessionGate({ client, userId }) {
   const [state, setState] = useState('loading')
   const [section, setSection] = useState('organizations')
   useEffect(() => {
@@ -53,7 +53,7 @@ function SessionGate({ client }) {
   if (state === 'loading') return <p role="status">Проверяем подтверждение входа…</p>
   if (state === 'error') return <p role="alert">Не удалось проверить сессию. Выйдите и повторите вход.</p>
   if (state === 'mfa') return <Mfa auth={client.auth} />
-  return <><nav aria-label="Разделы администрирования"><button aria-pressed={section === 'organizations'} onClick={() => setSection('organizations')}>Организации</button> <button aria-pressed={section === 'tariffs'} onClick={() => setSection('tariffs')}>Тарифы</button><button aria-pressed={section === 'campaigns'} onClick={() => setSection('campaigns')}>Акции</button><button aria-pressed={section === 'statistics'} onClick={() => setSection('statistics')}>Статистика платформы</button><button aria-pressed={section === 'documents'} onClick={() => setSection('documents')}>Документы</button>{isFiscalPolicyStage(client)&&<button aria-pressed={section === 'fiscal-acceptance'} onClick={() => setSection('fiscal-acceptance')}>Тестовый заказ</button>}{isFiscalPolicyStage(client)&&<button aria-pressed={section === 'fiscal-policy'} onClick={() => setSection('fiscal-policy')}>Тестовые чеки</button>}</nav>{section === 'fiscal-acceptance' ? <FiscalAcceptance client={client} /> : section === 'fiscal-policy' ? <FiscalPolicy client={client} /> : section === 'documents' ? <PurchaseDocuments client={client} /> : section === 'statistics' ? <QuestStatistics client={client} /> : section === 'organizations' ? <Organizations client={client} /> : section === 'campaigns' ? <OrganizationCampaigns client={client} /> : <Tariffs client={client} />}</>
+  return <><nav aria-label="Разделы администрирования"><button aria-pressed={section === 'organizations'} onClick={() => setSection('organizations')}>Организации</button> <button aria-pressed={section === 'tariffs'} onClick={() => setSection('tariffs')}>Тарифы</button><button aria-pressed={section === 'campaigns'} onClick={() => setSection('campaigns')}>Акции</button><button aria-pressed={section === 'statistics'} onClick={() => setSection('statistics')}>Статистика платформы</button><button aria-pressed={section === 'documents'} onClick={() => setSection('documents')}>Документы</button>{isFiscalPolicyStage(client)&&<button aria-pressed={section === 'fiscal-acceptance'} onClick={() => setSection('fiscal-acceptance')}>Тестовый заказ</button>}{isFiscalPolicyStage(client)&&<button aria-pressed={section === 'fiscal-policy'} onClick={() => setSection('fiscal-policy')}>Тестовые чеки</button>}</nav>{section === 'fiscal-acceptance' ? <FiscalAcceptance client={client} /> : section === 'fiscal-policy' ? <FiscalPolicy client={client} userId={userId} /> : section === 'documents' ? <PurchaseDocuments client={client} /> : section === 'statistics' ? <QuestStatistics client={client} /> : section === 'organizations' ? <Organizations client={client} /> : section === 'campaigns' ? <OrganizationCampaigns client={client} /> : <Tariffs client={client} />}</>
 }
 
 // Ключ только для состояния UI: права и свежесть MFA по-прежнему проверяет сервер.

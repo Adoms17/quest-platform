@@ -1,11 +1,21 @@
 import {useEffect,useRef,useState} from 'react'
 import {createFiscalPolicyApi,fiscalPolicyId,fiscalPolicyStorageKey,isFiscalPolicyStage,validateFiscalPolicyCommand} from './fiscalPolicyApi'
-function restore(){
- try{const raw=localStorage.getItem(fiscalPolicyStorageKey);return {command:raw?validateFiscalPolicyCommand(JSON.parse(raw)):null,error:''}}
+function restore(storageKey){
+ try{
+  if(!storageKey)throw Error('account_required')
+  const raw=localStorage.getItem(storageKey)
+  // An old command has no author: preserve it, but never assign it to the next user.
+  if(!raw&&localStorage.getItem(fiscalPolicyStorageKey)!==null)return {command:null,error:'Найдена прежняя операция без привязки к аккаунту. Повтор остановлен; требуется сверка владельцем.'}
+  return {command:raw?validateFiscalPolicyCommand(JSON.parse(raw)):null,error:''}
+ }
  catch{return {command:null,error:'Не удалось прочитать сохранённую операцию. Настройка остановлена; требуется проверка владельцем.'}}
 }
-export default function FiscalPolicy({client}){
- const [saved]=useState(restore),[command,setCommand]=useState(saved.command),[date,setDate]=useState('')
+export default function FiscalPolicy({client,userId}){
+ return <FiscalPolicyForm key={userId||'anonymous'} client={client} userId={userId}/>
+}
+function FiscalPolicyForm({client,userId}){
+ const storageKey=userId?`${fiscalPolicyStorageKey}:account:${userId}`:null
+ const [saved]=useState(()=>restore(storageKey)),[command,setCommand]=useState(saved.command),[date,setDate]=useState('')
  const [factors,setFactors]=useState([]),[factor,setFactor]=useState(''),[busy,setBusy]=useState(false)
  const [error,setError]=useState(saved.error),[result,setResult]=useState(null)
  const locked=useRef(false),alive=useRef(false)
@@ -31,7 +41,7 @@ export default function FiscalPolicy({client}){
    if(!alive.current)return
    const request=command||{p_id:fiscalPolicyId,p_shop_id:'1467641',p_effective_at:new Date(date).toISOString()}
    // Persist before sending: an uncertain result must keep exactly the same request across reloads.
-   localStorage.setItem(fiscalPolicyStorageKey,JSON.stringify(request));setCommand(request)
+   localStorage.setItem(storageKey,JSON.stringify(request));setCommand(request)
    const value=await createFiscalPolicyApi(client).create(request)
    if(alive.current)setResult(value)
   }catch(failure){if(alive.current)setError(failure?.code==='42501'?'Сервер отклонил доступ. Требуются права владельца и свежее MFA.':failure?.code==='22023'?'Сервер отклонил параметры. Сохранённая операция требует проверки; новую дату автоматически не назначаем.':'Результат не подтверждён. Повтор сохранит прежние параметры. При ошибке локального хранения отправка не выполняется.')}
