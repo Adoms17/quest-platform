@@ -2,6 +2,7 @@ import {isFiscalPolicyStage} from './fiscalPolicyApi'
 export const acceptanceFixtureId='b504e302-e2c8-9b96-edb0-8ff83476a935'
 export const acceptanceOrganizationId='dcc2e33b-108a-d22f-7409-162fa76447f3'
 export const fullRefundOrganizationId='64701955-543c-b77b-23ba-ede86feb8728'
+export const fullRefundBodyOrganizationId='e129101e-0878-5585-d3e8-207d76ef15c1'
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export function acceptanceEmail(value){
  if(typeof value!=='string')throw Error('invalid_email')
@@ -29,5 +30,5 @@ export function createFiscalAcceptanceApi(client){
 }
 
 export function isAcceptanceOrganization(client,organizationId){
- return isFiscalPolicyStage(client)&&[acceptanceOrganizationId,fullRefundOrganizationId].includes(organizationId)
+ return isFiscalPolicyStage(client)&&[acceptanceOrganizationId,fullRefundOrganizationId,fullRefundBodyOrganizationId].includes(organizationId)
 }

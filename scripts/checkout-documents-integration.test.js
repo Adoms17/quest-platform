@@ -107,6 +107,30 @@ savepoint operator_scope;
  select throws_ok($full_operator$${fullOperatorBody}$full_operator$,'P0001','full refund organization changed: manual review required','full refund retry preserves revoked scope');
  select * from finish(); rollback;`)
  expect(fullOperator).not.toMatch(/not ok|Looks like/)
+ const bodyOrg=readFileSync(new URL('./stage-full-refund-body-organization.sql',import.meta.url),'utf8').replace(/^begin;\s*/,'').replace(/commit;\s*$/,'')
+ const bodyOffer=readFileSync(new URL('./stage-full-refund-body-offer.sql',import.meta.url),'utf8').replace(/^begin;\s*/,'').replace(/commit;\s*$/,'')
+ const bodyFixture=sql(operatorSetup+tariffSetup+fullOperatorBody+bodyOrg+bodyOrg+`
+ select is((select count(*) from public.billing_sandbox_orders),0::bigint,'new format fixture creates no payment');
+ select is((select count(*) from public.billing_trial_access),0::bigint,'new format fixture starts no trial');
+ select is((select status from public.organization_subscriptions where organization_id='64701955-543c-b77b-23ba-ede86feb8728'),'free','new format fixture preserves old organization');
+ select throws_ok($new_offer$${bodyOffer}$new_offer$,'P0001','full refund offer preflight failed','new offer requires active trial');
+ select set_config('request.jwt.claim.sub',md5('operator-fixture-owner')::uuid::text,true);
+ select public.request_organization_trial('e129101e-0878-5585-d3e8-207d76ef15c1',md5('operator-current-pro')::uuid,repeat('c',64),md5('new-body-trial')::uuid,(select revision from public.organization_subscriptions where organization_id='e129101e-0878-5585-d3e8-207d76ef15c1'));
+ select throws_ok($new_org$${bodyOrg}$new_org$,'P0001','full refund organization changed: manual review required','provision retry cannot reset active trial');
+ select throws_ok($new_offer$${bodyOffer}$new_offer$,'P0001','expected stage test documents required','new offer requires test documents');
+ insert into public.purchase_document_versions(id,kind,body,status) values
+ ('stage-test-agreement-20260926','agreement','Synthetic nonbinding stage agreement','published'),
+ ('stage-test-payment-20260926','payment_terms','Synthetic nonbinding stage payment terms','published');
+ ${bodyOffer}
+ select set_config('test.body.offer',(select to_jsonb(o)::text from public.billing_sandbox_offers o where organization_id='e129101e-0878-5585-d3e8-207d76ef15c1'),true);
+ ${bodyOffer}
+ select is((select to_jsonb(o)::text from public.billing_sandbox_offers o where organization_id='e129101e-0878-5585-d3e8-207d76ef15c1'),current_setting('test.body.offer'),'new offer retry preserves expiry and terms');
+ select is(platform_private.capture_trial_checkout_terms('e129101e-0878-5585-d3e8-207d76ef15c1',md5('stage-full-refund-body-offer-20260930')::uuid)#>>'{trial_purchase,transition}','after_trial','new offer uses supported after trial route');
+ select is((select count(*) from public.billing_sandbox_orders),0::bigint,'new offer creates no payment');
+ select is((select count(*) from public.checkout_document_acceptances),0::bigint,'new offer never accepts documents');
+ select is((select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),current_setting('test.personal.before'),'new fixture preserves personal subscription');
+ select * from finish(); rollback;`)
+ expect(bodyFixture).not.toMatch(/not ok|Looks like/)
  const shortFixture=sql('set search_path=public,extensions;'+readFileSync(new URL('../supabase/tests/database/subscription_fiscal_acceptance_fixture.test.sql',import.meta.url),'utf8'))
  expect(shortFixture).not.toMatch(/not ok|Looks like/)
  expect(shortFixture).toContain('fixture order and receipt terms agree')
