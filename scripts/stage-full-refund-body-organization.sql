@@ -12,9 +12,9 @@ begin
  select user_id into actor from public.platform_access_assignments
  where role_key='owner' and scope_kind='platform' and revoked_at is null and valid_from<=clock_timestamp() limit 1;
  free_plan:=platform_private.current_tariff_version('free',clock_timestamp());
- paid_plan:=platform_private.current_tariff_version('pro',clock_timestamp());
- if free_plan is null or not exists(select 1 from public.billing_plan_versions where id=paid_plan and monthly_price_minor=99000)
- then raise exception 'current Free and Pro at 990 RUB required'; end if;
+ paid_plan:=platform_private.current_tariff_version('business',clock_timestamp());
+ if free_plan is null or not exists(select 1 from public.billing_plan_versions where id=paid_plan and monthly_price_minor=249000)
+ then raise exception 'current Free and Business at 2490 RUB required'; end if;
  policy:=public.select_subscription_fiscal_policy('1467641',statement_timestamp());
  if not exists(select 1 from public.billing_fiscal_policy_models where policy_id=policy and model_version='subscription_access_v1')
  then raise exception 'modeled sandbox policy required'; end if;
@@ -40,5 +40,5 @@ begin
  then raise exception 'full refund organization changed: manual review required'; end if;
 end; $prepare$;
 select 'e129101e-0878-5585-d3e8-207d76ef15c1'::uuid as organization_id,'sandbox-full-refund-body-20260930' as organization_name,
- 'sandbox' as environment,'1467641' as shop_id,99000 as expected_amount_minor;
+ 'sandbox' as environment,'1467641' as shop_id,249000 as expected_amount_minor;
 commit;
