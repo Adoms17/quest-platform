@@ -11,18 +11,18 @@ function setup(change={}) {
  const verifyShop=vi.fn().mockResolvedValue()
  return {request,verifyShop,client:settlementHttpMethods({request,verifyShop,shopId:'123',now:()=>Date.parse('2026-09-26T01:00:00Z')})}
 }
-it('creates only a receipt with persisted key after verification',async()=>{
- const {client,request,verifyShop}=setup()
- expect(await client.createSettlement(operation)).toEqual({id:'rt-test',status:'pending'})
+it.each(['rt-test','ra-test'])('creates and validates receipt %s with the persisted key',async id=>{
+ const {client,request,verifyShop}=setup({id})
+ expect(await client.createSettlement(operation)).toEqual({id,status:'pending'})
  expect(verifyShop).toHaveBeenCalledOnce()
  expect(request).toHaveBeenLastCalledWith('receipts','POST',operation.body,{'Idempotence-Key':operation.key,'Content-Type':'application/json'})
 })
 it('recovers using GET and never POST',async()=>{
- const {client,request}=setup()
- await client.readSettlement({...operation,receiptId:'rt-test'})
- expect(request).toHaveBeenLastCalledWith('receipts/rt-test')
+ const {client,request}=setup({id:'ra-test'})
+ await client.readSettlement({...operation,receiptId:'ra-test'})
+ expect(request).toHaveBeenLastCalledWith('receipts/ra-test')
 })
-it.each([{payment_id:'wrong'},{type:'refund'},{status:'unknown'},{items:[{...item,amount:{value:'9.00',currency:'RUB'}}]},{items:[{...item,payment_mode:'full_prepayment'}]}])('rejects mismatching provider receipt',async change=>{
+it.each([{id:'rx-invalid'},{id:'ra-../receipts'},{id:'ra-'},{payment_id:'wrong'},{type:'refund'},{status:'unknown'},{items:[{...item,amount:{value:'9.00',currency:'RUB'}}]},{items:[{...item,payment_mode:'full_prepayment'}]}])('rejects mismatching provider receipt',async change=>{
  const {client}=setup(change)
  await expect(client.createSettlement(operation)).rejects.toThrow('settlement_provider_mismatch')
 })
@@ -46,8 +46,8 @@ it('rejects payment that is no longer refundable in full',async()=>{
 it('finds a settlement on a later page, excluding the original prepayment',async()=>{
  const {client,request}=setup()
  const original={id:'rt-original',type:'payment',payment_id:paymentId,items:[{...item,payment_mode:'full_prepayment'}]}
- request.mockResolvedValueOnce({items:[original],next_cursor:'next'}).mockResolvedValueOnce({items:[{id:'rt-found',type:'payment',payment_id:paymentId,status:'succeeded',items:[item]}]})
- expect(await client.findSettlement(operation)).toEqual({id:'rt-found',status:'succeeded'})
+ request.mockResolvedValueOnce({items:[original],next_cursor:'next'}).mockResolvedValueOnce({items:[{id:'ra-found',type:'payment',payment_id:paymentId,status:'succeeded',items:[item]}]})
+ expect(await client.findSettlement(operation)).toEqual({id:'ra-found',status:'succeeded'})
  expect(request.mock.calls.every(call=>call.length===1)).toBe(true)
  expect(request.mock.calls[2][0]).toContain('cursor=next')
 })

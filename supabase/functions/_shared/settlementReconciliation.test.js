@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { expect, it, vi } from 'vitest'
 import { reconcilePrepaymentSettlements } from './settlementReconciliation.js'
-const operation={orderId:'order',shopId:'123',receiptId:'rt-known'}
+const operation={orderId:'order',shopId:'123',receiptId:'ra-known'}
 function setup(items=[operation]) {
  return {shopId:'123',rpc:vi.fn().mockResolvedValueOnce({data:items}).mockResolvedValue({error:null}),
- provider:{readSettlement:vi.fn().mockResolvedValue({id:'rt-known',status:'succeeded'}),findSettlement:vi.fn().mockResolvedValue(null),createSettlement:vi.fn()}}
+ provider:{readSettlement:vi.fn().mockResolvedValue({id:'ra-known',status:'succeeded'}),findSettlement:vi.fn().mockResolvedValue(null),createSettlement:vi.fn()}}
 }
 it('only reads existing operations and stores their results',async()=>{
  const ctx=setup()

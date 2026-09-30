@@ -1,6 +1,6 @@
 import { ReceiptDataError } from './subscriptionReceipt.js'
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const receiptId = /^rt-[a-zA-Z0-9-]{1,100}$/
+const receiptId = /^r[at]-[a-zA-Z0-9-]{1,100}$/
 const fail = () => { throw new ReceiptDataError('settlement_provider_mismatch') }
 // Uses the authenticated sandbox transport. No arbitrary URLs or retries.
 export function settlementHttpMethods({ request, verifyShop, shopId, now }) {

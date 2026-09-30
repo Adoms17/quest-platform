@@ -17,7 +17,7 @@ export async function runPrepaymentSettlement({ orderId, rpc, provider }) {
       : await provider.findSettlement({ ...operation, orderId })
     if (!result) return { state: 'review_required' }
   } else throw new ReceiptDataError('invalid_settlement_claim')
-  if (!result || typeof result.id !== 'string' || !/^rt-[a-zA-Z0-9-]{1,100}$/.test(result.id)
+  if (!result || typeof result.id !== 'string' || !/^r[at]-[a-zA-Z0-9-]{1,100}$/.test(result.id)
     || !['pending', 'succeeded', 'canceled'].includes(result.status)
     || (operation.receiptId && result.id !== operation.receiptId)) throw new ReceiptDataError('invalid_settlement_result')
   const saved = await rpc('record_prepayment_settlement', {

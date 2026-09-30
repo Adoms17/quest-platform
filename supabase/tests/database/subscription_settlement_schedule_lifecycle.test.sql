@@ -44,7 +44,7 @@ update public.billing_sandbox_settlement_schedule set expires_at=clock_timestamp
 select is(platform_private.run_scheduled_subscription_settlements()->>'sent','0','expired target not sent');
 select is((select stop_reason from public.billing_sandbox_settlement_schedule),'expired','expiry disables target');
 rollback to savepoint expired;
-select public.record_prepayment_settlement(current_setting('test.payment')::uuid,'rt-schedule-test','succeeded');
+select public.record_prepayment_settlement(current_setting('test.payment')::uuid,'ra-schedule-test','succeeded');
 select is(platform_private.run_scheduled_subscription_settlements()->>'sent','0','success prevents another send');
 select is((select stop_reason from public.billing_sandbox_settlement_schedule),'succeeded','registered receipt stops schedule');
 select is((select count(*) from public.billing_prepayment_settlements where order_id=current_setting('test.payment')::uuid),1::bigint,'one durable settlement after repeats');

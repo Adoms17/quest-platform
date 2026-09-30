@@ -51,3 +51,15 @@ it('rejects anonymous requests before constructing clients', async () => {
   expect((await c.handler(new Request('https://example.test', { method: 'POST' }))).status).toBe(401)
   expect(c.client).not.toHaveBeenCalled()
 })
+
+it.each(['settlement_provider_mismatch', 'private response contact@example.test secret-value'])('logs only allowlisted error codes', async failure => {
+  const c = setup()
+  c.rpc.mockReset().mockRejectedValue(new Error(failure))
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const response = await c.handler(request())
+    expect(response.status).toBe(503)
+    expect(log).toHaveBeenCalledExactlyOnceWith('sandbox_settlement_failure', failure === 'settlement_provider_mismatch' ? failure : 'unclassified')
+    expect(await response.text()).not.toContain(failure)
+  } finally { log.mockRestore() }
+})
