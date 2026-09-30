@@ -73,6 +73,7 @@ on:
           - subscription-settlement-schedule-provision
           - subscription-settlement-schedule-enable
           - subscription-settlement-schedule-disable
+          - subscription-settlement-recover-existing
           - subscription-settlement-dry-run
           - subscription-settlement-apply
           - subscription-full-refund-body-dry-run
@@ -2328,3 +2329,36 @@ jobs:
       - name: Provision fixture without preparing payment
         if: inputs.operation == 'subscription-settlement-fixture-provision'
         run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-subscription-settlement-fixture.sql
+
+  subscription-settlement-recover-existing:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'subscription-settlement-recover-existing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    concurrency:
+      group: stage-subscription-settlement-schedule
+      cancel-in-progress: false
+    env:
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm test -- scripts/recover-stage-settlement.test.js
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require corrected schema
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-settlement-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Recover existing receipt using provider GET only
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/recover-stage-settlement.mjs
