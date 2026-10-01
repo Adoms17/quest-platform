@@ -145,11 +145,30 @@ savepoint operator_scope;
  expect(operatorResult).toContain('operator selects current Pro instead of v1')
  expect(operatorResult).toContain('operator refuses a current tariff with a different price')
  const fullOperatorBody=readFileSync(new URL('./stage-full-refund-organization.sql',import.meta.url),'utf8').replace(/^begin;\s*/,'').replace(/commit;\s*$/,'')
+ const fullOfferBody=readFileSync(new URL('./stage-full-refund-offer.sql',import.meta.url),'utf8').replace(/^begin;\s*/,'').replace(/commit;\s*$/,'')
  const fullOperator=sql(operatorSetup+tariffSetup+fullOperatorBody+fullOperatorBody+`
  select is((select count(*) from public.billing_sandbox_orders),0::bigint,'full refund provisioning creates no payment');
  select is((select count(*) from public.billing_trial_access),0::bigint,'full refund provisioning starts no trial');
  select is((select count(*) from public.billing_fiscal_acceptance_fixtures),0::bigint,'full refund provisioning does not reuse timed fixture');
  select is((select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),current_setting('test.personal.before'),'full refund provisioning preserves personal subscription');
+ savepoint full_offer;
+ select throws_ok($offer_test$${fullOfferBody}$offer_test$,'P0001','full refund offer preflight failed','offer requires active Pro trial');
+ select set_config('request.jwt.claim.sub',md5('operator-fixture-owner')::uuid::text,true);
+ select public.request_organization_trial('64701955-543c-b77b-23ba-ede86feb8728',md5('operator-current-pro')::uuid,repeat('b',64),md5('full-offer-trial')::uuid,(select revision from public.organization_subscriptions where organization_id='64701955-543c-b77b-23ba-ede86feb8728'));
+ select throws_ok($offer_test$${fullOfferBody}$offer_test$,'P0001','expected stage test documents required','missing documents block offer and scope atomically');
+ select is((select count(*) from public.billing_sandbox_offers where organization_id='64701955-543c-b77b-23ba-ede86feb8728'),0::bigint,'failed document preflight leaves no offer');
+ insert into public.purchase_document_versions(id,kind,body,status) values
+ ('stage-test-agreement-20260926','agreement','Synthetic nonbinding stage agreement','published'),
+ ('stage-test-payment-20260926','payment_terms','Synthetic nonbinding stage payment terms','published');
+ ${fullOfferBody}
+ select set_config('test.full.offer',(select to_jsonb(o)::text from public.billing_sandbox_offers o where organization_id='64701955-543c-b77b-23ba-ede86feb8728'),true);
+ ${fullOfferBody}
+ select is((select to_jsonb(o)::text from public.billing_sandbox_offers o where organization_id='64701955-543c-b77b-23ba-ede86feb8728'),current_setting('test.full.offer'),'offer retry preserves terms and expiry');
+ select is(platform_private.capture_trial_checkout_terms('64701955-543c-b77b-23ba-ede86feb8728',md5('stage-full-refund-offer-20260929')::uuid)#>>'{trial_purchase,transition}','after_trial','offer uses supported future trial route');
+ select is((select count(*) from public.billing_sandbox_orders),0::bigint,'offer preparation creates no payment order');
+ select is((select count(*) from public.checkout_document_scope where organization_id='64701955-543c-b77b-23ba-ede86feb8728'),1::bigint,'document scope is enabled once for target');
+ select is((select count(*) from public.checkout_document_acceptances),0::bigint,'operator does not accept documents for user');
+ rollback to full_offer;
  delete from public.billing_sandbox_application_scope where organization_id='64701955-543c-b77b-23ba-ede86feb8728';
  select throws_ok($full_operator$${fullOperatorBody}$full_operator$,'P0001','full refund organization changed: manual review required','full refund retry preserves revoked scope');
  select * from finish(); rollback;`)
