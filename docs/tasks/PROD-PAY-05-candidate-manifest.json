@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "textNormalization": "utf8-lf",
+  "status": "local-candidate-not-deployable",
+  "baselineMigration": "20260914210000",
+  "historicalMigrationCount": 324,
+  "historicalChainSha256": "2fd4ceed117ad18b29ea0f4f548e10c0cd40265484230c4cde13a18659f762c7",
+  "files": [
+    {
+      "path": "scripts/production-sandbox-guard.candidate.sql",
+      "sha256": "ea4c20bfd65bf2fb7d175539cdb9d573ae2b36e7a519c5f889fce8b63c8c769c"
+    },
+    {
+      "path": "scripts/production-environment-pin.candidate.sql",
+      "sha256": "b74085c524a7bdf50e05ae11093f257d12f79831ba32358191707118d11faa6d"
+    }
+  ],
+  "initializationOrder": [
+    "historical migrations",
+    "sandbox guard",
+    "environment pin",
+    "explicit environment initialization",
+    "compatible workers"
+  ],
+  "requiresQuiescentWorkers": true
+}
