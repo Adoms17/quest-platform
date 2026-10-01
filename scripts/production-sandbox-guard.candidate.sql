@@ -1,7 +1,7 @@
 -- Candidate migration: deliberately outside automatic migration discovery.
 -- Stage initialization and remaining sandbox paths must be reviewed before release.
 begin;
--- Exact source hashes from the 324-migration baseline (PostgreSQL 17).
+-- Source hashes from the 324-migration baseline (PostgreSQL 17), CRLF -> LF.
 -- Validate every target before rewriting any body; unexpected drift fails closed.
 do $baseline$
 declare signature text; expected text; actual text;
@@ -15,13 +15,13 @@ begin
   "public.record_sandbox_refund(uuid,uuid,text)": "e25b58b82c03c63102531653bd62557ac413f38aa1ecbab7a8c6a6abb90d996b",
   "platform_private.apply_recurring_period(uuid)": "b13e6e30b12f68c491f0007b5d368bcb36af7fab1b7f1125c02258cce66e1fea",
   "platform_private.begin_recurring_attempt(uuid)": "8e8134572e3c24632d2315e660ad16286c6d3a7cecc1844bd2b0a0dc59c313b1",
-  "public.apply_sandbox_payment_event(uuid,jsonb)": "6675544b0a5ac10b5328d97294356bacb6d4ac1d4e5f23801c7b1fb1baeead1a",
+  "public.apply_sandbox_payment_event(uuid,jsonb)": "95440d5c07b4c9ead766c99dbdf3c5beceaeecb332bba941f77ee192e10bb175",
   "platform_private.fulfill_discount_payment(uuid)": "f209f0bdd6791dc043af7b2041bc461f3200b3e42ad2f813fe4b6a997b59758f",
   "platform_private.run_scheduled_sandbox_orders()": "a2c25b1ca7d7945399285cd3c441e19c0b4341b6812ce53c50ea580b38fb3ffe",
   "public.reserve_sandbox_refund(uuid,uuid,bigint)": "fb4e8c8114180829288cbe06d8f7a83ef88d447aa21d4a3506956ad3befa96c4",
   "platform_private.apply_subscription_refund(uuid)": "125cf5e105fe7d114959ed0f1faeb14cd90e8832dcd23aadf6bf3e18587e0356",
   "public.prepare_fiscal_acceptance_fixture(uuid,text)": "9bbb84440a9c3e3ede3fcfbbbe0bcb006548e4f5370bc2bccc0ae988054a9e02",
-  "public.record_prepayment_settlement(uuid,text,text)": "6378497609ff5f9e1177ff1f4ebeff12dd264ed4579f6505fe298bc625dcc75d",
+  "public.record_prepayment_settlement(uuid,text,text)": "8ad08301b9f43ef76758015a93c52a5c523304e9f617909fce21a719ec6c423e",
   "platform_private.authorize_recurring_send(uuid,uuid)": "917ef173994405894788c6bc72f17bf096f82d209dd11e31b30e4796c139eee7",
   "platform_private.claim_recurring_dispatch(uuid,uuid)": "21c43ee3c071b04f6744c864125e26b0487110caa62e10ad624ddf96e798440d",
   "platform_private.defer_future_discount_payment(uuid)": "58c815411ee5d1090b1f36a8a5f680e68d85cb8ffdf497ffec4acb5a339bc8a9",
@@ -44,7 +44,7 @@ begin
   "public.reserve_sandbox_payment_order(uuid,uuid,bigint,uuid,bigint,text,text,timestamptz,timestamptz)": "d3b8348096a53e79ea251e9cbd45a005470cc6583dced88a7ef1dd08f6019fd8"
 }
 $hashes$::jsonb) loop
-  select encode(sha256(convert_to(prosrc,'UTF8')),'hex') into actual
+  select encode(sha256(convert_to(replace(prosrc,E'\r\n',E'\n'),'UTF8')),'hex') into actual
    from pg_proc where oid=to_regprocedure(signature);
   if actual is distinct from expected then
    raise exception 'sandbox guard source hash mismatch: %',signature;

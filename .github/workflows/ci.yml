@@ -17,6 +17,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  production-billing-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Verify candidate manifest
+        run: node scripts/verify-production-candidate-manifest.js
+      - name: Prepare isolated database images
+        run: |
+          docker pull supabase/postgres:17.6.1.165
+          docker pull supabase/gotrue:v2.196.0
+      - name: Full historical schema and environment isolation
+        env:
+          QVESTA_TEST_PRODUCTION_BASELINE: '1'
+        run: npm run test -- scripts/production-baseline-migrations.test.js
+
   validate:
     runs-on: ubuntu-latest
 

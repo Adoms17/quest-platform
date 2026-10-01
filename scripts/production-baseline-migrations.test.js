@@ -2,7 +2,7 @@
 import {test,expect} from 'vitest'
 import {spawn,spawnSync} from 'node:child_process'
 import {readFileSync,readdirSync} from 'node:fs'
-import {randomUUID} from 'node:crypto'
+import {randomUUID,randomBytes} from 'node:crypto'
 const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
 test.skipIf(!enabled)('production baseline 99 migrations preserves existing organization across historical chain',async()=>{
@@ -12,9 +12,26 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   let ready=false;for(let i=0;i<60;i++){try{docker(['exec',name,'pg_isready','-U','postgres']);ready=true;break}catch{await new Promise(r=>setTimeout(r,500))}}if(!ready)throw Error('Postgres not ready')
   const sql=input=>docker(['exec','-i',name,'psql','-X','-qAt','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1'],input)
   sql('create role anon; create role authenticated; create role service_role bypassrls; create role supabase_auth_admin; create role supabase_admin superuser; create role authenticator; create role dashboard_user; create role supabase_read_only_user;')
-  // Только схема Auth, без аккаунтов, данных приложения и настроек доступа.
-  const auth=docker(['exec','supabase_db_quest-platform','pg_dump','-U','postgres','-d','postgres','--schema-only','--no-owner','--schema=auth','--no-publications','--no-subscriptions'])
-  sql(auth.replace(/^CREATE TRIGGER[^;]*EXECUTE FUNCTION public\.[^;]*;/gm,'').replace(/^ALTER DEFAULT PRIVILEGES[^;]*;/gm,''))
+  // Fresh GoTrue schema in the isolated database; no shared local stack needed.
+  sql('create schema auth; alter role postgres set search_path=auth,public;')
+  const authEnvironment={...process.env,
+   GOTRUE_DB_DRIVER:'postgres',GOTRUE_DB_DATABASE_URL:'postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable',
+   API_EXTERNAL_URL:'http://127.0.0.1',GOTRUE_SITE_URL:'http://127.0.0.1',
+   GOTRUE_JWT_SECRET:randomBytes(48).toString('hex'),GOTRUE_LOG_LEVEL:'fatal'}
+  const authResult=spawnSync('docker',['run','--rm','--name',name+'-auth','--network','container:'+name,
+   ...['GOTRUE_DB_DRIVER','GOTRUE_DB_DATABASE_URL','API_EXTERNAL_URL','GOTRUE_SITE_URL','GOTRUE_JWT_SECRET','GOTRUE_LOG_LEVEL'].flatMap(key=>['-e',key]),
+   'supabase/gotrue:v2.196.0','auth','migrate'],{env:authEnvironment,encoding:'utf8',timeout:60000,windowsHide:true})
+  // Auth diagnostics may include connection settings; do not print them.
+  if(authResult.status!==0){
+   spawnSync('docker',['rm','-f',name+'-auth'],{stdio:'ignore',windowsHide:true})
+   throw Error('Isolated Auth schema migration failed')
+  }
+  sql(`alter role postgres reset search_path;
+   grant usage on schema auth to anon,authenticated,service_role;
+  `)
+  for(const helper of ['auth.jwt()','auth.uid()','auth.role()']){
+   expect(sql(`select to_regprocedure('${helper}') is not null`).trim(),helper+' supplied by Auth migrations').toBe('t')
+  }
   const dir=new URL('../supabase/migrations/',import.meta.url),files=readdirSync(dir).filter(f=>f.endsWith('.sql')).sort()
   const base=files.filter(f=>f.slice(0,14)<='20260914210000'),later=files.filter(f=>f.slice(0,14)>'20260914210000')
   expect(base).toHaveLength(99)
