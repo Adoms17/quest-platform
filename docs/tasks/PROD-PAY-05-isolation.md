@@ -1,5 +1,76 @@
 # PROD-PAY-05 — границы изоляции sandbox
 
+## Конечные права административных gateway — 01.10.2026
+
+Расширен одноразовый SQL-harness: после всех 324 исторических миграций и установки guard проверяются конечные ACL девяти gateway: sandbox_checkout_from_gateway, sandbox_refund_from_gateway, subscription_refund_from_gateway, prepare_subscription_refund_from_gateway, prepare_linked_fiscal_refund_from_gateway, subscription_fiscal_refund_from_gateway, prepare_fiscal_acceptance_from_gateway, subscription_fiscal_worker_gateway и subscription_fiscal_order_worker_gateway. Проверка использует полные сигнатуры: PUBLIC EXECUTE отсутствует, эффективный EXECUTE для anon/authenticated=false, service_role=true. Она учитывает итог переопределений и default privileges, а не только исходные REVOKE в файлах.
+
+В тот же harness добавлены существующие pgTAP-наборы platform_access, platform_command_confirmation и platform_assignment_commands. Это проверка областей административного доступа, свежего MFA (одного aal2, нового iat или пароля недостаточно), назначения/отзыва прав и защиты последнего владельца. Фикстуры синтетические, транзакции откатываются; реальные назначения не создаются.
+
+Граница: ACL service_role означает доверие серверу. Эти тесты не заменяют проверку JWT в Edge endpoint, не доказывают отсутствие всех динамических путей и не проверяют настоящую MFA-сессию через браузер. Worker gateway намеренно не использует человеческий MFA; для него действуют серверная авторизация, shop/scope и среда. Полноту всех административных RPC по этим девяти gateway не заявляем.
+
+Изменены scripts/production-baseline-migrations.test.js, docs/tasks/PROD-PAY-05-isolation.md и docs/tasks/PROD-PAY-05-package-plan.md. Продуктовый SQL и candidate manifest в этом этапе не менялись.
+
+
+## HTTP-транспорт после отказа SQL — 01.10.2026
+
+Добавлены пять регрессионных случаев на существующем HTTP-клиенте с синтетическим fetch: отказ beforeFiscalSend для зачёта и фискального возврата после предварительных GET не допускает ни одного POST и не меняет сохранённую операцию. Для обычного возврата второй recover проверяется с SQL 42501, потерей ответа и data=null: endpoint возвращает 503, provider-запросы остаются только GET, record/reject не вызываются, возврат остаётся sending без provider ID. Первый recover и предварительные GET успешны, поэтому тест проверяет именно повторную авторизацию перед отправкой.
+
+Семь наборов обработчиков/транспорта (фискальные worker, адресный worker, фискальный возврат, обычный возврат, recurring и общий HTTP-клиент) прошли: 157 тестов PASS. lint/build и diff --check PASS, предупреждения React прежние. Реальных запросов к ЮKassa, деплоя или новых платежей не было. Это совместимость с транспортом в тестах, не браузерная/удалённая HTTP-приёмка и не единый прогон с настоящим Auth/RPC.
+
+Файлы этапа: supabase/functions/_shared/subscriptionFiscalHttp.test.js; supabase/functions/_shared/subscriptionRefundEndpoint.test.js; docs/tasks/PROD-PAY-05-isolation.md; docs/tasks/PROD-PAY-05-package-plan.md. Продуктовый код и SQL-кандидат в этом этапе не изменены. Дальнейшие условия: полный аудит оставшихся SQL-путей, окончательный состав пакета, затем разрешённый stage-выпуск и реальная HTTP-приёмка до production.
+
+
+## Применение возврата и сохранённые права — 01.10.2026
+
+Продолжен аудит вызывающих путей confirm_organization_subscription_period и apply_*subscription_refund. Общая функция подтверждения намеренно доступна доверенному service_role для будущих production-адаптеров; её нельзя целиком закрывать sandbox-only guard. Применение sandbox confirmation ограничено триггером по сохранённому sandbox order. Прямые discount/recurring fulfill и отложенные trial-пути защищены отдельно. Встроенные проверки production common confirmation/replay, legacy inbox и сохранённого будущего trial остаются в harness.
+
+| Путь | Проверяемая граница |
+|---|---|
+| process_billing_confirmation / process_due_billing_confirmations | trigger sandbox_period_confirmation_environment; отказ откатывает запись периода |
+| fulfill_discount_payment / fulfill_zero_discount_checkout / apply_recurring_period | Проверка среды в изменяющей функции |
+| effective_trial_subscription / advance_organization_trial | Условная защита сохранённого платного trial-периода; обычный trial сохранён |
+| record_subscription_refund_result → reconcile_subscription_refund → apply_subscription_refund | Отказ 42501 не попадает в обработчик доменной ошибки 55000, должен откатить результат и доступ |
+| retry_sandbox_subscription_refund_application → reconcile/apply | Проверка среды в retry и внутренних apply-функциях |
+
+Для последних двух путей добавлен тест с настоящими синтетическими записями: после pending-возврата production и отсутствие настройки запрещают запись succeeded с применением доступа; сравниваются полные строки возврата и подписки, отсутствие application. В sandbox та же операция проходит. Затем service_role повторно вызывает retry уже завершённого возврата в production и без настройки: ожидается отказ, подписка неизменна, application остаётся единственной. Проверяется атомарность результата, а не только отказ на NULL аргументах.
+
+Этот этап расширяет доказательства существующего кандидата; SQL-кандидат и его hash не менялись. Сценарий выполняется в одной сессии, не доказывает отсутствие всех deadlock при смешанных конкурентных маршрутах. Полный граф динамических функций, административные права и HTTP-приёмка остаются отдельными условиями выпуска. Изменены scripts/production-baseline-migrations.test.js, docs/tasks/PROD-PAY-05-isolation.md, docs/tasks/PROD-PAY-05-package-plan.md. Удалённые среды не изменялись.
+
+
+## Восстановление обычного возврата — 01.10.2026
+
+Найден второй путь повторной отправки без нового claim: subscriptionRefundEndpoint.beforeRefundSend вызывает subscription_refund_from_gateway(action=recover), а prepare_subscription_refund_recovery мог вернуть retry_same_request без проверки среды. В кандидат добавлена условная проверка после require_platform_owner, до блокировок подписки/заказа/возврата: если у возврата нет provider_refund_id, требуется sandbox. При известном provider_refund_id прежняя ветка read_provider сохраняется; оставшиеся проверки целостности, области, прав и статуса продолжают действовать. В production также закрывается восстановление manual_review для неидентифицированной операции; это намеренное ограничение, не автоматическое исправление её состояния.
+
+Исходник функции проверяется SHA-256 вместе с остальными (теперь 36 функций). Вставка проверяет единственность маркера, подпись и ACL сохраняются; historical SQL не изменяется. Обновлён только локальный кандидат и его manifest.
+
+В интеграционный harness включён subscription_refund_result с дополнительными проверками: реально сохранённый sending-возврат отклоняется в production через внутреннюю функцию и service_role gateway; отсутствие настройки тоже запрещает retry; строка возврата не меняется. После восстановления sandbox штатные проверки ключа/суммы проходят. После записи provider ID read_provider проверяется и в production, и без настройки. Внешние запросы ЮKassa не выполняются.
+
+| Проверенный callback | SQL-граница | Результат аудита |
+|---|---|---|
+| platformRefundEndpoint.beforeRefundSend | begin_sandbox_refund | Защита была в кандидате |
+| subscriptionRefundEndpoint.beforeRefundSend | gateway recover → prepare_subscription_refund_recovery | Добавлена условная защита |
+| subscriptionFiscalRefundStorage.before_send | check_linked_fiscal_refund_send | Защита была в кандидате |
+| subscriptionFiscalWorker.beforeFiscalSend, включая адресную обёртку | worker before_send | Исправлено предыдущим этапом |
+| sandboxRecurringWorker.beforeRecurringSend | worker claim → claim_recurring_dispatch / authorize_recurring_send | Защита была в кандидате |
+
+Матрица относится к перечисленным callback, не доказывает полноту всего графа SQL/HTTP. Остаются остальные пути изменения состояния и выдачи доступа, состав production-адаптеров и реальная HTTP-приёмка. Защита не отзывает разрешение после commit: смена среды по-прежнему требует остановки отправителей.
+
+Файлы этапа: scripts/production-sandbox-guard.candidate.sql; scripts/production-baseline-migrations.test.js; docs/tasks/PROD-PAY-05-candidate-manifest.json; docs/tasks/PROD-PAY-05-isolation.md; docs/tasks/PROD-PAY-05-package-plan.md. Commit/push/deploy и изменения удалённых БД не выполнялись.
+
+
+## Повторное разрешение отправки фискального worker — 01.10.2026
+
+При продолжении аудита найден обход границы среды в public.subscription_fiscal_worker_gateway(text,text,uuid,uuid,jsonb), действие before_send. Оно проверяло сохранённый ключ/хеш, статус, срок и область заказа, но возвращало authorized=true без повторной проверки среды. Предшествующий claim мог быть выполнен до изменения конфигурации. Адресная обёртка subscription_fiscal_order_worker_gateway делегирует в ту же функцию; JavaScript subscriptionFiscalWorker вызывает before_send непосредственно перед отправкой.
+
+В локальном production-sandbox-guard.candidate.sql добавлена условная require_sandbox_environment только для before_send, до захвата строк заказа/операции. Функция включена в проверку исходного SHA-256; единственность маркера тела проверяется до изменения. Прежние ACL, сигнатура и остальные действия сохраняются. Всего проверяются исходники 35 функций: 32 общих guard и 3 условных границы. Manifest кандидата пересчитан; исторические миграции не изменены, кандидат по-прежнему вне автоматических миграций.
+
+Тест встроен в существующий SQL-сценарий с фактически зарезервированной и отправляемой синтетической операцией: sandbox claim → production → before_send через общий и адресный gateway получает 42501 sandbox environment denied; отсутствие настройки также даёт отказ; строка статуса операции сохраняется полностью; возврат sandbox проходит прежнюю авторизацию с точным ключом/хешем. Все операции выполняются только в одноразовой локальной БД. Это не реальный HTTP-запрос и не отзыв уже закоммиченного разрешения: остановка workers перед сменой среды остаётся обязательной.
+
+Аудит всего SQL-графа ещё не завершён. Проверены конкретная ветка worker, её адресная обёртка и связь JavaScript beforeFiscalSend. Остальные RPC и динамические переопределения нельзя объявлять покрытыми по этому результату.
+
+Файлы этапа: scripts/production-sandbox-guard.candidate.sql; scripts/production-baseline-migrations.test.js; docs/tasks/PROD-PAY-05-candidate-manifest.json; docs/tasks/PROD-PAY-05-isolation.md; docs/tasks/PROD-PAY-05-package-plan.md. Production/stage, commit/push/deploy не менялись.
+
+
 01.10.2026. Проверяется полная историческая схема в контейнере без сети; production и stage не менялись.
 
 В `scripts/production-baseline-migrations.test.js` добавлены проверки пяти таблиц: billing_sandbox_offers, billing_sandbox_application_scope, billing_fiscal_acceptance_fixtures, billing_sandbox_scheduled_orders, billing_sandbox_settlement_schedule. После установки они пусты; anon, authenticated и service_role не имеют INSERT/UPDATE/DELETE/TRUNCATE. Прямой вызов prepare_fiscal_acceptance_from_gateway запрещён anon/authenticated. Для service_role с существующим синтетическим пользователем без назначения owner проверяется отказ с конкретной причиной platform owner required и отсутствие созданного заказа.
@@ -189,3 +260,11 @@ SQL-кандидат теперь защищает 21 функцию: к пят�
 Перед реализацией составить точный список изменяемых сигнатур и их внутренних вызовов. Проверки: неизвестная среда; production с синтетическим owner/AAL2 и заполненным допуском; подмена среды клиентом; попытка через service_role; конкурентное изменение допуска; stage после разрешённого включения; восстановление уже отправленного заказа. Переход stage с новой схемой требует совместимого порядка конфигурации и выпуска — это не изменение, которое следует включать в общий db push без подготовки.
 
 Проверки: интеграционный прогон с точной причиной отказа PASS (43.48 с); lint и build PASS, прежние React-предупреждения сохранены. Текущий результат разрешает продолжить разработку защиты; он не даёт допуска к публикации оплаты. Исторические миграции сохраняются, новая защита и её миграционные/RLS-тесты оформляются отдельным пакетом.
+
+Результат проверки before_send: изолированный SQL-прогон PASS (108.63 с), 38 тестов фискальных обработчиков PASS, 31 тест инструментов PASS; manifest integrity, lint/build и diff --check PASS. Предупреждения React прежние. Исправление остаётся локальным кандидатом.
+
+Проверки этапа recovery: изолированный SQL-прогон PASS (109.13 с), 36 тестов обработчиков/планировщика PASS, candidate manifest integrity PASS, lint/build PASS с прежними React-предупреждениями. Исправление остаётся локальным.
+
+Проверки этапа применения доступа: полный изолированный SQL-прогон PASS (116.40 с), lint/build PASS с прежними React-предупреждениями, git diff --check PASS. Проверены отказ результата с откатом и повтор завершённого возврата; commit/push/deploy не выполнялись.
+
+Результат административного этапа: полный SQL-прогон PASS (112.61 с), включая ACL девяти gateway и три административных pgTAP-набора; lint/build и diff --check PASS. Прежние предупреждения React сохранены. Удалённые среды, commit/push/deploy не менялись.

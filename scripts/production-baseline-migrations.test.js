@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {test,expect} from 'vitest'
 import {spawn,spawnSync} from 'node:child_process'
-import {readFileSync,readdirSync} from 'node:fs'
+import {readFileSync,readdirSync,writeFileSync} from 'node:fs'
 import {randomUUID,randomBytes} from 'node:crypto'
 const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
@@ -12,6 +12,14 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   let ready=false;for(let i=0;i<60;i++){try{docker(['exec',name,'pg_isready','-U','postgres']);ready=true;break}catch{await new Promise(r=>setTimeout(r,500))}}if(!ready)throw Error('Postgres not ready')
   const sql=input=>docker(['exec','-i',name,'psql','-X','-qAt','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1'],input)
   sql('create role anon; create role authenticated; create role service_role bypassrls; create role supabase_auth_admin; create role supabase_admin superuser; create role authenticator; create role dashboard_user; create role supabase_read_only_user;')
+  // Model observed API role switching and public schema privileges locally.
+  // The container postgres stays superuser; this does not model hosted admin restrictions.
+  sql(`alter role authenticator noinherit login;
+   grant anon,authenticated,service_role to authenticator with inherit false;
+   alter schema public owner to postgres;
+   revoke all on schema public from public;
+   grant usage on schema public to anon,authenticated;
+   grant usage,create on schema public to service_role;`)
   // Fresh GoTrue schema in the isolated database; no shared local stack needed.
   sql('create schema auth; alter role postgres set search_path=auth,public;')
   const authEnvironment={...process.env,
@@ -36,7 +44,37 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   const base=files.filter(f=>f.slice(0,14)<='20260914210000'),later=files.filter(f=>f.slice(0,14)>'20260914210000')
   expect(base).toHaveLength(99)
   expect(later).toHaveLength(225)
+  // Observed production defaults on 2026-10-01; applied ONLY inside this disposable container.
+  // These precede historical migrations so their REVOKE/GRANT statements remain authoritative.
+  sql(`alter default privileges for role postgres in schema public grant all on tables to anon,authenticated,service_role;
+   alter default privileges for role postgres in schema public grant all on sequences to anon,authenticated,service_role;
+   alter default privileges for role postgres in schema public grant execute on functions to anon,authenticated,service_role;`)
   sql(base.map(f=>readFileSync(new URL(f,dir),'utf8')).join('\n'))
+  const inventorySql=readFileSync(new URL('./inspect-production-baseline-catalog.sql',import.meta.url),'utf8')
+  const inventory=JSON.parse(sql(inventorySql).trim())
+  const observed=JSON.parse(readFileSync(new URL('../docs/tasks/PROD-PAY-05-production-catalog-20261001.json',import.meta.url),'utf8'))
+  for(const [category,fingerprint] of Object.entries(observed))expect(inventory[category],category+' matches production snapshot').toEqual(fingerprint)
+  for(const role of ['anon','authenticated','service_role']){
+   expect(sql(`select has_schema_privilege('${role}','public','USAGE')`).trim()).toBe('t')
+   expect(sql(`select has_schema_privilege('${role}','public','CREATE')`).trim()).toBe(role==='service_role'?'t':'f')
+   expect(sql(`select rolsuper or rolcreatedb or rolcreaterole or rolreplication or rolcanlogin from pg_roles where rolname='${role}'`).trim()).toBe('f')
+   expect(sql(`select rolbypassrls from pg_roles where rolname='${role}'`).trim()).toBe(role==='service_role'?'t':'f')
+   expect(sql(`select count(*) from pg_auth_members where member=(select oid from pg_roles where rolname='${role}')`).trim()).toBe('0')
+   expect(sql(`select set_option and not inherit_option and not admin_option from pg_auth_members where member=(select oid from pg_roles where rolname='authenticator') and roleid=(select oid from pg_roles where rolname='${role}')`).trim()).toBe('t')
+  }
+  expect(sql("select has_schema_privilege('authenticator','public','USAGE')").trim()).toBe('f')
+  expect(sql("select count(*) from pg_attribute a join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','platform_private') and a.attnum>0 and not a.attisdropped and a.attacl is not null").trim()).toBe('0')
+  // Prove the inventory detects permission/RLS drift and the rollback restores the fixture.
+  const changed=JSON.parse(sql(inventorySql.replace('begin read only;',`begin;
+   alter table public.organizations disable row level security;
+   grant select on public.organizations to public;`)).trim())
+  expect(changed.relations.md5).not.toBe(inventory.relations.md5)
+  expect(changed.relation_acl.md5).not.toBe(inventory.relation_acl.md5)
+  expect(JSON.parse(sql(inventorySql).trim())).toEqual(inventory)
+  expect(inventory.relations.count).toBeGreaterThan(0)
+  expect(inventory.policies.count).toBeGreaterThan(0)
+  expect(inventory.functions.count).toBeGreaterThan(0)
+  if(process.env.QVESTA_BASELINE_INVENTORY_OUTPUT)writeFileSync(process.env.QVESTA_BASELINE_INVENTORY_OUTPUT,JSON.stringify(inventory,null,2)+'\n')
   sql("insert into auth.users(id,email) values(md5('production-baseline-fixture')::uuid,'baseline@example.test');")
   const snapshot=()=>sql("select md5(row_to_json(o)::text) from public.organizations o where personal_owner_id=md5('production-baseline-fixture')::uuid").trim()
   const before=snapshot()
@@ -164,6 +202,28 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    expect(output,suite).toMatch(/^1\.\.\d+/m)
   }
   const readSuite=name=>readFileSync(new URL('../supabase/tests/database/'+name+'.test.sql',import.meta.url),'utf8')
+  // Inspect final ACL after all historical rewrites and sandbox guards.
+  const serverGateways=[
+   'public.sandbox_checkout_from_gateway(uuid,text,uuid,jsonb)',
+   'public.sandbox_refund_from_gateway(uuid,bigint,bigint,text,uuid,jsonb)',
+   'public.subscription_refund_from_gateway(uuid,bigint,bigint,text,uuid,jsonb)',
+   'public.prepare_subscription_refund_from_gateway(uuid,bigint,bigint,text,uuid,uuid,uuid,uuid)',
+   'public.prepare_linked_fiscal_refund_from_gateway(uuid,bigint,bigint,text,uuid,uuid,uuid)',
+   'public.subscription_fiscal_refund_from_gateway(uuid,bigint,bigint,text,text,uuid,jsonb)',
+   'public.prepare_fiscal_acceptance_from_gateway(uuid,bigint,bigint,uuid,text)',
+   'public.subscription_fiscal_worker_gateway(text,text,uuid,uuid,jsonb)',
+   'public.subscription_fiscal_order_worker_gateway(text,uuid,text,uuid,uuid,jsonb)',
+  ]
+  for(const gateway of serverGateways){
+   for(const role of ['anon','authenticated','service_role'])expect(sql(`select has_function_privilege('${role}','${gateway}','EXECUTE')`).trim(),role+' '+gateway).toBe(role==='service_role'?'t':'f')
+   expect(sql(`select not exists(select 1 from pg_proc p cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a where p.oid='${gateway}'::regprocedure and a.grantee=0 and a.privilege_type='EXECUTE')`).trim(),'PUBLIC cannot execute '+gateway).toBe('t')
+  }
+  for(const suite of ['platform_access','platform_command_confirmation','platform_assignment_commands']){
+   const output=sql('set search_path=public,extensions;'+readSuite(suite))
+   expect(output,suite).not.toMatch(/not ok|Looks like/)
+   expect(output,suite).toMatch(/^1\.\.\d+/m)
+  }
+
   const pinSource=readFileSync(new URL('./production-environment-pin.candidate.sql',import.meta.url),'utf8')
   const pinInTransaction=pinSource.replace(/^begin;\s*$/m,'').replace(/^commit;\s*$/m,'')
   const withHistoryPreflight=(source,tables)=>{
@@ -193,6 +253,65 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   const recurringHistory=sql('set search_path=public,extensions;'+withHistoryPreflight(readSuite('billing_recurring_apply'),['billing_recurring_attempts','billing_sandbox_orders']))
   expect(recurringHistory).not.toMatch(/not ok|Looks like/)
   expect(recurringHistory).toContain('preflight preserves billing_recurring_attempts')
+  const recoverySource=readSuite('subscription_refund_result')
+  const recoveryMarker="select is(platform_private.prepare_subscription_refund_recovery(current_setting('test.reserve')::uuid)->>'action','retry_same_request'"
+  const recoveryChecks=`
+   select set_config('test.recovery.before',(select to_jsonb(r)::text from public.billing_sandbox_refunds r where id=current_setting('test.reserve')::uuid),true);
+   update platform_private.billing_runtime_environment set environment='production';
+   select throws_ok($deny$select platform_private.prepare_subscription_refund_recovery(current_setting('test.reserve')::uuid)$deny$,'42501','sandbox environment denied','production denies refund retry');
+   set local role service_role;
+   select throws_ok($deny$select public.subscription_refund_from_gateway(md5('subscription-refund-owner')::uuid,floor(extract(epoch from clock_timestamp()))::bigint,floor(extract(epoch from clock_timestamp()))::bigint+300,'recover',current_setting('test.reserve')::uuid)$deny$,'42501','sandbox environment denied','gateway denies production refund retry');
+   reset role;
+   delete from platform_private.billing_runtime_environment;
+   select throws_ok($deny$select platform_private.prepare_subscription_refund_recovery(current_setting('test.reserve')::uuid)$deny$,'42501','sandbox environment denied','unknown environment denies refund retry');
+   select is((select to_jsonb(r)::text from public.billing_sandbox_refunds r where id=current_setting('test.reserve')::uuid),current_setting('test.recovery.before'),'retry denial preserves refund');
+   insert into platform_private.billing_runtime_environment(environment) values('sandbox');
+  `
+  const readMarker="select is(platform_private.prepare_subscription_refund_recovery(current_setting('test.reserve')::uuid)->>'action','read_provider','known provider identity uses read only');"
+  expect(recoverySource.split(recoveryMarker)).toHaveLength(2)
+  expect(recoverySource.split(readMarker)).toHaveLength(2)
+  const recoveryGuarded=recoverySource.replace(recoveryMarker,recoveryChecks+recoveryMarker).replace(readMarker,`
+   update platform_private.billing_runtime_environment set environment='production';
+   ${readMarker}
+   delete from platform_private.billing_runtime_environment;
+   ${readMarker}
+   insert into platform_private.billing_runtime_environment(environment) values('sandbox');
+  `)
+  const applyMarker="select is(pg_temp.result('succeeded')->>'access_state','applied','verified success applies access');"
+  expect(recoveryGuarded.split(applyMarker)).toHaveLength(2)
+  const applicationDenials=`
+   select set_config('test.apply.refund',(select to_jsonb(r)::text from public.billing_sandbox_refunds r where id=current_setting('test.reserve')::uuid),true);
+   select set_config('test.apply.subscription',(select to_jsonb(s)::text from public.organization_subscriptions s where organization_id=current_setting('test.org')::uuid),true);
+   update platform_private.billing_runtime_environment set environment='production';
+   select throws_ok($deny$select pg_temp.result('succeeded')$deny$,'42501','sandbox environment denied','production rejects verified refund access application');
+   delete from platform_private.billing_runtime_environment;
+   select throws_ok($deny$select pg_temp.result('succeeded')$deny$,'42501','sandbox environment denied','unknown environment rejects verified refund access application');
+   select is((select to_jsonb(r)::text from public.billing_sandbox_refunds r where id=current_setting('test.reserve')::uuid),current_setting('test.apply.refund'),'denied application rolls back refund status');
+   select is((select to_jsonb(s)::text from public.organization_subscriptions s where organization_id=current_setting('test.org')::uuid),current_setting('test.apply.subscription'),'denied application preserves access');
+   select is((select count(*) from public.subscription_refund_applications where refund_id=current_setting('test.reserve')::uuid),0::bigint,'denied application creates no audit');
+   insert into platform_private.billing_runtime_environment(environment) values('sandbox');
+  `
+  const replayDenials=`
+   select set_config('test.applied.subscription',(select to_jsonb(s)::text from public.organization_subscriptions s where organization_id=current_setting('test.org')::uuid),true);
+   update platform_private.billing_runtime_environment set environment='production';
+   set local role service_role;
+   select throws_ok($deny$select public.retry_sandbox_subscription_refund_application('123',current_setting('test.reserve')::uuid)$deny$,'42501','sandbox environment denied','production rejects completed refund replay');
+   reset role;
+   delete from platform_private.billing_runtime_environment;
+   set local role service_role;
+   select throws_ok($deny$select public.retry_sandbox_subscription_refund_application('123',current_setting('test.reserve')::uuid)$deny$,'42501','sandbox environment denied','unknown environment rejects completed refund replay');
+   reset role;
+   select is((select to_jsonb(s)::text from public.organization_subscriptions s where organization_id=current_setting('test.org')::uuid),current_setting('test.applied.subscription'),'denied replay preserves applied access');
+   select is((select count(*) from public.subscription_refund_applications where refund_id=current_setting('test.reserve')::uuid),1::bigint,'denied replay preserves single application');
+   insert into platform_private.billing_runtime_environment(environment) values('sandbox');
+  `
+  const accessGuarded=recoveryGuarded.replace(applyMarker,applicationDenials+applyMarker+replayDenials)
+  const recoveryOutput=sql('set search_path=public,extensions;'+accessGuarded)
+  expect(recoveryOutput).toContain('denied application rolls back refund status')
+  expect(recoveryOutput).toContain('denied replay preserves single application')
+  expect(recoveryOutput).not.toMatch(/not ok|Looks like/)
+  expect(recoveryOutput).toContain('gateway denies production refund retry')
+  expect(recoveryOutput).toContain('retry denial preserves refund')
   const paid=readSuite('checkout_documents_atomic').replace('10000,2,1','5000,2,1')
    .replace("'0','100 percent discount supported'","'6172','paid checkout with discount supported'")
   const trialSource=readSuite('billing_trial_payment_schedule')
@@ -220,10 +339,31 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    select pg_sleep(2.1);`)
   expect(modeledPrefix).not.toBe(receiptPrefix)
   const resultPrefix=readSuite('subscription_fiscal_reservations').split("select set_config('test.ledger.first'")[0]
-  const workerSql=paid.replace('select * from finish();rollback;',()=>readSuite('platform_order_documents')+'\n'+modeledPrefix+'\n'+resultPrefix+'\n'+readSuite('subscription_fiscal_worker')+'\nselect * from finish();rollback;')
+  const workerSource=readSuite('subscription_fiscal_worker')
+  const sendMarker="select is(public.subscription_fiscal_worker_gateway('123','before_send'"
+  const sendDenials=`
+   reset role;
+   select set_config('test.send.before',(select to_jsonb(s)::text from public.billing_subscription_fiscal_operation_status s where command_id=(current_setting('test.worker.claim')::jsonb->>'commandId')::uuid),true);
+   update platform_private.billing_runtime_environment set environment='production';
+   set local role service_role;
+   select throws_ok($deny$select public.subscription_fiscal_worker_gateway('123','before_send',null,(current_setting('test.worker.claim')::jsonb->>'commandId')::uuid,current_setting('test.worker.claim')::jsonb)$deny$,'42501','sandbox environment denied','production denies persisted send reauthorization');
+   select throws_ok($deny$select public.subscription_fiscal_order_worker_gateway('123',current_setting('test.payment')::uuid,'before_send',null,(current_setting('test.worker.claim')::jsonb->>'commandId')::uuid,current_setting('test.worker.claim')::jsonb)$deny$,'42501','sandbox environment denied','scoped worker denies persisted send reauthorization');
+   reset role;
+   delete from platform_private.billing_runtime_environment;
+   set local role service_role;
+   select throws_ok($deny$select public.subscription_fiscal_worker_gateway('123','before_send',null,(current_setting('test.worker.claim')::jsonb->>'commandId')::uuid,current_setting('test.worker.claim')::jsonb)$deny$,'42501','sandbox environment denied','unknown environment denies persisted send reauthorization');
+   reset role;
+   select is((select to_jsonb(s)::text from public.billing_subscription_fiscal_operation_status s where command_id=(current_setting('test.worker.claim')::jsonb->>'commandId')::uuid),current_setting('test.send.before'),'send denials preserve operation');
+   insert into platform_private.billing_runtime_environment(environment) values('sandbox');
+   set local role service_role;
+  `
+  expect(workerSource.split(sendMarker)).toHaveLength(2)
+  const guardedWorker=workerSource.replace(sendMarker,sendDenials+sendMarker)
+  const workerSql=paid.replace('select * from finish();rollback;',()=>readSuite('platform_order_documents')+'\n'+modeledPrefix+'\n'+resultPrefix+'\n'+guardedWorker+'\nselect * from finish();rollback;')
   expect(workerSql).not.toBe(paid)
   const workerOutput=sql('set search_path=public,extensions;'+withHistoryPreflight(workerSql,['billing_receipt_snapshots','billing_subscription_fiscal_operations','billing_sandbox_orders']))
   expect(workerOutput).not.toMatch(/not ok|Looks like/)
+  expect(workerOutput).toContain('send denials preserve operation')
   expect(workerOutput).toContain('payment receipt history includes exact settled remainder')
   expect(workerOutput).toMatch(/^1\.\.\d+/m)
   const asyncSql=input=>new Promise((resolve,reject)=>{

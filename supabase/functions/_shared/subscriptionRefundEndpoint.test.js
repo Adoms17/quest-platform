@@ -68,3 +68,21 @@ test.each([[400,'invalid_request',200],[500,'internal_server_error',503],[429,'t
   }else expect(s.refund.state).toBe('sending')
  }finally{log.mockRestore()}
 })
+
+test.each(['sql-denied','lost-response','empty-response'])('second recovery %s never sends or records a refund',async failure=>{
+ const s=setup(),normal=s.service.rpc.getMockImplementation();let checks=0
+ s.service.rpc.mockImplementation(async(name,args)=>{
+  if(args.p_action==='recover'&&++checks===2){
+   if(failure==='lost-response')throw Error('connection lost')
+   return failure==='sql-denied'?{error:{code:'42501'}}:{data:null}
+  }
+  return normal(name,args)
+ })
+ expect((await s.handler(s.request())).status).toBe(503)
+ expect(checks).toBe(2)
+ expect(s.fetchImpl.mock.calls.length).toBeGreaterThan(0)
+ expect(s.fetchImpl.mock.calls.every(([,options])=>options.method==='GET')).toBe(true)
+ expect(s.service.rpc.mock.calls.some(([,args])=>['record','reject'].includes(args.p_action))).toBe(false)
+ expect(s.refund.state).toBe('sending')
+ expect(s.refund.provider_refund_id).toBeNull()
+})
