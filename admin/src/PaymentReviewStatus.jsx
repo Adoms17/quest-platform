@@ -18,7 +18,7 @@ export default function PaymentReviewStatus({ item }) {
  <section className={`payment-activation payment-activation--${tone}`} aria-label="Активация периода">
   <h4>Активация периода</h4>
   {applied && <p role="status">Период по заказу выдан.</p>}
-  {item.fulfillment_state === 'not_paid' && !paymentReview && <p role="status">Период по заказу не выдан.</p>}
+  {item.fulfillment_state === 'not_paid' && !paymentReview && <p role="status">{item.fulfillment_reason === 'subscription_refunded' ? 'Подписка по заказу прекращена после возврата. Повторное событие оплаты не выдаёт доступ.' : 'Период по заказу не выдан.'}</p>}
   {paymentReview && <p role="status">Требуется проверка платежа. Его результат пока не подтверждён. Перед новой оплатой необходимо сверить существующий платёж.</p>}
   {deferred && <p role="status"><strong>{item.payment_status === 'succeeded' && item.paid === true ? 'Оплачено, ожидает активации.' : 'Период ожидает активации.'}</strong>{item.period_start && Number.isFinite(start.getTime()) && <> Запланированное начало: {start.toLocaleString('ru-RU')}.</>} Фактическую активацию подтверждает сервер. Для получения актуального результата загрузите платежи повторно.</p>}
   {orderReview && <p role="status">Требуется проверка обработки заказа. Статус оплаты сам по себе не подтверждает начало периода подписки. {reasons[item.fulfillment_reason] || 'Причина обработки в этом списке пока не указана.'}</p>}

@@ -69,5 +69,24 @@ select set_config('test.applied',platform_private.apply_current_subscription_ref
 select is((select status from public.organization_subscriptions where organization_id=current_setting('test.org')::uuid),'free','confirmed refund switches exact subscription to Free');
 select is(platform_private.apply_current_subscription_refund((current_setting('test.receipt')::jsonb->>'id')::uuid)::text,current_setting('test.applied'),'application retry returns immutable receipt');
 select throws_ok($$select public.confirm_organization_subscription_period(current_setting('test.org')::uuid,current_setting('test.order')::uuid,0,platform_private.current_tariff_version('pro',clock_timestamp()),now(),now()+interval '1 day')$$,'55000','subscription period refunded','old confirmation cannot reapply refunded period');
+
+select ok(platform_private.subscription_refund_replay_resolved(current_setting('test.order')::uuid),'bound applied refund resolves replay');
+select ok(not platform_private.subscription_refund_replay_resolved(gen_random_uuid()),'unrelated order does not resolve');
+select ok(not has_function_privilege('authenticated','platform_private.subscription_refund_replay_resolved(uuid)','execute'),'client cannot invoke private replay guard');
+select ok(not has_function_privilege('service_role','platform_private.subscription_refund_replay_resolved(uuid)','execute'),'service cannot bypass event handler');
+select set_config('test.after_refund',(select to_jsonb(s)::text from public.organization_subscriptions s where organization_id=current_setting('test.org')::uuid),true);
+select set_config('test.replay_event',public.enqueue_sandbox_payment_event('123',current_setting('test.order')::uuid,md5('subscription-refund-payment')::uuid,'reconciliation')::text,true);
+select is(public.apply_sandbox_payment_event(current_setting('test.replay_event')::uuid,jsonb_build_object('paymentId',md5('subscription-refund-payment')::uuid,'status','succeeded','paid',true,'test',true))->>'reason','subscription_refunded','late event handled as refunded');
+select is(public.apply_sandbox_payment_event(current_setting('test.replay_event')::uuid,jsonb_build_object('paymentId',md5('subscription-refund-payment')::uuid,'status','succeeded','paid',true,'test',true))->>'fulfillmentState','not_paid','repeat does not issue a period');
+select is((select to_jsonb(s)::text from public.organization_subscriptions s where organization_id=current_setting('test.org')::uuid),current_setting('test.after_refund'),'entire subscription unchanged on replay');
+select is((select count(*) from public.subscription_refund_applications where period_order_id=current_setting('test.order')::uuid),1::bigint,'one refund application after repeats');
+savepoint replay_mismatch;
+update public.billing_sandbox_payment_results set payment_id=gen_random_uuid() where order_id=current_setting('test.order')::uuid;
+select ok(not platform_private.subscription_refund_replay_resolved(current_setting('test.order')::uuid),'different payment cannot resolve replay');
+rollback to replay_mismatch;
+savepoint replay_review;
+update public.billing_sandbox_payment_results set requires_review=true where order_id=current_setting('test.order')::uuid;
+select ok(not platform_private.subscription_refund_replay_resolved(current_setting('test.order')::uuid),'conflicting payment remains unresolved');
+rollback to replay_review;
 select * from finish();
 rollback;

@@ -65,4 +65,11 @@ select is((select order_id::text from platform_private.trial_paid_period_slots w
 set local role authenticated;
 select throws_ok($$select * from platform_private.trial_paid_period_slots$$,'42501',null,'slot data private');
 reset role;
+
+select set_config('test.replay_event',public.enqueue_sandbox_payment_event('123',current_setting('test.order')::uuid,md5('trial-refund-payment')::uuid,'reconciliation')::text,true);
+select is(public.apply_sandbox_payment_event(current_setting('test.replay_event')::uuid,jsonb_build_object('paymentId',md5('trial-refund-payment')::uuid,'status','succeeded','paid',true,'test',true))->>'reason','subscription_refunded','late original payment resolves after replacement');
+select is(public.apply_sandbox_payment_event(current_setting('test.replay_event')::uuid,jsonb_build_object('paymentId',md5('trial-refund-payment')::uuid,'status','succeeded','paid',true,'test',true))->>'fulfillmentState','not_paid','repeat remains terminal');
+select is((select order_id::text from platform_private.trial_paid_period_slots where access_id=(current_setting('test.trial')::jsonb->>'trial_access_id')::uuid),current_setting('test.second'),'replacement survives late payment');
+select is((select count(*)::integer from public.billing_trial_paid_periods where organization_id=current_setting('test.org')::uuid),2,'late event adds no historical period');
+select is((select to_jsonb(s)::text from public.organization_subscriptions s where organization_id=current_setting('test.org')::uuid),current_setting('test.trial'),'late event leaves trial unchanged');
 select * from finish();rollback;
