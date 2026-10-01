@@ -3,6 +3,7 @@ import {test,expect} from 'vitest'
 import {spawn,spawnSync} from 'node:child_process'
 import {readFileSync,readdirSync,writeFileSync} from 'node:fs'
 import {randomUUID,randomBytes} from 'node:crypto'
+import {buildStageBillingGuard} from './build-stage-billing-guard.js'
 const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
 test.skipIf(!enabled)('production baseline 99 migrations preserves existing organization across historical chain',async()=>{
@@ -107,6 +108,20 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    md5('unprovisioned-fixture')::uuid,'baseline@example.test'); rollback;`)).toThrow('platform owner required')
   expect(sql('select count(*) from public.billing_sandbox_orders').trim()).toBe('0')
   expect(sql("select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and c.relname like 'billing_%' and not c.relrowsecurity").trim()).toBe('0')
+  const quiescence=JSON.parse(sql(readFileSync(new URL('./inspect-stage-billing-quiescence.sql',import.meta.url),'utf8')).trim())
+  expect(quiescence).toEqual({edge_drain_verified:false,active_cron_jobs:0,active_reconciliation_leases:0,order_states:{},refund_states:{},fiscal_states:{},enabled_settlement_schedules:0})
+  // Exercise the exact offline bundle inside a disposable database, never stage.
+  const bundle=buildStageBillingGuard({projectRef:'jeugfyaqzfgdvfhdxfht'})
+  const originalCatalog=JSON.parse(sql(inventorySql).trim())
+  const rehearsal=bundle.replace(/^commit;\s*$/m,`select 'stage_bundle_initialized=' || environment from platform_private.billing_runtime_environment;
+   rollback;`)
+  expect(sql(rehearsal)).toContain('stage_bundle_initialized=sandbox')
+  expect(JSON.parse(sql(inventorySql).trim())).toEqual(originalCatalog)
+  expect(sql("select to_regclass('platform_private.billing_runtime_environment') is null").trim()).toBe('t')
+  const failedBundle=bundle.replace(/^commit;\s*$/m,`do $failure$ begin raise exception 'injected stage bundle failure'; end; $failure$; commit;`)
+  expect(()=>sql(failedBundle)).toThrow('injected stage bundle failure')
+  expect(sql("select to_regclass('platform_private.billing_runtime_environment') is null").trim()).toBe('t')
+  expect(JSON.parse(sql(inventorySql).trim())).toEqual(originalCatalog)
   const guardSource=readFileSync(new URL('./production-sandbox-guard.candidate.sql',import.meta.url),'utf8')
   expect(()=>sql(`begin;
    do $mutate$ declare source text; definition text; begin
