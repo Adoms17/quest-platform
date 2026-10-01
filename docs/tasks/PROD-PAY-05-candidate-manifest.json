@@ -1,9 +1,10 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "textNormalization": "utf8-lf",
   "status": "local-candidate-not-deployable",
   "baselineMigration": "20260914210000",
   "historicalMigrationCount": 324,
-  "historicalChainSha256": "bd0d6c7e91250df24b1f46c72fc77fe53aa751c652cce33de3cce22a14a8eb49",
+  "historicalChainSha256": "2fd4ceed117ad18b29ea0f4f548e10c0cd40265484230c4cde13a18659f762c7",
   "files": [
     {
       "path": "scripts/production-sandbox-guard.candidate.sql",
