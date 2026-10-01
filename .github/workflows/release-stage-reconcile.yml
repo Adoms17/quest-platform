@@ -1,0 +1,67 @@
+name: Release stage sandbox reconcile
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Approved full SHA of the staging commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-staging
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - name: Require approved commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$EXPECTED_SHA" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm test -- supabase/functions/_shared --maxWorkers=1
+      - name: Disable sandbox and all reconcile dispatch paths
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          npx --no-install supabase secrets set \
+            YOOKASSA_SANDBOX_ENABLED=false \
+            YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH=false \
+            YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false \
+            YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_RECONCILIATION=false \
+            YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false \
+            YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false \
+            --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy only sandbox-reconcile
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --no-install supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Record completion and remaining acceptance
+        run: |
+          echo "Released sandbox-reconcile from $GITHUB_SHA with sandbox disabled." >> "$GITHUB_STEP_SUMMARY"
+          echo 'No SQL, cron changes, provider requests or automatic re-enable performed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Secret update success does not prove old invocations drained. Verify deployed code, disabled runtime and quiescence before SQL guard/pin.' >> "$GITHUB_STEP_SUMMARY"
