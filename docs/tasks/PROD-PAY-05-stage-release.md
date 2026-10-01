@@ -138,3 +138,13 @@ Workflow выключает общий YOOKASSA_SANDBOX_ENABLED и пять reco
 Это выпуск функции, не исполнитель SQL guard/pin: завершение старых вызовов он не подтверждает. После публикации нужны повторная выгрузка/сверка кода, проверка выключенного runtime и отдельно процедура остановки перед SQL.
 
 Локально lint/build PASS (существующие React warnings), diff --check PASS. 675 тестов Edge пройдены на предыдущем шаге с тем же исходным кодом функций. Отдельный YAML/Actions validator недоступен: попытки загрузить существующие yaml/js-yaml/PyYAML показали отсутствие модулей; новые зависимости не устанавливались. Workflow не запускался и ещё не проверен GitHub. Следующий внешний шаг — commit/push и draft PR подготовленного пакета; требуется отдельное разрешение согласно AGENTS.md.
+
+## Исправление доступности dispatch после слияния #152 — 01.10.2026
+
+PR #152 слит в staging, SHA b7f5cf5a942b7d47933a4e7b283000d2aa3e319d. Попытка read-only gh workflow view release-stage-reconcile.yml --ref staging вернула HTTP 404: новый workflow не зарегистрирован на default branch. Выпуск не запускался.
+
+Локальное исправление переносит job в существующий deploy-staging.yml (GitHub workflow id 346976831, state active), добавляет operation=reconcile-compatible-functions-deploy и expected_sha. Старый отдельный workflow удалён как дубликат. Проверки staging/ref/SHA, тесты, выключение флагов, один deploy и отсутствие автоматического включения сохранены. expected_sha необязателен для остальных операций, но новый job отклоняет пустое или неверное значение до побочных эффектов.
+
+После отдельного PR/слияния используется новый merge SHA, а не b7f5cf5: gh workflow run deploy-staging.yml --ref staging -f operation=reconcile-compatible-functions-deploy -f expected_sha=<approved-full-merge-sha>. Эта запись — план, команда НЕ выполнена. Запуск требует разрешения на временное выключение sandbox и публикацию функции.
+
+Локально lint/build PASS, diff --check PASS. Изменены только два workflow и этот отчёт; функций/SQL исправление не меняет. Нужны commit/push/draft PR и CI для исправления dispatch.
