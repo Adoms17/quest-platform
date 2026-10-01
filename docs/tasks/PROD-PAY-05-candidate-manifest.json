@@ -8,7 +8,7 @@
   "files": [
     {
       "path": "scripts/production-sandbox-guard.candidate.sql",
-      "sha256": "ea4c20bfd65bf2fb7d175539cdb9d573ae2b36e7a519c5f889fce8b63c8c769c"
+      "sha256": "c1463635656920164b6598a80514ff971538492dd9bb6569bd4ce13f3a55ab46"
     },
     {
       "path": "scripts/production-environment-pin.candidate.sql",

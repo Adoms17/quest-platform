@@ -19,7 +19,7 @@ function operation(kind='refund_after'){
 const payment={id:uid(1),test:true,status:'succeeded',paid:true,recipient:{account_id:'123'},amount:{value:'990.00',currency:'RUB'},refunded_amount:{value:'317.43',currency:'RUB'},refundable:true,receipt_registration:'succeeded'}
 const refund={id:uid(13),payment_id:uid(1),status:'succeeded',amount:{value:'672.57',currency:'RUB'}}
 const final={id:rid(13),payment_id:uid(1),type:'refund',refund_id:uid(13),status:'succeeded',items:[{...item,quantity:0.679364}]}
-function harness({p=payment,receipts=[original,first,settlement],post=refund,shop={account_id:'123',test:true,status:'enabled'},clock=()=>now,readReceipt=final,readRefund=refund,priorRefund={id:first.refund_id,payment_id:payment.id,status:'succeeded',amount:{value:'317.43',currency:'RUB'}}}={}){
+function harness({beforeFiscalSend,p=payment,receipts=[original,first,settlement],post=refund,shop={account_id:'123',test:true,status:'enabled'},clock=()=>now,readReceipt=final,readRefund=refund,priorRefund={id:first.refund_id,payment_id:payment.id,status:'succeeded',amount:{value:'317.43',currency:'RUB'}}}={}){
  const fetchImpl=vi.fn(async(url,options)=>{
   const path=url.replace('https://api.yookassa.ru/v3/','')
   let value
@@ -32,7 +32,7 @@ function harness({p=payment,receipts=[original,first,settlement],post=refund,sho
   else throw Error('unexpected path')
   return {ok:true,json:async()=>value}
  })
- const client=createSandboxHttpClient({enabled:true,shopId:'123',secretKey:'synthetic-test-key'},{fetchImpl,now:clock})
+ const client=createSandboxHttpClient({enabled:true,shopId:'123',secretKey:'synthetic-test-key'},{fetchImpl,now:clock,beforeFiscalSend})
  return {client,fetchImpl,posts:()=>fetchImpl.mock.calls.filter(([,r])=>r.method==='POST')}
 }
 it('uses authenticated transport, exact immutable body and one refund POST',async()=>{
@@ -295,4 +295,16 @@ it('supports full refund after a verified full settlement without a receipt requ
  const h=harness({p:{...payment,refunded_amount:{value:'0.00',currency:'RUB'}},receipts:[original,settled],post:fullRefund})
  expect(await h.client.createFiscalOperation(o)).toMatchObject({state:'succeeded'})
  expect(JSON.parse(h.posts()[0][1].body)).toEqual(o.body)
+})
+it.each(['settlement','refund_after'])('authorization failure after GETs prevents every %s POST',async kind=>{
+ const beforeFiscalSend=vi.fn().mockRejectedValue(Error('sandbox environment denied'))
+ const h=harness({beforeFiscalSend,receipts:kind==='settlement'?[original,first]:[original,first,settlement]})
+ const saved=operation(kind),before=structuredClone(saved)
+ await expect(h.client.createFiscalOperation(saved)).rejects.toThrow('sandbox environment denied')
+ expect(beforeFiscalSend).toHaveBeenCalledTimes(1)
+ expect(beforeFiscalSend).toHaveBeenCalledWith({commandId:saved.commandId,key:saved.key,sha256:saved.sha256,firstSentAt:saved.firstSentAt})
+ expect(h.fetchImpl.mock.calls.length).toBeGreaterThan(0)
+ expect(h.fetchImpl.mock.calls.every(([,options])=>options.method==='GET')).toBe(true)
+ expect(h.posts()).toHaveLength(0)
+ expect(saved).toEqual(before)
 })

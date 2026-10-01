@@ -8,6 +8,8 @@ declare signature text; expected text; actual text;
 begin
  for signature,expected in select key,value from jsonb_each_text($hashes$
 {
+  "platform_private.prepare_subscription_refund_recovery(uuid)": "91067f0ee1b0564f60fd29daec74b8517e7a9e85cdfbc445aac58918f4491c9e",
+  "public.subscription_fiscal_worker_gateway(text,text,uuid,uuid,jsonb)": "1bc2bf7b776110d435cda3f5eb3805753668dcc7e70856b37aff9497114a49da",
   "public.begin_sandbox_refund(uuid)": "35c18b0104c1ef4d8793344d229fdd401ccaca8695fd0ce3cde2e7969b87018e",
   "public.advance_organization_trial(uuid)": "b30af47c8c38353319a158f9f36bcc69ea81dcdebbcadc141422d9c627b774a3",
   "public.begin_sandbox_payment_send(uuid)": "cc2a8f977ab777b362582c2f0072027591daf64af334364915d92a977241034e",
@@ -172,4 +174,32 @@ begin
   'if exists(select 1 from platform_private.active_trial_paid_periods where organization_id=p_organization_id) then
    perform platform_private.require_sandbox_environment(); end if; '||marker);
 end; $$;
+
+-- Reauthorization of a persisted HTTP request must recheck the environment.
+-- Poll/review stay available; claim/record already cross their guarded primitives.
+do $worker_guard$
+declare definition text; source text; marker text:=E'begin\n if current_setting(''transaction_isolation'')';
+begin
+ definition:=pg_get_functiondef('public.subscription_fiscal_worker_gateway(text,text,uuid,uuid,jsonb)'::regprocedure);
+ select replace(prosrc,E'\r\n',E'\n') into source from pg_proc
+ where oid='public.subscription_fiscal_worker_gateway(text,text,uuid,uuid,jsonb)'::regprocedure;
+ if (length(source)-length(replace(source,marker,'')))/length(marker)<>1 then
+  raise exception 'fiscal worker entry marker missing or ambiguous'; end if;
+ execute replace(replace(definition,E'\r\n',E'\n'),source,
+  replace(source,marker,E'begin\n if p_action=''before_send'' then perform platform_private.require_sandbox_environment(); end if;\n if current_setting(''transaction_isolation'')'));
+end; $worker_guard$;
+
+
+-- Recovery may authorize another POST without a new claim. Keep identified GET recovery available.
+do $recovery_guard$
+declare definition text; source text; marker text:=E'begin\n perform public.require_platform_owner();';
+begin
+ definition:=pg_get_functiondef('platform_private.prepare_subscription_refund_recovery(uuid)'::regprocedure);
+ select replace(prosrc,E'\r\n',E'\n') into source from pg_proc
+ where oid='platform_private.prepare_subscription_refund_recovery(uuid)'::regprocedure;
+ if (length(source)-length(replace(source,marker,'')))/length(marker)<>1 then
+  raise exception 'refund recovery entry marker missing or ambiguous'; end if;
+ execute replace(replace(definition,E'\r\n',E'\n'),source,replace(source,marker,marker||E'\n if not exists(select 1 from public.billing_sandbox_refunds where id=p_refund_id and provider_refund_id is not null) then\n  perform platform_private.require_sandbox_environment();\n end if;'));
+end; $recovery_guard$;
+
 commit;
