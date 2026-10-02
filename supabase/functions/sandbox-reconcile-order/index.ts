@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.112.3'
 import { createSandboxHttpClient } from '../_shared/yookassaSandboxHttp.js'
-import { createSandboxReconciler } from '../_shared/sandboxReconciliation.js'
+import { reconcileSandboxOrder } from '../_shared/sandboxOrderReconciliation.js'
 import { createSandboxOrderWorkerHandler } from '../_shared/sandboxOrderWorkerHandler.js'
 
 Deno.serve(async request => {
@@ -11,6 +11,9 @@ Deno.serve(async request => {
     const orderId = request.headers.get('x-qvesta-order-id')
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId ?? '')) throw Error('invalid_order_id')
     const client = createClient(url!, serviceKey!, { auth: { persistSession: false, autoRefreshToken: false } })
-    return createSandboxReconciler({ rpc: client.rpc.bind(client), provider: createSandboxHttpClient({ enabled, shopId, secretKey }), shopId }).order(orderId)
+    return reconcileSandboxOrder({ rpc: client.rpc.bind(client), shopId, orderId,
+      receiptsEnabled: Deno.env.get('YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION') === 'true',
+      createProvider: options => createSandboxHttpClient({ enabled, shopId, secretKey }, options),
+    })
   } })(request)
 })
