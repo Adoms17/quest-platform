@@ -29,8 +29,11 @@ export async function verifyRealAdminBrowser({ authBase, restBase, credentials, 
     page.setDefaultTimeout(15000)
     step = 'вход по паролю'
     await page.goto(`http://127.0.0.1:${address.port}`)
+    step = 'загрузка формы входа'
     await page.getByLabel('Электронная почта').fill(credentials.email)
+    step = 'заполнение пароля'
     await page.getByLabel('Пароль', { exact: true }).fill(credentials.password)
+    step = 'отправка формы входа'
     await page.getByRole('button', { name: 'Войти', exact: true }).click()
     step = 'подтверждение настоящего TOTP'
     await expect(page.getByRole('heading', { name: 'Подтверждение входа' })).toBeVisible()
