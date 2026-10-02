@@ -113,3 +113,15 @@ it('settlement selection rejects legacy response and unknown scenario',async()=>
  await expect(createFiscalAcceptanceApi(c,'settlement').prepare(email)).rejects.toThrow('preparation_unconfirmed')
  expect(()=>createFiscalAcceptanceApi(c,'unknown')).toThrow('invalid_scenario')
 })
+
+it('post-guard scenario keeps its own fixture and rejects an old order response',async()=>{
+ const {postGuardFixtureId,postGuardOrganizationId,isAcceptanceOrganization}=await import('./fiscalAcceptanceApi')
+ const c=setup()
+ await expect(createFiscalAcceptanceApi(c,'postGuard').prepare(email)).rejects.toThrow('preparation_unconfirmed')
+ c.functions.invoke.mockResolvedValue({data:{...response,fixtureId:postGuardFixtureId,organizationId:postGuardOrganizationId}})
+ await expect(createFiscalAcceptanceApi(c,'postGuard').prepare(email)).resolves.toMatchObject({orderId:response.orderId})
+ expect(c.functions.invoke).toHaveBeenLastCalledWith('admin-fiscal-acceptance-prepare',{body:{fixtureId:postGuardFixtureId,email}})
+ expect(isAcceptanceOrganization(c,postGuardOrganizationId)).toBe(true)
+ vi.stubGlobal('location',{origin:'https://admin.qvesta.ru'})
+ expect(isAcceptanceOrganization(c,postGuardOrganizationId)).toBe(false)
+})

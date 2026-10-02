@@ -1,0 +1,106 @@
+[
+  {
+    "slug": "redeem-quest-code",
+    "version": 126,
+    "status": "ACTIVE",
+    "verify_jwt": true,
+    "ezbr_sha256": "09073054bbdc66f4b4a5fb0b622d29a8ff596d4bad2664f1de104a94ad6b8c9b",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "sandbox-checkout",
+    "version": 118,
+    "status": "ACTIVE",
+    "verify_jwt": true,
+    "ezbr_sha256": "03729c5c6b75262c89200506379eadc8a2137a4b7321d84b2013eb4594ad1126",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "sandbox-reconcile",
+    "version": 127,
+    "status": "ACTIVE",
+    "verify_jwt": false,
+    "ezbr_sha256": "b0bfcae9df831b8c6cef0ef9b55939194d4779b795cfffb6e17b85b2c44b7686",
+    "previous_bundle_equal": false
+  },
+  {
+    "slug": "yookassa-sandbox-webhook",
+    "version": 118,
+    "status": "ACTIVE",
+    "verify_jwt": false,
+    "ezbr_sha256": "92ecb610a4aa60e54fb5a571e40752035f0451333d46fcb310efd34ae4ceaaf8",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "admin-sandbox-refund",
+    "version": 112,
+    "status": "ACTIVE",
+    "verify_jwt": true,
+    "ezbr_sha256": "b49953315d0d5647923a6733c1bbb383b5dc74f495646e232029bbd089758045",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "sandbox-recurring",
+    "version": 106,
+    "status": "ACTIVE",
+    "verify_jwt": false,
+    "ezbr_sha256": "f263084b66e11f62ae4551e99a7d234346f8d7ff8bfce38a832e49bab1f37d0d",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "sandbox-reconcile-order",
+    "version": 81,
+    "status": "ACTIVE",
+    "verify_jwt": false,
+    "ezbr_sha256": "1e20f817ac3b918278a68de2d76bfc1d25e3b8438c49b265fd7cf45ade01197d",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "admin-subscription-refund-prepare",
+    "version": 71,
+    "status": "ACTIVE",
+    "verify_jwt": true,
+    "ezbr_sha256": "c25a61567ab7fc51ad550e04fb84b0edb2f7772fb228eb0d64c578e11e9d6abe",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "admin-subscription-refund",
+    "version": 72,
+    "status": "ACTIVE",
+    "verify_jwt": true,
+    "ezbr_sha256": "9642be84b54845e0b78950eacff667106178996e03afa91803d4fa9b025235da",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "admin-subscription-fiscal-refund",
+    "version": 69,
+    "status": "ACTIVE",
+    "verify_jwt": true,
+    "ezbr_sha256": "11833af4821b3e6281279e69bc59f2ae544b9d4da55543d50b965adda48f7a4b",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "sandbox-subscription-fiscal-order",
+    "version": 68,
+    "status": "ACTIVE",
+    "verify_jwt": false,
+    "ezbr_sha256": "397b3d9dd1633af344c00cbb4e93a33a4d958eed3b25669148ade8f14c9c01de",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "admin-fiscal-acceptance-prepare",
+    "version": 64,
+    "status": "ACTIVE",
+    "verify_jwt": true,
+    "ezbr_sha256": "a00050de72f27ce9c0846f5f5902ceb7d3a058b15b33ce3bbef4d3079bc46a80",
+    "previous_bundle_equal": true
+  },
+  {
+    "slug": "sandbox-subscription-settlement-order",
+    "version": 9,
+    "status": "ACTIVE",
+    "verify_jwt": false,
+    "ezbr_sha256": "74976171ba5e4780c6291b36c115e786edf48b3c2d3004aa7795293976cd64f2",
+    "previous_bundle_equal": true
+  }
+]

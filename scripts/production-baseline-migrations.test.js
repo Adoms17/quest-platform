@@ -118,6 +118,25 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   expect(sql(rehearsal)).toContain('stage_bundle_initialized=sandbox')
   expect(JSON.parse(sql(inventorySql).trim())).toEqual(originalCatalog)
   expect(sql("select to_regclass('platform_private.billing_runtime_environment') is null").trim()).toBe('t')
+
+  // Rehearse the exact post-guard fixture only inside this disposable database.
+  const postGuardBody=readFileSync(new URL('./stage-post-guard-fixture.sql',import.meta.url),'utf8').replace(/^begin;\s*/,'').replace(/commit;\s*$/,'')
+  const postGuardSetup=bundle.replace(/commit;\s*$/,'')+" \n insert into auth.users(id,email) values(md5('operator-fixture-owner')::uuid,'operator@example.test');\n insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('operator-fixture-owner')::uuid,'owner','platform');\n select set_config('test.personal.before',(select to_jsonb(s)::text from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('operator-fixture-owner')::uuid),true);\n insert into public.billing_fiscal_policies(id,environment,shop_id,effective_at,vat_code,payment_subject,payment_mode)\n values(md5('operator-policy')::uuid,'sandbox','1467641',clock_timestamp()+interval '1 second',1,'service','full_prepayment');\n insert into public.billing_fiscal_policy_models(policy_id,product_kind,model_version,seller_tax_regime,settlement_basis)\n values(md5('operator-policy')::uuid,'subscription','subscription_access_v1','ausn','period_end'); select pg_sleep(1.1);\n "
+  const fixtureQuery="select to_jsonb(f)::text from public.billing_fiscal_acceptance_fixtures f where id=md5('stage-guard-fixture-20261002')::uuid"
+  const fixtureOut=sql(postGuardSetup+postGuardBody+`
+   select set_config('test.saved.fixture', (${fixtureQuery}),true);
+   ${postGuardBody}
+   do $verify$ begin
+    if (${fixtureQuery}) is distinct from current_setting('test.saved.fixture') then raise exception 'fixture retry changed row'; end if;
+    if exists(select 1 from public.billing_sandbox_orders) then raise exception 'fixture created payment'; end if;
+   end; $verify$;
+   select 'post_guard_fixture_retry_ok'; rollback;`)
+  expect(fixtureOut).toContain('post_guard_fixture_retry_ok')
+  expect(sql("select count(*) from public.organizations where id=md5('stage-guard-org-20261002')::uuid").trim()).toBe('0')
+  expect(()=>sql(postGuardSetup+postGuardBody.replace("clock_timestamp()+interval '2 hours'","clock_timestamp()-interval '1 second'")+postGuardBody+'rollback;')).toThrow('fixture already used, expired or mismatched')
+  expect(()=>sql(postGuardSetup+`insert into public.organizations(id,name) values(md5('stage-guard-org-20261002')::uuid,'existing test organization');`+postGuardBody+'rollback;')).toThrow('organization collision: preserve existing organization')
+  expect(()=>sql(postGuardSetup+postGuardBody+`select public.prepare_fiscal_acceptance_from_gateway(md5('operator-fixture-owner')::uuid,floor(extract(epoch from clock_timestamp()))::bigint,floor(extract(epoch from clock_timestamp()))::bigint+300,md5('stage-guard-fixture-20261002')::uuid,'operator@example.test');`+postGuardBody+'rollback;')).toThrow('fixture already used, expired or mismatched')
+  expect(sql("select to_regclass('platform_private.billing_runtime_environment') is null").trim()).toBe('t')
   const failedBundle=bundle.replace(/^commit;\s*$/m,`do $failure$ begin raise exception 'injected stage bundle failure'; end; $failure$; commit;`)
   expect(()=>sql(failedBundle)).toThrow('injected stage bundle failure')
   expect(sql("select to_regclass('platform_private.billing_runtime_environment') is null").trim()).toBe('t')
