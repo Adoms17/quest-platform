@@ -5,7 +5,10 @@ export const fullRefundOrganizationId='64701955-543c-b77b-23ba-ede86feb8728'
 export const fullRefundBodyOrganizationId='e129101e-0878-5585-d3e8-207d76ef15c1'
 export const settlementOrganizationId='e2790c93-7bfa-7992-f6f0-74f1cf1c79e5'
 export const settlementFixtureId='1e75dddf-2f61-4807-22ce-b6d382284f82'
+export const postGuardOrganizationId='f4544b10-7b44-28e2-67c6-8ad7cf62c737'
+export const postGuardFixtureId='0f95a5be-e036-5ac0-d5ac-99fc38df90da'
 export const acceptanceScenarios=Object.freeze({
+ postGuard:Object.freeze({fixtureId:postGuardFixtureId,organizationId:postGuardOrganizationId,name:'sandbox-post-guard-20261002',label:'Проверка после защиты среды'}),
  legacy:Object.freeze({fixtureId:acceptanceFixtureId,organizationId:acceptanceOrganizationId,name:'sandbox-fiscal-acceptance-20260929-session-ready',label:'Прежняя приёмка возвратов'}),
  settlement:Object.freeze({fixtureId:settlementFixtureId,organizationId:settlementOrganizationId,name:'sandbox-subscription-settlement-20260930',label:'Зачёт после окончания периода'}),
 })
@@ -38,5 +41,5 @@ export function createFiscalAcceptanceApi(client,scenario='legacy'){
 }
 
 export function isAcceptanceOrganization(client,organizationId){
- return isFiscalPolicyStage(client)&&[acceptanceOrganizationId,fullRefundOrganizationId,fullRefundBodyOrganizationId,settlementOrganizationId].includes(organizationId)
+ return isFiscalPolicyStage(client)&&[acceptanceOrganizationId,fullRefundOrganizationId,fullRefundBodyOrganizationId,settlementOrganizationId,postGuardOrganizationId].includes(organizationId)
 }
