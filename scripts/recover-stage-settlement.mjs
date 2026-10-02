@@ -15,14 +15,14 @@ export function parseQueryRows(stdout) {
  if (!Array.isArray(rows)) throw Error('recovery query format denied')
  return rows
 }
-export const guard = `
+function targetGuard(order, payment, organization) { return `
 do $guard$ begin
  if not exists(select 1 from public.billing_sandbox_orders o
  join public.billing_sandbox_payment_results p on p.order_id=o.id
  join public.billing_prepayment_settlements r on r.order_id=o.id
  join public.billing_prepayment_settlement_status s on s.order_id=o.id
  join public.billing_sandbox_settlement_schedule q on q.order_id=o.id
- where o.id='${order}' and o.organization_id='e2790c93-7bfa-7992-f6f0-74f1cf1c79e5'
+ where o.id='${order}' and o.organization_id='${organization}'
  and o.shop_id='1467641' and o.amount_minor=99000 and o.currency='RUB'
  and p.payment_id='${payment}' and p.shop_id=o.shop_id and p.status='succeeded' and p.paid and not p.requires_review
  and r.body->>'payment_id'=p.payment_id::text and not s.requires_review and s.status in ('unknown','pending','succeeded')
@@ -32,6 +32,8 @@ do $guard$ begin
  then raise exception 'recovery target denied'; end if;
 end; $guard$;
 `
+}
+export const guard = targetGuard(order, payment, 'e2790c93-7bfa-7992-f6f0-74f1cf1c79e5')
 async function query(sql) {
  const dir = await mkdtemp(join(tmpdir(), 'settlement-recovery-'))
  try {
@@ -42,6 +44,14 @@ async function query(sql) {
  } finally { await rm(dir, {recursive:true,force:true}) }
 }
 export async function recoverStageSettlement(env, execute = query, createProvider = createSandboxHttpClient) {
+ const targets = {
+  '80fac987-e40e-4521-8f94-ffbc3193ca32': ['324f7174-000f-5001-a000-179c65421768','e2790c93-7bfa-7992-f6f0-74f1cf1c79e5',null],
+  '37ca8401-9ceb-4b50-985b-31c6e8aff131': ['32518d9b-000f-5001-8000-1879f1c4b519','f4544b10-7b44-28e2-67c6-8ad7cf62c737','ra-3252047f-0000-0051-ce7a-a32f564a7378'],
+ }
+ const order = env.SANDBOX_ORDER_ID || '80fac987-e40e-4521-8f94-ffbc3193ca32'
+ if (!Object.hasOwn(targets,order)) throw Error('recovery target denied')
+ const [payment,organization,expectedReceipt] = targets[order]
+ const guard = targetGuard(order,payment,organization)
  if (env.SUPABASE_PROJECT_ID !== project || env.GITHUB_REF !== 'refs/heads/staging'
   || env.GITHUB_REPOSITORY !== 'Adoms17/quest-platform' || env.GITHUB_EVENT_NAME !== 'workflow_dispatch'
   || env.YOOKASSA_SANDBOX_SHOP_ID !== '1467641') throw Error('recovery environment denied')
@@ -58,7 +68,9 @@ export async function recoverStageSettlement(env, execute = query, createProvide
    return fetch(url,options)
   },
  })
- const result = await provider.findSettlement(rows[0].operation)
+ if (expectedReceipt && rows[0].operation.receiptId !== expectedReceipt) throw Error('recovery receipt denied')
+ const result = expectedReceipt ? await provider.readSettlement(rows[0].operation) : await provider.findSettlement(rows[0].operation)
+ if (expectedReceipt && result?.id !== expectedReceipt) throw Error('recovery receipt mismatch')
  if (!result || !/^r[at]-[a-zA-Z0-9-]{1,100}$/.test(result.id) || result.status !== 'succeeded') throw Error('recovery not resolved')
  const saved = await execute(`begin; set local lock_timeout='5s';
  select 1 from public.billing_sandbox_orders where id='${order}' for update;

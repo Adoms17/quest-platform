@@ -2366,6 +2366,7 @@ jobs:
         env:
           YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
           YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          SANDBOX_ORDER_ID: ${{ inputs.sandbox_order_id }}
         run: node scripts/recover-stage-settlement.mjs
 
   reconcile-compatible-functions:

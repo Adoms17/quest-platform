@@ -288,3 +288,51 @@ Read-only metadata CLI: все 15 булевых flags false (общий sandbox
 Следующий выпуск: review/PR/CI, публикация только sandbox-reconcile-order на stage; затем отдельно разрешённое временное включение receipt reconciliation и один вызов с order 37ca8401-9ceb-4b50-985b-31c6e8aff131. Общий batch и cron не запускать. После успешной адресной сверки выключить receipt reconciliation, подтвердить статус в billing, затем подготовить проверку зачёта предоплаты. Свежий допуск или новую оплату для сверки существующего платежа не создавать.
 
 Сборка npm run build завершилась успешно (exit 0), включая PWA generateSW; отмечен медленный closeBundle, ошибок нет.
+
+## PR #155 выпущен на stage — 02.10.2026
+
+По явному разрешению пользователя PR #155 слит squash с проверенным head 6204e227ffdfe76059325ad8191eb09f32381876; merge SHA 7c632e749b37bc6216dc28401f58f6d594f54933. Все CI/CodeQL checks SUCCESS. Перед публикацией diff HEAD/origin-staging для supabase/functions и config.toml пустой.
+
+CLI functions deploy sandbox-reconcile-order --project-ref jeugfyaqzfgdvfhdxfht --use-api завершился успешно; независимый functions list: version 83, ACTIVE. Опубликована только указанная функция. Metadata флагов подтвердили прежние три true (sandbox enabled, prepare enabled, receipts required), остальные 12 false, включая receipt reconciliation. Cron не менялся. Сама адресная сверка ещё не запускалась, локальный receipt status не подтверждён как обновлённый.
+
+Следующее согласуемое действие: временно включить YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION, вызвать reconcile-order только для 37ca8401-9ceb-4b50-985b-31c6e8aff131, затем вернуть flag=false независимо от результата и проверить UI. Не запускать общий reconcile, отправку чеков, возвраты и cron. Перед включением повторно проверить отсутствие активного расписания.
+
+## Адресная сверка чека выполнена — 02.10.2026
+
+По разрешению пользователя временно включён receipt reconciliation. Перед запуском read-only SQL подтвердил environment=sandbox, active_cron=0. Первый run 37041472102 SUCCESS (checked=1, applied), но слежение ошибочно выбрало старый run из eventually-consistent списка, finally выключил flag раньше завершения нужного запуска; статус оставался unknown. Без новых отправок выполнен повтор той же GET-сверки с ID из прямого ответа dispatch: https://github.com/Adoms17/quest-platform/actions/runs/37041704609 — SUCCESS. Флаг выключен в finally после завершения точного запуска.
+
+Независимый read-only SQL после повтора: billing_receipt_payment_status.status=succeeded для order 37ca8401-9ceb-4b50-985b-31c6e8aff131, payment 32518d9b-000f-5001-8000-1879f1c4b519; active_cron=0. Новые платежи, чеки и возвраты не создавались. При будущих gh workflow run брать ID из ответа dispatch, не из первой строки run list.
+
+Браузерная проверка billing (20:36 МСК): правильная организация, «Регистрация чека подтверждена», оплаченный период применён, согласий автопродления нет. Период завершился в 12:48:48; UI показывает льготный доступ до 07.10.2026 12:48:48. Независимая metadata-проверка: receipt reconciliation=false. Следующий этап — проверка зачёта предоплаты; отправка зачётного чека в этом шаге не выполнялась.
+
+## Подготовка зачёта postGuard — 02.10.2026
+
+Read-only stage: сумма 99000, период завершён, MODEL-03 ledger отсутствует, fiscal operations=0, legacy settlements=0, список MODEL-03 due_work пуст. Это не ошибка оплаты: MODEL-03 worker выбирает только заказы с существующим ledger. Для заказа без возвратов применим существующий prepayment settlement путь. Старый admission script ограничен fixture от 30.09 и часом после period_end; запускать его для postGuard нельзя.
+
+Подготовлен отдельный scripts/stage-post-guard-settlement-admission.sql: фиксированный order ID, postGuard fixture/organization, require_sandbox_environment, прежние проверки суммы/периода/оплаты/чека/возвратов. Создаётся только выключенный schedule на 30 минут, не позднее period_end+24 часа (ограничение таблицы); повтор не продлевает срок, использованный или истёкший schedule отклоняется. Скрипт завершается ROLLBACK; COMMIT только отдельным разрешённым шагом. Не выполнялся на stage, SQL rehearsal ещё не выполнен. Lint PASS с прежними warnings; build первоначально не смог записать Vite temp из sandbox, повтор с правом записи PASS. Это не подтверждение SQL-корректности. Флаги и общая БД не менялись.
+
+Следующий шаг согласования: preview этого скрипта с ROLLBACK, затем при успешном результате provision выключенного допуска; отправка зачётного чека остаётся отдельным этапом. Новый платёж не требуется.
+
+## Выключенный допуск зачёта postGuard сохранён — 02.10.2026
+
+По разрешению пользователя выполнен preview admission SQL с ROLLBACK. Получена строка 99000/enabled=false/attempts=0; отдельный read-only SELECT подтвердил persisted_after_preview=0. Затем тот же SQL с mode=provision и COMMIT выполнен успешно. Независимый SELECT: enabled=false, attempts=0, expires_msk=2026-10-02 21:24:30.39789, active_cron=0, settlements=0. Флаги функций не менялись, чек не создавался и не отправлялся.
+
+При вводе большого SQL через typeText произошёл тайм-аут до Run; редактор содержал лишь часть текста. После повторного подключения неполный текст полностью заменён через paste; повторного исполнения неизвестного COMMIT не было. Для длинных SQL использовать paste, проверять результат и отдельным SELECT подтверждать rollback/commit.
+
+## Одна отправка зачёта postGuard — 02.10.2026
+
+После согласия продолжить следующий объявленный этап временно включён адресный settlement-order gate с target=37ca8401-9ceb-4b50-985b-31c6e8aff131. В одной транзакции проверены sandbox environment, отсутствие активного cron и других enabled schedules, действующий неиспользованный допуск на 99000. Включён только этот допуск и однократно вызван существующий run_scheduled_subscription_settlements с проверкой sent=1. COMMIT: attempts=1, last_request_id=4.
+
+Ответ pg_net: HTTP 200, timed_out=false. Сохранён существующий provider receipt ra-3252047f-0000-0051-ce7a-a32f564a7378, status=pending, requires_review=false. Gate выключен CLI; допуск выключен отдельной транзакцией. Проверка после COMMIT: enabled=false, attempts=1, active_cron=0. Нового платежа и возврата не было. Чек зачёта отправлен один раз; регистрацию succeeded ещё не подтверждали.
+
+Кабинет ЮKassa открылся, но карточка существующего платежа дважды показала «Данные не загрузились». Не считать это ошибкой отправки и не повторять POST. Следующий шаг — GET-сверка уже известного receipt ID и сохранение подтверждённого результата; затем приёмка отображения в админке.
+
+## Чек зачёта подтверждён в ЮKassa — 02.10.2026
+
+Старая вкладка кабинета перестала отвечать на focus; новая вкладка того же IAB восстановила доступ. В тестовом магазине 1467641 история платежа показывает исходный чек и один связанный чек 990 рублей. Открыт точный receipt ra-3252047f-0000-0051-ce7a-a32f564a7378: доставлен в облачную кассу, дата фискализации 02.10.2026 20:58 МСК. Позиция: услуга, полный расчёт, количество 1, сумма 990 рублей, без НДС; расчёты: зачёт аванса или предоплаты 990 рублей. Это подтверждение тестовой регистрации у провайдера. Статус в собственной БД в этом шаге не обновлялся (последний pending); далее нужна GET-сверка существующего чека и проверка админки. Отправители не включались, повторной отправки не было.
+
+## GET-only сверка postGuard после истечения допуска — 02.10.2026
+
+Подготовлена локальная доработка recover-stage-settlement.mjs: явный allowlist прежнего и postGuard заказов; для postGuard жёстко связаны организация, платёж и receipt ra-3252047f-0000-0051-ce7a-a32f564a7378. Используется readSettlement известного receipt ID, запросы POST запрещены транспортом, результат сохраняется только при совпадении ID и succeeded. Schedule остаётся выключенным; продление допуска не требуется. Workflow передаёт существующий sandbox_order_id в recovery job. Прежний вызов без параметра сохранён.
+
+17 тестов PASS, lint PASS (прежние warnings), build/PWA PASS, diff --check PASS. Stage recovery не запускался, последний сохранённый статус pending. Нужны разрешённые commit/push/PR, CI, merge в staging и запуск subscription-settlement-recover-existing только для postGuard. Новая Edge Function и включение dispatch не требуются.

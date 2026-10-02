@@ -44,3 +44,31 @@ test('storage conflict is not reported as successful recovery',async()=>{
  const c=setup();c.query.mockReset().mockResolvedValueOnce([{operation}]).mockResolvedValue([{status:'succeeded',provider_receipt_id:'ra-other',requires_review:true}])
  await expect(recoverStageSettlement(env,c.query,c.createProvider)).rejects.toThrow('storage unconfirmed')
 })
+
+const postGuardOrder='37ca8401-9ceb-4b50-985b-31c6e8aff131'
+const postGuardReceipt='ra-3252047f-0000-0051-ce7a-a32f564a7378'
+const postGuardOperation={shopId:'1467641',receiptId:postGuardReceipt,body:{payment_id:'32518d9b-000f-5001-8000-1879f1c4b519'}}
+test('postGuard reads the exact existing receipt and persists only verified success',async()=>{
+ const query=vi.fn().mockResolvedValueOnce([{operation:postGuardOperation}]).mockResolvedValueOnce([{status:'succeeded',provider_receipt_id:postGuardReceipt,requires_review:false}])
+ const readSettlement=vi.fn().mockResolvedValue({id:postGuardReceipt,status:'succeeded'})
+ const findSettlement=vi.fn()
+ const factory=vi.fn(()=>({readSettlement,findSettlement}))
+ expect(await recoverStageSettlement({...env,SANDBOX_ORDER_ID:postGuardOrder},query,factory)).toEqual({status:'succeeded',receiptId:postGuardReceipt})
+ expect(readSettlement).toHaveBeenCalledWith(postGuardOperation)
+ expect(findSettlement).not.toHaveBeenCalled()
+ expect(query.mock.calls[1][0]).toContain(postGuardOrder)
+ expect(query.mock.calls[1][0]).not.toContain('80fac987-e40e-4521-8f94-ffbc3193ca32')
+ expect(()=>factory.mock.calls[0][1].fetchImpl('https://api.yookassa.ru/v3/receipts',{method:'POST'})).toThrow('GET only')
+})
+test('unknown recovery target is rejected before database access',async()=>{
+ const c=setup()
+ await expect(recoverStageSettlement({...env,SANDBOX_ORDER_ID:'other'},c.query,c.createProvider)).rejects.toThrow('target denied')
+ expect(c.query).not.toHaveBeenCalled()
+})
+test.each(['stored','provider'])('postGuard rejects a different %s receipt',async phase=>{
+ const query=vi.fn().mockResolvedValue([{operation:{...postGuardOperation,receiptId:phase==='stored'?'ra-other':postGuardReceipt}}])
+ const readSettlement=vi.fn().mockResolvedValue({id:'ra-other',status:'succeeded'})
+ await expect(recoverStageSettlement({...env,SANDBOX_ORDER_ID:postGuardOrder},query,()=>({readSettlement}))).rejects.toThrow('receipt')
+ expect(query).toHaveBeenCalledTimes(1)
+ if(phase==='stored')expect(readSettlement).not.toHaveBeenCalled()
+})
