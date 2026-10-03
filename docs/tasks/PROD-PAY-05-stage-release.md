@@ -1,5 +1,10 @@
 # PROD-PAY-05 — подготовка stage-пакета guard/pin
 
+**Текущий статус на 02.10.2026, 22:32 МСК:** GET-восстановление существующего чека завершено (run 37049621847, attempt 3 SUCCESS), UI подтверждает регистрацию оплаты и зачёта 990 ₽. Ошибка авторизации устранена. Учёт guard/pin в миграциях и production-пакет не завершены. Последний снимок общего sandbox gate — включён; нельзя считать все отправители выключенными только по успеху recovery.
+
+Единая актуальная очередь и границы доказательств: [план подготовки production](WEB-PAY-production-readiness.md). Датированные записи ниже сохраняют историю.
+
+
 Дата: 01.10.2026. PR #151 слит в staging: `58b1fdabbf4f9da18f9338e773fe2fdf853189c9`. Этот документ описывает локальную подготовку следующего выпуска. Удалённое применение НЕ выполнено.
 
 ## Локальный сборщик
@@ -336,3 +341,15 @@ Read-only stage: сумма 99000, период завершён, MODEL-03 ledge
 Подготовлена локальная доработка recover-stage-settlement.mjs: явный allowlist прежнего и postGuard заказов; для postGuard жёстко связаны организация, платёж и receipt ra-3252047f-0000-0051-ce7a-a32f564a7378. Используется readSettlement известного receipt ID, запросы POST запрещены транспортом, результат сохраняется только при совпадении ID и succeeded. Schedule остаётся выключенным; продление допуска не требуется. Workflow передаёт существующий sandbox_order_id в recovery job. Прежний вызов без параметра сохранён.
 
 17 тестов PASS, lint PASS (прежние warnings), build/PWA PASS, diff --check PASS. Stage recovery не запускался, последний сохранённый статус pending. Нужны разрешённые commit/push/PR, CI, merge в staging и запуск subscription-settlement-recover-existing только для postGuard. Новая Edge Function и включение dispatch не требуются.
+
+## PR #156 слит; recovery остановлен авторизацией — 02.10.2026
+
+PR #156: head 1ed878645188aa8fc646681b48ab44a13ab48759, все CI/CodeQL checks SUCCESS (validate 9m29s), squash merge 2725468e5a95079067386b45dc6fa6df4a00eaae. Разрешённый workflow https://github.com/Adoms17/quest-platform/actions/runs/37049621847 завершился failure на supabase link: Unexpected error retrieving remote project status / Unauthorized. До GET к ЮKassa, миграционной проверки и записи статуса runner не дошёл; повторных чеков нет. Не повторять до восстановления SUPABASE_ACCESS_TOKEN в GitHub Actions staging.
+
+Пользователь вошёл в админку, открыта sandbox-post-guard-20261002. Перед recovery UI подтвердил чек оплаты «Зарегистрирован», зачёт «Регистрируется», сумма 990 рублей, возвраты 0, период выдан. Флаги/cron не менялись. Следующий шаг — обновление доступа workflow пользователем, затем повтор только recovery run и проверка админки. Секреты в чат не передавать.
+
+## GET-сверка и браузерная приёмка завершены — 02.10.2026 22:32 МСК
+
+Run https://github.com/Adoms17/quest-platform/actions/runs/37049621847, attempt 3, job 110996331616 SUCCESS (26s), тот же staging SHA 2725468e5a95079067386b45dc6fa6df4a00eaae. Результат: status=succeeded, receiptId=ra-3252047f-0000-0051-ce7a-a32f564a7378. После обновления статусов в админке оба чека по postGuard заказу на 990 рублей показывают «Зарегистрирован»; последняя сверка зачёта 22:32:00. Новых платежей, возвратов или receipt POST не выполнялось; recovery не меняет флаги и допуск.
+
+Уточнение прав CI: supabase db query --linked в CLI 2.116.0 использует Management API, а не SUPABASE_DB_PASSWORD. Scoped PAT для этого recovery ограничен stage jeugfyaqzfgdvfhdxfht: Project Settings Read, API Keys Read, API Key Secrets Read, Database Read-write. Предыдущая рекомендация только трёх Read прав была неполной: attempt 2 прошёл link и migrations, но остановился на recovery; после обновления токена attempt 3 успешен. Локальный gh также вернул 401, поэтому повторы выполнены через авторизованный браузер GitHub. Значения секретов не читались и не сохранялись.
