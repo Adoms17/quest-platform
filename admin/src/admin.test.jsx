@@ -18,7 +18,7 @@ function authClient(level = 'aal1') {
       enroll: vi.fn(),
     },
   }
-  return { auth, rpc: vi.fn(), notify: (...args) => notify(...args) }
+  return { auth, rpc: vi.fn().mockResolvedValue({data:['organizations','tariffs']}), notify: (...args) => notify(...args) }
 }
 
 describe('административный контур', () => {
@@ -99,7 +99,7 @@ describe('административный контур', () => {
   it('выход скрывает каталог и запоздалый ответ не возвращает данные', async () => {
     const client = authClient('aal2')
     let resolve
-    client.rpc.mockReturnValue(new Promise(done => { resolve = done }))
+    client.rpc.mockImplementation(name => name === 'read_my_platform_sections' ? Promise.resolve({data:['organizations']}) : new Promise(done => { resolve = done }))
     render(<App client={client} />)
     fireEvent.click(await screen.findByText('Найти'))
     await act(async () => { client.notify('SIGNED_OUT', null) })
@@ -115,9 +115,9 @@ it('preserves tariff screen on token refresh but resets on account change', asyn
  client.auth.getSession.mockResolvedValue({ data: { session: session('owner', 'old') } })
  render(<App client={client} />)
  fireEvent.click(await screen.findByRole('button', { name: 'Тарифы' }))
- expect(screen.getByRole('heading', { name: 'Тарифы' })).toBeInTheDocument()
+ expect(await screen.findByRole('heading', { name: 'Тарифы' })).toBeInTheDocument()
  await act(async () => client.notify('TOKEN_REFRESHED', session('owner', 'new')))
- expect(screen.getByRole('heading', { name: 'Тарифы' })).toBeInTheDocument()
+ expect(await screen.findByRole('heading', { name: 'Тарифы' })).toBeInTheDocument()
  await act(async () => client.notify('SIGNED_IN', session('other', 'new')))
  await screen.findByRole('heading', { name: 'Организации' })
  expect(screen.queryByRole('heading', { name: 'Тарифы' })).not.toBeInTheDocument()

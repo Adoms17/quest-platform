@@ -18,6 +18,7 @@ async function mockApi(page, initialLevel = null) {
     if (path === '/auth/v1/user') return respond(user)
     if (path === '/auth/v1/factors/factor/challenge') return respond({ id: 'challenge', expires_at: 9999999999 })
     if (path === '/auth/v1/factors/factor/verify') return respond(session('aal2'))
+    if (path === '/rest/v1/rpc/read_my_platform_sections') return respond(['organizations','tariffs','campaigns','statistics','documents','fiscal-acceptance','fiscal-policy'])
     if (path === '/auth/v1/logout') return respond({})
     if (path === '/rest/v1/rpc/search_platform_organizations') return respond({ items: [{ id: 'org', name: 'Тестовая организация', created_at: '2026-09-18T10:00:00Z' }], next_cursor: null })
     if (path === '/rest/v1/rpc/get_platform_organization_summary') return respond({ id: 'org', name: 'Тестовая организация', created_at: '2026-09-18T10:00:00Z' })
@@ -624,4 +625,21 @@ test('fiscal refund receipt status and repeat check',async({page},testInfo)=>{
  await section.screenshot({path:testInfo.outputPath('fiscal-receipt-complete.png')})
  expect(reserves).toBe(1);expect(checks).toBe(2)
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width)
+})
+
+test('navigation denies an account without a role and allows retry', async ({page}) => {
+ await mockApi(page,'aal2')
+ let sections=[]
+ await page.route('**/rest/v1/rpc/read_my_platform_sections',route=>route.fulfill({json:sections}))
+ await page.goto('/')
+ await expect(page.getByRole('heading',{name:'Доступ не предоставлен'})).toBeVisible()
+ await expect(page.getByRole('navigation')).toHaveCount(0)
+ sections=['organizations']
+ await page.getByRole('button',{name:'Повторить проверку'}).click()
+ await expect(page.getByRole('heading',{name:'Организации',exact:true})).toBeVisible()
+ await expect(page.getByRole('button',{name:'Тарифы',exact:true})).toHaveCount(0)
+ sections=[]
+ await page.getByRole('button',{name:'Организации',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Доступ не предоставлен'})).toBeVisible()
+ await expect(page.getByRole('navigation')).toHaveCount(0)
 })

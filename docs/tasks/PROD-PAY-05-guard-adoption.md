@@ -40,3 +40,19 @@ scripts/build-stage-guard-release.js строит preview (ROLLBACK по умо�
 
 
 Итог 03.10.2026: 10 тестов PASS (2 набора), включая полную изолированную SQL-репетицию, 141.74 с. Fresh bootstrap, принятие установленной защиты, повтор без дублирования версии, недостающая/лишняя история, конфликт statements, дрейф RLS и откат после инъецированного сбоя проверены. Lint/build/PWA PASS с прежними предупреждениями. Пакет готов к PR; stage-журнал не менялся.
+
+## Stage adoption завершён — 03.10.2026
+
+По явному разрешению владельца PR #157 слит в staging: merge 9a9b000529bab912e6d6400f1dc9e3682c50be57, исходный проверенный e831ceda0ef5b72b0f60bafce7d43dab4aea8461; деревья совпадают. Все 5 GitHub checks PASS, E2E 224 passed / 22 skipped: https://github.com/Adoms17/quest-platform/actions/runs/37108439007.
+
+На stage jeugfyaqzfgdvfhdxfht в 08:21:12 UTC выключены общий sandbox gate, sandbox refunds, recurring и пять dispatch/reconciliation flags. Сверка digest подтвердила false; остальные специальные refund/acceptance/settlement gates уже false. ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED и YOOKASSA_SANDBOX_RECEIPTS_REQUIRED остаются true. Production не менялся.
+
+До preview выдержано более 400 секунд после отключения. Основание drain — подтверждённая конфигурация и документированный предел жизни worker https://supabase.com/docs/guides/functions/limits (проверен 03.10), включая background tasks; это вывод по пределу платформы, не индивидуальные shutdown logs. Анонимный запрос checkout остановлен gateway 401 и не считается проверкой disabled handler. SQL-инспектор по-прежнему честно возвращает edge_drain_verified=false.
+
+Preview после 08:28:10 UTC PASS; независимый SELECT подтвердил version_count=0 после ROLLBACK. Apply PASS; отдельная READ ONLY транзакция после COMMIT: version_count=1, exact_record=true (version/name/full statements), environment=sandbox; active_cron=0, unfinished_cron=0, active_leases=0, queued_http=0. Состояния до/после совпали: orders finished=19/reserved=2/review=2; refunds succeeded=9/rejected=1; fiscal succeeded=4; enabled settlement schedules=0. Старые reserved/review не изменялись. Отправители не включались обратно.
+
+SHA256 подготовленных файлов с source-комментарием:
+- preview: 32dd93ce3f3a4070d3a4f0060dd95f70752e776dcf9ee22d9c4238f60d6e7149
+- apply: 6dedf3e3dba5c55fb26a7df2bfa6be5ae7f06514343d7a0c1f0c5864fb8753e9
+
+Закрыт stage-учёт guard/pin. Перед будущим общим db push учитывать дополнительную remote version из release-migrations; не удалять запись ради совпадения с автоматическим каталогом. Production-пакет и оставшаяся HTTP-матрица остаются открытыми. Этот отчёт дописан локально после merge; дополнительный commit не выполнялся.

@@ -635,5 +635,7 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    'public.process_billing_confirmation(uuid)',
    'public.recheck_expiration_billing_review(uuid)',
   ])for(const role of ['anon','authenticated'])expect(sql(`select has_function_privilege('${role}','${gateway}','EXECUTE')`).trim(),role+' cannot call '+gateway).toBe('f')
+  sql(readFileSync(new URL('../supabase/release-migrations/20261003010000_read_my_platform_sections.sql',import.meta.url),'utf8'))
+  sql(readFileSync(new URL('../supabase/tests/database/platform_sections.test.sql',import.meta.url),'utf8'))
  }finally{if(created)docker(['rm','-f',name])}
 },180000)

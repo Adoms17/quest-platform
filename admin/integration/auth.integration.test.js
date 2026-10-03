@@ -199,6 +199,7 @@ test.skipIf(!enabled)('настоящий Auth: TOTP и администрати
     await sql(inboxDdl + '\ncommit;')
     const inboxSource = readFileSync(new URL('../../supabase/migrations/20260916031000_add_sandbox_payment_inbox.sql', import.meta.url), 'utf8')
     await sql(inboxSource.slice(inboxSource.indexOf('create function public.read_sandbox_reconciliation_order'), inboxSource.indexOf('create function public.enqueue_sandbox_payment_event')))
+    await sql(readFileSync(new URL('../../supabase/release-migrations/20261003010000_read_my_platform_sections.sql', import.meta.url), 'utf8'))
     const rest = `${prefix}-rest`
     const restEnvironment = {
       PGRST_DB_URI: 'postgres://authenticator@test-db:5432/postgres',
