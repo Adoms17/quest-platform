@@ -1,14 +1,9 @@
-import FiscalAcceptance from './FiscalAcceptance'
-import FiscalPolicy from './FiscalPolicy'
-import {isFiscalPolicyStage} from './fiscalPolicyApi'
-import PurchaseDocuments from './PurchaseDocuments'
-import QuestStatistics from './QuestStatistics'
-import OrganizationCampaigns from './OrganizationCampaigns'
+import AdminSections from './AdminSections'
 import { useEffect, useState } from 'react'
 import Login from './Login'
 import Mfa from './Mfa'
-import Organizations from './Organizations'
-import Tariffs from './Tariffs'
+
+
 
 export default function App({ client }) {
   const [session, setSession] = useState(undefined)
@@ -42,7 +37,7 @@ export default function App({ client }) {
 
 function SessionGate({ client, userId }) {
   const [state, setState] = useState('loading')
-  const [section, setSection] = useState('organizations')
+
   useEffect(() => {
     let active = true
     client.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data, error }) => {
@@ -53,7 +48,7 @@ function SessionGate({ client, userId }) {
   if (state === 'loading') return <p role="status">Проверяем подтверждение входа…</p>
   if (state === 'error') return <p role="alert">Не удалось проверить сессию. Выйдите и повторите вход.</p>
   if (state === 'mfa') return <Mfa auth={client.auth} />
-  return <><nav aria-label="Разделы администрирования"><button aria-pressed={section === 'organizations'} onClick={() => setSection('organizations')}>Организации</button> <button aria-pressed={section === 'tariffs'} onClick={() => setSection('tariffs')}>Тарифы</button><button aria-pressed={section === 'campaigns'} onClick={() => setSection('campaigns')}>Акции</button><button aria-pressed={section === 'statistics'} onClick={() => setSection('statistics')}>Статистика платформы</button><button aria-pressed={section === 'documents'} onClick={() => setSection('documents')}>Документы</button>{isFiscalPolicyStage(client)&&<button aria-pressed={section === 'fiscal-acceptance'} onClick={() => setSection('fiscal-acceptance')}>Тестовый заказ</button>}{isFiscalPolicyStage(client)&&<button aria-pressed={section === 'fiscal-policy'} onClick={() => setSection('fiscal-policy')}>Тестовые чеки</button>}</nav>{section === 'fiscal-acceptance' ? <FiscalAcceptance client={client} /> : section === 'fiscal-policy' ? <FiscalPolicy client={client} userId={userId} /> : section === 'documents' ? <PurchaseDocuments client={client} /> : section === 'statistics' ? <QuestStatistics client={client} /> : section === 'organizations' ? <Organizations client={client} /> : section === 'campaigns' ? <OrganizationCampaigns client={client} /> : <Tariffs client={client} />}</>
+  return <AdminSections client={client} userId={userId} />
 }
 
 // Ключ только для состояния UI: права и свежесть MFA по-прежнему проверяет сервер.
