@@ -99,3 +99,51 @@ it.each([{}, {YOOKASSA_SANDBOX_ENABLED:'true',ADMIN_SUBSCRIPTION_REFUNDS_ENABLED
  const response=await handler(new Request('https://example.test',{method:'POST'}))
  expect(response.status).toBe(503);expect(create).not.toHaveBeenCalled()
 })
+
+it.each([false,true])('scoped status is read-only with dispatch enabled=%s',async enabled=>{
+ const s=setup();const handler=createSubscriptionFiscalRefundEndpoint({...s.options,enabled,statusCommandId:id(2)})
+ const response=await handler(s.request({action:'status',commandId:id(2)}))
+ expect(response.status).toBe(200);expect(await response.json()).toEqual(s.current)
+ expect(s.service.rpc).toHaveBeenCalledTimes(1)
+ expect(s.service.rpc.mock.calls[0][1].p_action).toBe('status')
+ expect(s.fetchImpl).not.toHaveBeenCalled()
+ for(const body of [{action:'execute',commandId:id(2)},{action:'reserve',organizationId:id(9),orderId:id(10),requestId:id(2)},{action:'status',commandId:id(9)}]){
+  expect((await handler(s.request(body))).status).toBe(503)
+ }
+ expect(s.service.rpc).toHaveBeenCalledTimes(1);expect(s.fetchImpl).not.toHaveBeenCalled()
+})
+it.each(['expired','stale','signature','user'])('status rejects %s identity before storage',async reason=>{
+ const s=setup(),epoch=Math.floor(Date.now()/1000)
+ const claims=(await s.auth.getClaims()).data.claims
+ if(reason==='expired')claims.exp=epoch-1
+ if(reason==='stale')claims.amr=[{method:'totp',timestamp:epoch-301}]
+ s.auth.getClaims.mockResolvedValue(reason==='signature'?{error:{}}:{data:{claims}})
+ if(reason==='user')s.auth.getUser.mockResolvedValue({error:{}})
+ const handler=createSubscriptionFiscalRefundEndpoint({...s.options,enabled:false,statusCommandId:id(2)})
+ expect((await handler(s.request({action:'status',commandId:id(2)}))).status).toBe(401)
+ expect(s.service.rpc).not.toHaveBeenCalled();expect(s.fetchImpl).not.toHaveBeenCalled()
+})
+it('status preserves gateway role denial and does not disclose storage data',async()=>{
+ const s=setup();s.service.rpc.mockResolvedValue({error:{code:'42501'}})
+ const handler=createSubscriptionFiscalRefundEndpoint({...s.options,enabled:false,statusCommandId:id(2)})
+ const response=await handler(s.request({action:'status',commandId:id(2)}))
+ expect(response.status).toBe(403);expect(await response.json()).toEqual({error:'refund_access_denied'})
+ expect(s.fetchImpl).not.toHaveBeenCalled()
+})
+it('status is unavailable without a configured target',async()=>{
+ const s=setup();expect((await s.handler(s.request({action:'status',commandId:id(2)}))).status).toBe(503)
+ expect(s.service.rpc).not.toHaveBeenCalled()
+})
+it('runtime scoped status needs no provider secret and overrides financial flags',()=>{
+ const env={ADMIN_SUBSCRIPTION_FISCAL_STATUS_COMMAND_ID:id(2),YOOKASSA_SANDBOX_ENABLED:'true',ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED:'true',SUPABASE_URL:'https://example.test',SUPABASE_ANON_KEY:'synthetic',SUPABASE_SERVICE_ROLE_KEY:'synthetic',YOOKASSA_SANDBOX_SHOP_ID:'123'}
+ const read=vi.fn(key=>env[key]),create=vi.fn(()=>({auth:{}})),endpoint=vi.fn()
+ createSubscriptionFiscalRefundRuntime(read,create,endpoint)
+ expect(endpoint).toHaveBeenCalledWith(expect.objectContaining({enabled:false,statusCommandId:id(2),providerConfig:{enabled:false,shopId:'123',secretKey:null}}))
+ expect(read).not.toHaveBeenCalledWith('YOOKASSA_SANDBOX_SECRET_KEY')
+})
+it('invalid status target cannot fall back to enabled financial execution',async()=>{
+ const env={ADMIN_SUBSCRIPTION_FISCAL_STATUS_COMMAND_ID:'invalid',YOOKASSA_SANDBOX_ENABLED:'true',ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED:'true'}
+ const create=vi.fn(),handler=createSubscriptionFiscalRefundRuntime(key=>env[key],create)
+ expect((await handler(new Request('https://example.test',{method:'POST'}))).status).toBe(503)
+ expect(create).not.toHaveBeenCalled()
+})

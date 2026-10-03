@@ -11,7 +11,7 @@ async function payload(request) {
  const bytes=new Uint8Array(size);let offset=0
  for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength}
  const value=JSON.parse(new TextDecoder().decode(bytes))
- const keys=value?.action==='reserve'?['action','organizationId','orderId','requestId']:value?.action==='execute'?['action','commandId']:null
+ const keys=value?.action==='reserve'?['action','organizationId','orderId','requestId']:['execute','status'].includes(value?.action)?['action','commandId']:null
  if(!keys||!value||Array.isArray(value)||Object.keys(value).length!==keys.length
   ||keys.some(key=>!Object.hasOwn(value,key)||(key!=='action'&&(typeof value[key]!=='string'||!uuid.test(value[key])))))throw Error('invalid_request')
  return value
@@ -24,7 +24,7 @@ function status(value,commandId){
   ||!['applied','not_applied','review_required','applied_review_required'].includes(value.accessEffect))throw Error('invalid_fiscal_status')
  return Object.fromEntries(['commandId','refundId','state','operationState','receiptStatus','requiresReview','accessEffect','environment'].map(key=>[key,value[key]]))
 }
-export function createSubscriptionFiscalRefundEndpoint({enabled=false,allowedOrigins=[],auth,service,providerConfig,transport={}}){
+export function createSubscriptionFiscalRefundEndpoint({enabled=false,statusCommandId=null,allowedOrigins=[],auth,service,providerConfig,transport={}}){
  return async request=>{
   const origin=request.headers.get('origin')
   const headers={'Content-Type':'application/json','Cache-Control':'no-store',Vary:'Origin',
@@ -34,12 +34,16 @@ export function createSubscriptionFiscalRefundEndpoint({enabled=false,allowedOri
   if(origin&&!allowedOrigins.includes(origin))return reply({error:'origin_denied'},403)
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers})
   if(request.method!=='POST')return reply({error:'method_not_allowed'},405)
-  if(enabled!==true)return reply({error:'sandbox_disabled'},503)
+  const statusOnly=uuid.test(statusCommandId || '')
+  if(enabled!==true&&!statusOnly)return reply({error:'sandbox_disabled'},503)
   const bearer=request.headers.get('authorization'),token=bearer?.startsWith('Bearer ')?bearer.slice(7):null
   const identity=token?await authenticateRefundOwner(auth,token):null
   if(!identity)return reply({error:'authentication_required'},401)
   let input
   try{input=await payload(request)}catch{return reply({error:'invalid_request'},400)}
+  // A configured acceptance target forces read-only mode, even if dispatch flags are on.
+  if(statusOnly && (input.action!=='status'||input.commandId!==statusCommandId))return reply({error:'sandbox_disabled'},503)
+  if(input.action==='status'&&!statusOnly)return reply({error:'sandbox_disabled'},503)
   const shopId=providerConfig?.shopId
   if(input.action==='reserve'){
    try{
@@ -54,7 +58,10 @@ export function createSubscriptionFiscalRefundEndpoint({enabled=false,allowedOri
   }
   let storage
   try{storage=createSubscriptionFiscalRefundStorage({rpc:service.rpc.bind(service),identity,shopId,commandId:input.commandId})}catch{return reply({error:'sandbox_disabled'},503)}
-  try{status(await storage.status(),input.commandId)}catch{return reply({error:'refund_access_denied'},403)}
+  try{
+   const current=status(await storage.status(),input.commandId)
+   if(input.action==='status')return reply(current,200)
+  }catch{return reply({error:'refund_access_denied'},403)}
   try{
    const provider=createSandboxHttpClient(providerConfig,{...transport,beforeFiscalSend:async operation=>{
     // Re-check Auth after provider GETs; roles, MFA, scope and access are rechecked in SQL.
