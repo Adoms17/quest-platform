@@ -4,6 +4,9 @@ import {spawn,spawnSync} from 'node:child_process'
 import {readFileSync,readdirSync,writeFileSync} from 'node:fs'
 import {randomUUID,randomBytes} from 'node:crypto'
 import {buildStageBillingGuard} from './build-stage-billing-guard.js'
+import {guardCatalogSql,buildGuardAdoption} from './build-billing-guard-adoption.js'
+import {buildGuardRelease} from './build-stage-guard-release.js'
+import {isolatedSandboxBootstrap} from './isolated-billing-bootstrap.js'
 const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
 test.skipIf(!enabled)('production baseline 99 migrations preserves existing organization across historical chain',async()=>{
@@ -118,6 +121,65 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   expect(sql(rehearsal)).toContain('stage_bundle_initialized=sandbox')
   expect(JSON.parse(sql(inventorySql).trim())).toEqual(originalCatalog)
   expect(sql("select to_regclass('platform_private.billing_runtime_environment') is null").trim()).toBe('t')
+
+
+  // Adoption must recognize the exact manually installed package, without provisioning.
+  const guardCatalog=guardCatalogSql()
+  const expectedGuard=JSON.parse(sql(bundle.replace(/commit;\s*$/,'')+
+   'set local search_path=pg_catalog;'+guardCatalog+'; rollback;').trim())
+  const adoption=buildGuardAdoption(expectedGuard)
+  const adoptionBody=adoption.replace(/^begin;\s*$/m,'').replace(/^commit;\s*$/m,'')
+  const fresh=sql('begin;'+adoptionBody+
+   "select 'unconfigured='||count(*) from platform_private.billing_runtime_environment; rollback;")
+  expect(fresh).toContain('unconfigured=0')
+  expect(JSON.parse(sql(inventorySql).trim())).toEqual(originalCatalog)
+  const installed=bundle.replace(/commit;\s*$/,'')
+  const adopted=sql(installed+adoptionBody+adoptionBody+
+   "select 'preserved='||environment from platform_private.billing_runtime_environment;rollback;")
+  expect(adopted).toContain('preserved=sandbox')
+  for(const mutation of [
+   'alter table platform_private.billing_runtime_environment disable row level security;',
+   'grant select on platform_private.billing_runtime_environment to authenticated;',
+   'alter table platform_private.billing_runtime_environment disable trigger billing_environment_identity_immutable;',
+   'alter table platform_private.billing_runtime_environment add column unexpected text;',
+   'alter table platform_private.billing_runtime_environment drop constraint billing_runtime_environment_environment_check;',
+   'grant execute on function platform_private.require_sandbox_environment() to service_role;',
+   "create or replace function platform_private.require_sandbox_environment() returns void language plpgsql security definer set search_path='' as $$begin return; end;$$;",
+   "alter function public.begin_sandbox_payment_send(uuid) security invoker;",
+   "create policy unexpected on platform_private.billing_runtime_environment for select to authenticated using(true);",
+  ]){
+   expect(()=>sql(installed+mutation+adoptionBody+'rollback;')).toThrow('billing guard catalog mismatch')
+   expect(JSON.parse(sql(inventorySql).trim())).toEqual(originalCatalog)
+  }
+  expect(()=>sql("begin;create function platform_private.require_sandbox_environment() returns void language sql as $$select$$;"+adoptionBody+'rollback;')).toThrow('billing guard partial installation')
+
+  const crlfMutation="do $crlf$ declare source text; definition text; begin select prosrc into source from pg_proc where oid='platform_private.require_sandbox_environment()'::regprocedure; definition:=pg_get_functiondef('platform_private.require_sandbox_environment()'::regprocedure); execute replace(definition,source,replace(source,chr(10),chr(13)||chr(10))); end; $crlf$;"
+  expect(sql(installed+crlfMutation+adoptionBody+"select 'crlf_accepted';rollback;")).toContain('crlf_accepted')
+  expect(()=>sql('begin;'+adoptionBody+'select platform_private.require_sandbox_environment();rollback;')).toThrow('sandbox environment denied')
+
+  if(process.env.QVESTA_GUARD_ADOPTION_OUTPUT)writeFileSync(process.env.QVESTA_GUARD_ADOPTION_OUTPUT,adoption)
+
+
+  // Execute the versioned artifact, not only the generator.
+  const versionedGuard=readFileSync(new URL('../supabase/release-migrations/20261003000000_adopt_billing_environment_guard.sql',import.meta.url),'utf8')
+  expect(versionedGuard).toBe(adoption)
+  expect(sql(versionedGuard.replace(/commit;\s*$/,'')+
+   "select 'fresh_empty='||count(*) from platform_private.billing_runtime_environment;rollback;")).toContain('fresh_empty=0')
+  const freshBootstrap=sql(versionedGuard.replace(/commit;\s*$/,'')+isolatedSandboxBootstrap(name)+isolatedSandboxBootstrap(name)+"select 'sandbox_ready='||environment from platform_private.billing_runtime_environment;rollback;")
+  expect(freshBootstrap).toContain('sandbox_ready=sandbox')
+  const release=buildGuardRelease({projectRef:'jeugfyaqzfgdvfhdxfht',mode:'apply'})
+  const releaseBody=release.replace(/^begin;\s*$/m,'').replace(/commit;\s*$/,'')
+  const historySetup="create schema if not exists supabase_migrations;create table if not exists supabase_migrations.schema_migrations(version text primary key,name text,statements text[]);"+
+   "insert into supabase_migrations.schema_migrations(version) values "+files.map(f=>"('"+f.slice(0,14)+"')").join(',')+";"
+  const recorded=sql(installed+historySetup+releaseBody+releaseBody+
+   "select 'recorded='||count(*) from supabase_migrations.schema_migrations where version='20261003000000';rollback;")
+  expect(recorded).toContain('recorded=1')
+  expect(()=>sql(installed+historySetup+"delete from supabase_migrations.schema_migrations where version='20260914210000';"+releaseBody+'rollback;')).toThrow('guard release history mismatch')
+  expect(()=>sql(installed+historySetup+"insert into supabase_migrations.schema_migrations(version) values('20990101000000');"+releaseBody+'rollback;')).toThrow('guard release history mismatch')
+  expect(()=>sql(installed+historySetup+releaseBody+"update supabase_migrations.schema_migrations set statements=array['select 1'] where version='20261003000000';"+releaseBody+'rollback;')).toThrow('guard release recorded content mismatch')
+  expect(()=>sql(installed+historySetup+"alter table platform_private.billing_runtime_environment disable row level security;"+releaseBody+'rollback;')).toThrow('billing guard catalog mismatch')
+  expect(()=>sql(installed+historySetup+releaseBody+"do $$begin raise exception 'injected release failure';end;$$;commit;")).toThrow('injected release failure')
+  expect(JSON.parse(sql(inventorySql).trim())).toEqual(originalCatalog)
 
   // Rehearse the exact post-guard fixture only inside this disposable database.
   const postGuardBody=readFileSync(new URL('./stage-post-guard-fixture.sql',import.meta.url),'utf8').replace(/^begin;\s*/,'').replace(/commit;\s*$/,'')
