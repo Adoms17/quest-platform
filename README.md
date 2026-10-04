@@ -158,13 +158,17 @@ docs            архитектура проекта
 
 ## Рабочий процесс
 
-Рекомендуемый процесс: feature branch → локальные проверки → pull request в `staging` → staging deploy и smoke → pull request `staging` → `main` → ручное подтверждение production deployment → squash merge. Правила merge и branch protection задаются настройками GitHub.
+Рекомендуемый процесс: самодостаточная задача → отдельная feature branch/worktree → локальные проверки → разрешённый PR в `staging` → ревью → разрешённые merge, stage-выпуск и приёмка → отдельное решение владельца о production. Перед push/merge проверять внешние автопубликации Cloudflare: ручной Supabase workflow не гарантирует ручной frontend deploy. Правила и актуальная точка входа приведены ниже.
 
 ## Документация
 
 - [Архитектура](docs/ARCHITECTURE.md)
 - [Подробная документация в Notion](https://app.notion.com/p/3bc511103a9a811996feff01bcc586d6)
 - [Правила работы агента](AGENTS.md)
+- [Текущая точка передачи и состояние рабочих копий](docs/process/WORKSPACE-HANDOFF.md)
+- [Координация и смена аккаунта](docs/process/TWO-ACCOUNT-WORKFLOW.md)
+- [Самодостаточное задание и completion report](docs/process/HANDOFF-TEMPLATES.md)
+- [Канонический backlog в Notion](https://app.notion.com/p/66f9d031b6394253a2574fb14865c850)
 
 ## Статус
 
