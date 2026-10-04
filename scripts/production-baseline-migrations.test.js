@@ -9,12 +9,62 @@ import {buildGuardRelease} from './build-stage-guard-release.js'
 import {isolatedSandboxBootstrap} from './isolated-billing-bootstrap.js'
 const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
+function assertIsolation(info,{id,owner,network,image,environment={}}){
+ const require=(condition,message)=>{if(!condition)throw Error('Disposable container preflight: '+message)}
+ require(info.Id===id && info.Config.Labels?.['qvesta.test.owner']===owner,'ownership mismatch')
+ const host=info.HostConfig
+ require(host.NetworkMode===network,'network mismatch')
+ require(!host.PublishAllPorts && Object.keys(host.PortBindings||{}).length===0 &&
+  Object.values(info.NetworkSettings?.Ports||{}).every(bindings=>bindings===null || bindings.length===0),'published ports')
+ require(!host.Privileged && !host.PidMode && !host.IpcMode?.startsWith('host') && !host.CapAdd?.length && !host.Devices?.length,'host privileges')
+ require(!host.Binds?.length && !host.Mounts?.length && !host.VolumesFrom?.length,'host or supplied mounts')
+ require((host.RestartPolicy?.Name||'no')==='no','restart policy')
+ require((info.Mounts||[]).every(m=>m.Type==='tmpfs' ||
+  (m.Type==='volume' && /^[a-f0-9]{64}$/.test(m.Name) && Object.hasOwn(image.Volumes||{},m.Destination))),'unexpected volume')
+ const envMap=values=>Object.fromEntries((values||[]).map(value=>{const i=value.indexOf('=');return [value.slice(0,i),value.slice(i+1)]}))
+ const inherited=envMap(image.Env)
+ require(!Object.entries(inherited).some(([key,value])=>value && /password|secret|token|credential|api.?key|private.?key/i.test(key)),'credential in image defaults')
+ const expected={...inherited,...environment},actual=envMap(info.Config.Env)
+ // Boolean comparison deliberately avoids dumping environment values on failure.
+ require(Object.keys(actual).length===Object.keys(expected).length && Object.entries(expected).every(([key,value])=>actual[key]===value),'unexpected environment')
+}
+
+test('disposable preflight rejects shared resources and unexpected credentials without Docker',()=>{
+ const id='a'.repeat(64),owner='unit-owner',image={Env:['PATH=/bin'],Volumes:{'/data':{}}}
+ const options={id,owner,image,network:'none'}
+ const clean={Id:id,Config:{Labels:{'qvesta.test.owner':owner},Env:['PATH=/bin']},
+  HostConfig:{NetworkMode:'none',RestartPolicy:{Name:'no'}},NetworkSettings:{Ports:{}},
+  Mounts:[{Type:'volume',Name:'b'.repeat(64),Destination:'/data'}]}
+ expect(()=>assertIsolation(clean,options)).not.toThrow()
+ for(const mutate of [
+  x=>{x.Id='foreign'},x=>{x.Config.Labels={}},x=>{x.HostConfig.NetworkMode='bridge'},
+  x=>{x.HostConfig.PortBindings={'5432/tcp':[{HostPort:'5432'}]}},
+  x=>{x.NetworkSettings.Ports={'5432/tcp':[{HostPort:'5432'}]}},
+  x=>{x.HostConfig.Binds=['/host:/data']},x=>{x.Mounts[0].Name='shared'},
+  x=>{x.HostConfig.Privileged=true},x=>{x.Config.Env.push('ACCESS_TOKEN=synthetic-unexpected')},
+ ]){const changed=structuredClone(clean);mutate(changed);expect(()=>assertIsolation(changed,options)).toThrow('Disposable container preflight')}
+ expect(()=>assertIsolation(clean,{...options,image:{...image,Env:['PASSWORD=synthetic']}})).toThrow('credential in image defaults')
+})
 test.skipIf(!enabled)('production baseline 99 migrations preserves existing organization across historical chain',async()=>{
- const name='qvesta-release-test-'+randomUUID().replaceAll('-','');let created=false
+ const name='qvesta-release-test-'+randomUUID().replaceAll('-','');let databaseId,authId
+ const ownedIds=[]
+ const failures=[]
+ const create=args=>{
+  const id=docker(['create','--pull','never','--label','qvesta.test.owner='+name,...args]).trim()
+  if(!/^[a-f0-9]{64}$/.test(id))throw Error('Docker did not return a full container ID')
+  ownedIds.push(id);return id
+ }
+ const inspect=(id,network,environment={})=>{
+  const info=JSON.parse(docker(['inspect',id]))[0]
+  const image=JSON.parse(docker(['image','inspect',info.Image]))[0].Config
+  assertIsolation(info,{id,owner:name,network,image,environment})
+ }
  try{
-  docker(['run','-d','--network','none','--name',name,'--tmpfs','/tmp','--entrypoint','sh','supabase/postgres:17.6.1.165','-c','mkdir -p /tmp/test-pg /etc/postgresql-custom; chown postgres:postgres /tmp/test-pg /etc/postgresql-custom; gosu postgres initdb -D /tmp/test-pg -A trust >/dev/null && exec gosu postgres postgres -D /tmp/test-pg -c shared_preload_libraries=pg_cron,pg_net,supabase_vault -c vault.getkey_script=/usr/share/postgresql/extension/pgsodium_getkey -c cron.database_name=postgres']);created=true
-  let ready=false;for(let i=0;i<60;i++){try{docker(['exec',name,'pg_isready','-U','postgres']);ready=true;break}catch{await new Promise(r=>setTimeout(r,500))}}if(!ready)throw Error('Postgres not ready')
-  const sql=input=>docker(['exec','-i',name,'psql','-X','-qAt','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1'],input)
+  databaseId=create(['--network','none','--name',name,'--tmpfs','/tmp','--entrypoint','sh','supabase/postgres:17.6.1.165','-c','mkdir -p /tmp/test-pg /etc/postgresql-custom; chown postgres:postgres /tmp/test-pg /etc/postgresql-custom; gosu postgres initdb -D /tmp/test-pg -A trust >/dev/null && exec gosu postgres postgres -D /tmp/test-pg -c shared_preload_libraries=pg_cron,pg_net,supabase_vault -c vault.getkey_script=/usr/share/postgresql/extension/pgsodium_getkey -c cron.database_name=postgres']);
+  inspect(databaseId,'none')
+  docker(['start',databaseId])
+  let ready=false;for(let i=0;i<60;i++){try{docker(['exec',databaseId,'pg_isready','-U','postgres']);ready=true;break}catch{await new Promise(r=>setTimeout(r,500))}}if(!ready)throw Error('Postgres not ready')
+  const sql=input=>docker(['exec','-i',databaseId,'psql','-X','-qAt','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1'],input)
   sql('create role anon; create role authenticated; create role service_role bypassrls; create role supabase_auth_admin; create role supabase_admin superuser; create role authenticator; create role dashboard_user; create role supabase_read_only_user;')
   // Model observed API role switching and public schema privileges locally.
   // The container postgres stays superuser; this does not model hosted admin restrictions.
@@ -26,18 +76,26 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    grant usage,create on schema public to service_role;`)
   // Fresh GoTrue schema in the isolated database; no shared local stack needed.
   sql('create schema auth; alter role postgres set search_path=auth,public;')
-  const authEnvironment={...process.env,
+  const authEnvironment={
    GOTRUE_DB_DRIVER:'postgres',GOTRUE_DB_DATABASE_URL:'postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable',
    API_EXTERNAL_URL:'http://127.0.0.1',GOTRUE_SITE_URL:'http://127.0.0.1',
    GOTRUE_JWT_SECRET:randomBytes(48).toString('hex'),GOTRUE_LOG_LEVEL:'fatal'}
-  const authResult=spawnSync('docker',['run','--rm','--name',name+'-auth','--network','container:'+name,
-   ...['GOTRUE_DB_DRIVER','GOTRUE_DB_DATABASE_URL','API_EXTERNAL_URL','GOTRUE_SITE_URL','GOTRUE_JWT_SECRET','GOTRUE_LOG_LEVEL'].flatMap(key=>['-e',key]),
-   'supabase/gotrue:v2.196.0','auth','migrate'],{env:authEnvironment,encoding:'utf8',timeout:60000,windowsHide:true})
+  // Only explicitly generated local values enter the container; no host env forwarding.
+  // Suppress create diagnostics because argv includes a synthetic JWT secret.
+  try{
+   authId=create(['--name',name+'-auth','--network','container:'+databaseId,
+    ...Object.entries(authEnvironment).flatMap(([key,value])=>['-e',key+'='+value]),
+    'supabase/gotrue:v2.196.0','auth','migrate'])
+  }catch{throw Error('Isolated Auth container creation failed')}
+  inspect(authId,'container:'+databaseId,authEnvironment)
+  inspect(databaseId,'none')
+  const authResult=spawnSync('docker',['start','--attach',authId],{encoding:'utf8',timeout:60000,windowsHide:true})
   // Auth diagnostics may include connection settings; do not print them.
-  if(authResult.status!==0){
-   spawnSync('docker',['rm','-f',name+'-auth'],{stdio:'ignore',windowsHide:true})
-   throw Error('Isolated Auth schema migration failed')
-  }
+  if(authResult.status!==0)throw Error('Isolated Auth schema migration failed')
+  inspect(authId,'container:'+databaseId,authEnvironment)
+  const authState=JSON.parse(docker(['inspect','--format','{{json .State}}',authId]))
+  expect(authState.Status).toBe('exited')
+  expect(authState.ExitCode).toBe(0)
   sql(`alter role postgres reset search_path;
    grant usage on schema auth to anon,authenticated,service_role;
   `)
@@ -463,7 +521,7 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   expect(workerOutput).toContain('payment receipt history includes exact settled remainder')
   expect(workerOutput).toMatch(/^1\.\.\d+/m)
   const asyncSql=input=>new Promise((resolve,reject)=>{
-   const child=spawn('docker',['exec','-i',name,'psql','-X','-qAt','-U','postgres','-v','ON_ERROR_STOP=1'],{windowsHide:true})
+   const child=spawn('docker',['exec','-i',databaseId,'psql','-X','-qAt','-U','postgres','-v','ON_ERROR_STOP=1'],{windowsHide:true})
    let output='',error=''
    child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>error+=x)
    child.on('error',reject);child.on('close',code=>resolve({code,output,error}))
@@ -637,5 +695,78 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   ])for(const role of ['anon','authenticated'])expect(sql(`select has_function_privilege('${role}','${gateway}','EXECUTE')`).trim(),role+' cannot call '+gateway).toBe('f')
   sql(readFileSync(new URL('../supabase/release-migrations/20261003010000_read_my_platform_sections.sql',import.meta.url),'utf8'))
   sql(readFileSync(new URL('../supabase/tests/database/platform_sections.test.sql',import.meta.url),'utf8'))
- }finally{if(created)docker(['rm','-f',name])}
+  // Last fixture deliberately commits. Every sql() opens a new psql session;
+  // only disposal of this test's own container cleans up committed synthetic data.
+  {
+  const binding=readSuite('subscription_fiscal_refund_binding').split('-- LINKED_LIFECYCLE_CHECKS')
+  expect(binding).toHaveLength(2)
+  const persistenceFixture=paid.replace('select * from finish();rollback;',()=>
+   readSuite('platform_order_documents')+'\n'+modeledPrefix+'\n'+binding[0]+'\n'+
+   readSuite('subscription_fiscal_presend_commit'))
+  expect(persistenceFixture).not.toBe(paid)
+  const committed=sql('set search_path=public,extensions;'+persistenceFixture)
+  expect(committed).not.toMatch(/not ok|Looks like/)
+  expect(committed).toMatch(/^1\.\.\d+/m)
+  const claimLines=committed.split(/\r?\n/).filter(line=>line.startsWith('PRESEND_CLAIM|'))
+  expect(claimLines).toHaveLength(1)
+  const claim=JSON.parse(claimLines[0].slice('PRESEND_CLAIM|'.length))
+  expect(claim.action).toBe('send')
+  expect(claim.commandId).toMatch(/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/)
+  expect(claim.key).toBeTruthy()
+  expect(claim.sha256).toMatch(/^[a-f0-9]{64}$/)
+  expect(claim.firstSentAt).toBeTruthy()
+  const tables=['billing_sandbox_orders','billing_sandbox_payment_results','billing_sandbox_refunds',
+   'billing_subscription_fiscal_ledgers','billing_subscription_fiscal_operations',
+   'billing_subscription_fiscal_operation_status','subscription_refund_requests',
+   'subscription_refund_dispatches','subscription_refund_period_bindings','subscription_refund_reservations',
+   'subscription_refund_applications','organization_subscriptions','billing_period_confirmations',
+   'billing_review_resolutions']
+  const snapshot=()=>JSON.parse(sql(`select jsonb_build_object(${tables.map(table=>
+   `'${table}',(select coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]'::jsonb) from public.${table} t)`
+  ).join(',')})`).trim())
+  const before=snapshot()
+  expect(before.subscription_refund_requests).toHaveLength(1)
+  expect(before.subscription_refund_requests[0].id).toBe(claim.commandId)
+  expect(before.subscription_refund_reservations).toHaveLength(1)
+  expect(before.subscription_refund_reservations[0]).toMatchObject({
+   request_id:claim.commandId,refund_id:before.billing_sandbox_refunds[0]?.id})
+  expect(before.billing_sandbox_refunds[0]?.fiscal_command_id).toBe(claim.commandId)
+  expect(before.subscription_refund_dispatches).toHaveLength(1)
+  expect(before.subscription_refund_applications).toHaveLength(0)
+  expect(before.billing_subscription_fiscal_operation_status).toHaveLength(1)
+  expect(before.billing_subscription_fiscal_operation_status[0]).toMatchObject({state:'unknown',requires_review:false})
+  expect(before.billing_sandbox_refunds).toHaveLength(1)
+  expect(before.billing_sandbox_refunds[0]).toMatchObject({state:'sending'})
+  const epoch='floor(extract(epoch from clock_timestamp()))::bigint'
+  const quote=value=>"'"+JSON.stringify(value).replaceAll("'","''")+"'::jsonb"
+  const gateway=(action,mfa=epoch,exp=epoch+'+300',expected=claim)=>
+   `public.subscription_fiscal_refund_from_gateway(md5('discount-checkout-owner')::uuid,${mfa},${exp},'123','${action}','${claim.commandId}'::uuid,${quote(expected)})`
+  const call=expression=>JSON.parse(sql(`begin;set local role service_role;select ${expression};commit;`).trim())
+  // A successful control establishes that refusals are not a broken fixture/ACL.
+  expect(call(gateway('before_send'))).toMatchObject({authorized:true,key:claim.key,sha256:claim.sha256})
+  expect(snapshot()).toEqual(before)
+  for(const scenario of [
+   {name:'expired identity with fresh MFA',mfa:epoch,exp:epoch+'-1',state:'42501'},
+   {name:'stale MFA with valid identity',mfa:epoch+'-301',exp:epoch+'+300',state:'42501'},
+   {name:'wrong saved hash',mfa:epoch,exp:epoch+'+300',state:'55000',expected:{...claim,sha256:'0'.repeat(64)}},
+  ]){
+   expect(()=>sql('\\set VERBOSITY sqlstate\n'+`begin;set local role service_role;select ${
+    gateway('before_send',scenario.mfa,scenario.exp,scenario.expected||claim)};commit;`),scenario.name)
+    .toThrow(new RegExp('ERROR:\\s+'+scenario.state))
+   expect(snapshot(),scenario.name+' leaves committed claim unchanged in a new session').toEqual(before)
+   expect(call(gateway('status')),scenario.name+' status').toMatchObject({
+    state:'sending',operationState:'unknown',requiresReview:false,accessEffect:'not_applied'})
+   expect(call(gateway('claim')),scenario.name+' retry cannot dispatch twice').toMatchObject({
+    action:'reconcile',key:claim.key,sha256:claim.sha256,firstSentAt:claim.firstSentAt})
+   expect(snapshot(),scenario.name+' retry preserves all rows including single dispatch').toEqual(before)
+  }
+  }
+ }catch(error){failures.push(error)}finally{
+  // IDs came only from successful creates in this invocation. -v removes their
+  // anonymous image volumes; no volume prune, named-volume delete or name lookup.
+  for(const id of ownedIds.reverse()){
+   try{docker(['rm','-f','-v',id])}catch{failures.push(Error('Own container cleanup failed: '+id))}
+  }
+ }
+ if(failures.length)throw new AggregateError(failures,'Disposable baseline test or cleanup failed')
 },180000)

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import {it,expect,vi} from 'vitest'
+import {it,expect,vi,describe,beforeEach,afterEach} from 'vitest'
 import {createSubscriptionFiscalRefundEndpoint} from './subscriptionFiscalRefundEndpoint.js'
 import {createSubscriptionFiscalRefundRuntime} from './subscriptionFiscalRefundRuntime.js'
 const id=n=>`11111111-1111-4111-8111-${String(n).padStart(12,'0')}`
@@ -58,11 +58,145 @@ it('a concurrent check without provider ID cannot mark an in-flight send for rev
  expect(s.service.rpc.mock.calls.some(([,a])=>a.p_action==='review')).toBe(false)
  release();expect(await (await first).json()).toMatchObject({state:'succeeded'});expect(s.posts()).toHaveLength(1)
 })
-it.each(['auth','gateway'])('revoked %s after GETs blocks POST',async reason=>{
- const s=setup()
- if(reason==='auth')s.auth.getClaims.mockResolvedValueOnce(await s.auth.getClaims()).mockResolvedValue({error:{}})
- else {const rpc=s.service.rpc.getMockImplementation();s.service.rpc.mockImplementation((n,a)=>a.p_action==='before_send'?{error:{code:'42501'}}:rpc(n,a))}
- expect((await s.handler(s.request())).status).toBe(200);expect(s.posts()).toHaveLength(0);expect(s.current.state).toBe('sending')
+describe('final pre-send refusal after a successful in-memory claim and GETs',()=>{
+ const epoch=1800000000
+ const authFailures=['expired','stale','claims-error','claims-throw','user-error','user-throw','user-mismatch','actor-change']
+ const sqlFailures=['unauthorized','non-boolean-authorization','command','key','hash','null-data','empty-data','sql-error','rejection','throw']
+ let network
+ beforeEach(()=>{
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(epoch*1000)
+  // Do not let a missing injected transport silently fall back to real fetch.
+  network=vi.fn(()=>{throw Error('network forbidden in final-send tests')})
+  vi.stubGlobal('fetch',network)
+ })
+ afterEach(()=>{
+  try{expect(network).not.toHaveBeenCalled()}
+  finally{vi.unstubAllGlobals();vi.useRealTimers()}
+ })
+ function deniedSend(layer,failure,finalStatus){
+  const s=setup(),events=[],claimActions=[]
+  const initialOperation=structuredClone(s.operation)
+  const initialContext={p_actor_user_id:id(1),p_mfa_at:epoch,p_expires_at:epoch+600,p_shop_id:'123',p_command_id:id(2)}
+  const rpc=s.service.rpc.getMockImplementation(),fetch=s.fetchImpl.getMockImplementation()
+  let afterGets=false,retrying=false,statusReads=0
+  const finalAuth=()=>afterGets&&!retrying
+  s.auth.getClaims.mockImplementation(async()=>{
+   events.push('auth:claims')
+   const claims={sub:id(1),role:'authenticated',aal:'aal2',exp:epoch+600,amr:[{method:'totp',timestamp:epoch}]}
+   if(finalAuth()&&layer==='auth'){
+    if(failure==='claims-error')return {error:{code:'synthetic'}}
+    if(failure==='claims-throw')throw Error('synthetic claims failure')
+    // Change one condition only, at the exact rejection boundary.
+    if(failure==='expired')claims.exp=epoch
+    if(failure==='stale')claims.amr[0].timestamp=epoch-300
+    if(failure==='actor-change')claims.sub=id(9)
+   }
+   if(finalAuth()&&layer==='sql'){
+    // Both identities are valid, but RPCs must retain the initial frozen context.
+    claims.exp=epoch+900;claims.amr[0].timestamp=epoch-1
+   }
+   return {data:{claims}}
+  })
+  s.auth.getUser.mockImplementation(async()=>{
+   events.push('auth:user')
+   if(finalAuth()&&layer==='auth'){
+    if(failure==='user-error')return {error:{code:'synthetic'}}
+    if(failure==='user-throw')throw Error('synthetic user failure')
+    // actor-change updates both SDK identities, reaching actor continuity check.
+    if(['user-mismatch','actor-change'].includes(failure))return {data:{user:{id:id(9)}}}
+   }
+   return {data:{user:{id:id(1)}}}
+  })
+  s.fetchImpl.mockImplementation(async(url,options)=>{
+   const path=new URL(url).pathname
+   if(options.method!=='GET'||!['/v3/me','/v3/payments/'+id(4),'/v3/receipts'].includes(path)){
+    throw Error('unexpected fake provider request')
+   }
+   const response=await fetch(url,options)
+   return {...response,json:async()=>{
+    const body=await response.json()
+    events.push('get:ok:'+path)
+    if(path==='/v3/receipts')afterGets=true
+    return body
+   }}
+  })
+  s.service.rpc.mockImplementation((name,args)=>{
+   const action=args.p_action
+   events.push('rpc:'+action)
+   if(action==='status'&&++statusReads===2){
+    if(finalStatus==='error')return Promise.resolve({error:{code:'42501'}})
+    if(finalStatus==='invalid')return Promise.resolve({data:{...s.current,commandId:id(9)}})
+   }
+   if(action==='before_send'){
+    if(failure==='throw')throw Error('synthetic synchronous RPC failure')
+    if(failure==='rejection')return Promise.reject(Error('synthetic RPC rejection'))
+    if(failure==='sql-error')return Promise.resolve({error:{code:'42501'}})
+    if(failure==='null-data')return Promise.resolve({data:null})
+    if(failure==='empty-data')return Promise.resolve({data:{}})
+    const data={authorized:true,commandId:id(2),key:initialOperation.key,sha256:initialOperation.sha256}
+    if(failure==='unauthorized')data.authorized=false
+    if(failure==='non-boolean-authorization')data.authorized='true'
+    if(failure==='command')data.commandId=id(9)
+    if(failure==='key')data.key=id(9)
+    if(failure==='hash')data.sha256='b'.repeat(64)
+    return Promise.resolve({data})
+   }
+   return Promise.resolve(rpc(name,args)).then(result=>{
+    if(action==='claim'){claimActions.push(result.data.action);events.push('claim:'+result.data.action)}
+    return result
+   })
+  })
+  return {...s,events,claimActions,initialOperation,initialContext,restoreAuth:()=>{retrying=true}}
+ }
+ async function assertDenialAndRetry(layer,failure,finalStatus){
+  const s=deniedSend(layer,failure,finalStatus)
+  const response=await s.handler(s.request())
+  expect(response.status).toBe(finalStatus==='readable'?200:503)
+  const unchangedMoney={commandId:id(2),refundId:id(3),state:'sending',operationState:'unknown',receiptStatus:null,requiresReview:false,accessEffect:'not_applied',environment:'sandbox'}
+  expect(await response.json()).toEqual(finalStatus==='readable'?unchangedMoney:{error:'fiscal_refund_unconfirmed',commandId:id(2)})
+  const finalUser=layer==='sql'||['user-error','user-throw','user-mismatch','actor-change'].includes(failure)
+  expect(s.events).toEqual([
+   'auth:claims','auth:user','rpc:status','rpc:claim','claim:send',
+   'get:ok:/v3/me','get:ok:/v3/payments/'+id(4),'get:ok:/v3/receipts',
+   'auth:claims',...(finalUser?['auth:user']:[]),...(layer==='sql'?['rpc:before_send']:[]),'rpc:status',
+  ])
+  expect(s.claimActions).toEqual(['send'])
+  expect(s.current).toEqual(unchangedMoney)
+  expect(s.operation).toEqual(s.initialOperation)
+  expect(s.posts()).toHaveLength(0)
+  const actions=()=>s.service.rpc.mock.calls.map(([,args])=>args.p_action)
+  expect(actions().filter(action=>action==='before_send')).toHaveLength(layer==='sql'?1:0)
+  expect(actions().some(action=>['record','review'].includes(action))).toBe(false)
+  // A refusal before the very first POST consumes the fake claim too. This is
+  // distinct from lost-response recovery after an already attempted POST.
+  s.restoreAuth();const start=s.events.length
+  const retry=await s.handler(s.request())
+  expect(retry.status).toBe(200);expect(await retry.json()).toEqual(unchangedMoney)
+  expect(s.events.slice(start)).toEqual([
+   'auth:claims','auth:user','rpc:status','rpc:claim','claim:reconcile',
+   'get:ok:/v3/me','get:ok:/v3/payments/'+id(4),'rpc:status',
+  ])
+  expect(s.claimActions).toEqual(['send','reconcile'])
+  expect(s.current).toEqual(unchangedMoney);expect(s.operation).toEqual(s.initialOperation)
+  expect(s.posts()).toHaveLength(0)
+  expect(actions().filter(action=>action==='before_send')).toHaveLength(layer==='sql'?1:0)
+  expect(actions().some(action=>['record','review'].includes(action))).toBe(false)
+  // Assert outside the handler: an assertion thrown inside its RPC callback
+  // could be swallowed as the very refusal this test expects.
+  for(const [name,args] of s.service.rpc.mock.calls){
+   expect(name).toBe('subscription_fiscal_refund_from_gateway')
+   expect(args).toMatchObject(s.initialContext)
+   if(args.p_action==='before_send')expect(args.p_result).toEqual({key:s.initialOperation.key,sha256:s.initialOperation.sha256,firstSentAt:s.initialOperation.firstSentAt})
+  }
+ }
+ for(const finalStatus of ['readable','error','invalid']){
+  it.each(authFailures)(`Auth %s refusal, final status ${finalStatus}, then restored-auth retry never sends`,async failure=>{
+   await assertDenialAndRetry('auth',failure,finalStatus)
+  })
+  it.each(sqlFailures)(`SQL %s refusal, final status ${finalStatus}, then retry never sends`,async failure=>{
+   await assertDenialAndRetry('sql',failure,finalStatus)
+  })
+ }
 })
 it('lost POST response stays unknown and a retry never sends again',async()=>{
  const s=setup(),fetch=s.fetchImpl.getMockImplementation(),log=vi.spyOn(console,'error').mockImplementation(()=>{})
