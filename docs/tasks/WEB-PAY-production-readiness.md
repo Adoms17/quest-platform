@@ -1,5 +1,76 @@
 # План подготовки оплаты подписки на production
 
+## PROD-PAY-07: время получения данных и сверки — локальный подэтап 05.10.2026
+
+Назначение: оператор отличает чтение сохранённых данных платежей/чеков от сверки
+с ЮKassa. Это UI-подэтап для независимого review; весь PROD-PAY-07, N2 и 04/05
+не закрыты. Исторические статусы остальных работ ниже не переоценивались.
+
+- Baseline после fetch: `16d839475d0b0c3a85c47d9affc6e1d3d6c84732` (`origin/staging`).
+  ADOMS-HOME, `M:\Dev\Projects\quest-platform\prod-pay-07-payment-freshness.local`,
+  ветка `codex/prod-pay-07-payment-freshness`, новая копия начата чистой.
+  Единственный writer — назначенная сессия Codex/Work. Существующая копия
+  `prod-pay-final-send-tests.local`, её `ee5ba8e` и незакоммиченный отчёт сохранены.
+- `OrganizationPayments` и `OrderFiscalReceipts` показывают время **успешного
+  получения показанного результата браузером**, включая пустой результат.
+  Это локальные часы устройства, не серверное время и не время сверки провайдера.
+  `payment_checked_at`/`checkedAt` остаются полученными серверными значениями;
+  null, пустая строка и некорректная дата отображаются как «Неизвестно».
+  Обе отметки отображаются в часовом поясе устройства, что явно указано в UI.
+- Кнопки чеков «Загрузить данные чеков» / «Перечитать данные чеков» и пояснения
+  обоих списков называют действие чтением БД, без запуска сверки с ЮKassa.
+  Предупреждения о различии оплаты, доступа, возврата и чека сохранены.
+- Общий `useReadSnapshot` хранит данные и время получения атомарно. При начале
+  чтения прежний результат и его время скрываются (прежнее поведение списка).
+  Ошибка не создаёт новое время успешной загрузки. При смене организации/заказа
+  keyed-компонент начинает новый snapshot; пагинация заменяет весь результат.
+  Повторные клики блокируются, ответы/ошибки размонтированной карточки игнорируются.
+- Scope: только представление, общий hook/форматирование дат и компонентные тесты.
+  Backend/RPC, auth/MFA/flags, финансовые операции, зависимости и deployment не
+  менялись. SLA, пороги устаревания и уведомления не вводились. Общие Docker/БД/
+  порты не использовались; никакие пользователи/сессии не создавались. Notion не
+  изменялся. Сборки локальные, не release; push/merge удерживаются до review.
+
+Проверки этого подэтапа: `npm.cmd run test -- admin/src/paymentFreshness.test.jsx
+admin/src/organizationPayments.test.jsx admin/src/OrderFiscalReceipts.test.jsx
+admin/src/paymentReviewStatus.test.jsx` — **47 PASS / 4 файла**, 16.84 с. Новый
+набор содержит 25 проверок с фиксированными часами и fail-fast network trap:
+valid/null/empty/invalid, success/error/empty/reload, повторный запрос, смена
+организации/заказа/страницы и поздний success/error. Это mock-компонентные проверки,
+не live Auth, SQL/RLS или provider acceptance.
+
+Фактически выполнены в этой копии: `npm.cmd run lint` — PASS (8 прежних warnings),
+`npm.cmd run build` — PASS, PWA 78 precache entries; дополнительная сборка админки
+`npm.cmd run build -- --config admin/vite.config.mjs --mode test` — PASS с прежним
+предупреждением о chunk >500 kB. Для неё использованы только синтетические значения
+из существующего admin Playwright config: loopback URL и placeholder, без env-файлов
+или реального backend. TEMP/TMP — собственный ignored cache, зависимости взяты из
+существующего ancestor node_modules. Diff/whitespace/local links проверены. Browser
+E2E, SQL/RLS, live stage/provider и production NOT RUN; публикации нет. Следующий
+шаг — независимое review точного локального diff, а не финансовая приёмка.
+
+### Независимое review и разрешённая публикация подэтапа — 05.10.2026
+
+Координатор передал **review PASS** точного patch
+`62e38394d3a1570890d22546d1f27a2077a9d50a010d3dd3bfd18c35ac9b9e3b`:
+reviewer повторил 47 тестов / 4 файла, lint (8 прежних warnings), syntax,
+diff/whitespace и соответствие patch рабочей копии — PASS. Build выполнен только
+автором; reviewer build/live/SQL/production NOT RUN. Код после review не изменён;
+добавлена только эта запись. Общая приёмка PROD-PAY-07 и N2/04–05 остаётся открытой.
+
+После review разрешён обычный feature PR → CI точного SHA → staging squash merge
+по действующим правилам без bypass. Проверены актуальные GitHub rules: up-to-date,
+обязательный validate, CodeQL, разрешён squash, unresolved review threads запрещены.
+Fetch перед публикацией: staging остаётся `16d8394`, main `706473d`.
+Прочитан свежий справочник сред Notion (редакция 05.10.2026 06:00 UTC): подтверждённые
+владельцем branch controls — admin/app stage на staging, production app на main;
+admin deploy использует `admin/wrangler.stage.jsonc` с доменом stage-admin.qvesta.ru.
+Сверены repo scripts/workflows: build не публикует, Supabase deploy ручной; CI/config
+этим пакетом не меняются. Ожидаются автоматические frontend stage builds admin/app,
+не production. Ранее неизвестные preview-поля не объявляются проверенными; изменений
+в deployment-конфигурации нет. Итоговые PR/SHA/CI/build evidence — в completion/PR;
+эта запись не утверждает, что merge или stage build уже завершились.
+
 ## Единый статус оплаты — 02.10.2026, после сверки 22:32 МСК
 
 Первый коммерческий выпуск: ручная месячная подписка. Автопродление и магазин шаблонов — отдельные потоки. Production Go не выдан; успешные тестовые чеки не подтверждают боевую фискализацию. Этот раздел заменяет прежние «следующие шаги» в исторических записях ниже.

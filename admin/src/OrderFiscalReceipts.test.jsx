@@ -5,7 +5,7 @@ it('fiscal problem is explicit without changing payment or offering another char
  const client={rpc:vi.fn().mockResolvedValue({data:{items:[{id:'refund',kind:'refund',amountMinor:100,status:'canceled',needsAttention:true}],truncated:false}})}
  render(<OrderFiscalReceipts client={client} workspace="one" order="order"/> )
  expect(client.rpc).not.toHaveBeenCalled()
- fireEvent.click(screen.getByRole('button',{name:'Показать статусы чеков'}))
+ fireEvent.click(screen.getByRole('button',{name:'Загрузить данные чеков'}))
  await screen.findByText(/Чек возврата.*Не зарегистрирован/)
  expect(screen.getByRole('alert').textContent).toMatch(/Не создавайте повторную оплату/)
  expect(client.rpc).toHaveBeenCalledWith('read_platform_order_receipts',{p_organization_id:'one',p_order_id:'order'})

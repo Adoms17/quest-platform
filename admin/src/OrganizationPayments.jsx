@@ -7,8 +7,9 @@ import PaymentOrderDetails from './PaymentOrderDetails'
 import PaymentReviewStatus from './PaymentReviewStatus'
 import RefundHistory from './RefundHistory'
 import RefundPreview from './RefundPreview'
-import { useEffect, useRef, useState } from 'react'
-import { adminError } from './api'
+import { useRef, useState } from 'react'
+import { useReadSnapshot } from './useReadSnapshot'
+import DeviceDateTime from './DeviceDateTime'
 
 export default function OrganizationPayments({ api, client, organizationId }) {
  return <PaymentList key={organizationId} api={api} client={client} organizationId={organizationId} />
@@ -19,35 +20,18 @@ const money = value => new Intl.NumberFormat('ru-RU', { style: 'currency', curre
 function PaymentList({ api, client, organizationId }) {
  const [version, setVersion] = useState(null)
  const versionTrigger = useRef(null)
- const [page, setPage] = useState(null)
- const [busy, setBusy] = useState(false)
- const [error, setError] = useState('')
- const generation = useRef(0)
- const running = useRef(false)
- useEffect(() => () => { generation.current += 1 }, [])
- async function load(cursor = null) {
-  if (running.current) return
-  running.current = true
-  const request = ++generation.current
-  setBusy(true); setError(''); setPage(null)
-  try {
-   const result = await api.payments(organizationId, cursor)
-   if (request === generation.current) setPage(result)
-  } catch (failure) {
-   if (request === generation.current) setError(adminError(failure))
-  } finally {
-   running.current = false
-   if (request === generation.current) setBusy(false)
-  }
- }
+ const { snapshot, busy, error, load } = useReadSnapshot((cursor = null) => api.payments(organizationId, cursor))
+ const page = snapshot?.data
  return <><div hidden={!!version}><section aria-label="Платежи организации">
   <h3>Платежи</h3>
   <p>Тестовая среда (sandbox). Реальные деньги не списываются. Здесь показаны денежные заказы; покупки со скидкой 100% без платежа в этот список не входят.</p>
   <p>Время указано по часовому поясу устройства. Возврат сам по себе не изменяет доступ.</p>
+  <p>Загрузка перечитывает сохранённые данные платежей из базы и не запускает сверку с ЮKassa.</p>
   <button type="button" disabled={busy} onClick={() => load()}>Загрузить платежи</button>
   {busy && <p role="status">Загружаем платежи…</p>}
   {error && <p role="alert">{error}</p>}
   {page && <>
+   <p>Данные платежей получены: <DeviceDateTime value={snapshot.loadedAt} />.</p>
    {!page.items.length && <p>Тестовых платежей нет.</p>}
    <ul>{page.items.map(item => <li key={item.id}>
     <strong>{money(item.amount_minor)} · {paymentLabels[item.payment_status] || 'Неизвестный статус оплаты'}</strong>
