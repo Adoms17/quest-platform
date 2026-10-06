@@ -7,7 +7,9 @@ import {buildStageBillingGuard} from './build-stage-billing-guard.js'
 import {guardCatalogSql,buildGuardAdoption} from './build-billing-guard-adoption.js'
 import {buildGuardRelease} from './build-stage-guard-release.js'
 import {isolatedSandboxBootstrap} from './isolated-billing-bootstrap.js'
-const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'
+import {verifyAccountActivity} from './verify-account-activity.js'
+const accountActivityEnabled=process.env.QVESTA_TEST_ACCOUNT_ACTIVITY==='1'
+const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'||accountActivityEnabled
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
 function assertIsolation(info,{id,owner,network,image,environment={}}){
  const require=(condition,message)=>{if(!condition)throw Error('Disposable container preflight: '+message)}
@@ -54,10 +56,15 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   if(!/^[a-f0-9]{64}$/.test(id))throw Error('Docker did not return a full container ID')
   ownedIds.push(id);return id
  }
- const inspect=(id,network,environment={})=>{
+  const inspect=(id,network,environment={})=>{
   const info=JSON.parse(docker(['inspect',id]))[0]
   const image=JSON.parse(docker(['image','inspect',info.Image]))[0].Config
   assertIsolation(info,{id,owner:name,network,image,environment})
+ }
+ const removeOwned=id=>{
+  const info=JSON.parse(docker(['inspect',id]))[0]
+  if(info.Id!==id||info.Config.Labels?.['qvesta.test.owner']!==name)throw Error('Cleanup ownership mismatch')
+  docker(['rm','-f','-v',id])
  }
  try{
   databaseId=create(['--network','none','--name',name,'--tmpfs','/tmp','--entrypoint','sh','supabase/postgres:17.6.1.165','-c','mkdir -p /tmp/test-pg /etc/postgresql-custom; chown postgres:postgres /tmp/test-pg /etc/postgresql-custom; gosu postgres initdb -D /tmp/test-pg -A trust >/dev/null && exec gosu postgres postgres -D /tmp/test-pg -c shared_preload_libraries=pg_cron,pg_net,supabase_vault -c vault.getkey_script=/usr/share/postgresql/extension/pgsodium_getkey -c cron.database_name=postgres']);
@@ -102,7 +109,8 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   for(const helper of ['auth.jwt()','auth.uid()','auth.role()']){
    expect(sql(`select to_regprocedure('${helper}') is not null`).trim(),helper+' supplied by Auth migrations').toBe('t')
   }
-  const dir=new URL('../supabase/migrations/',import.meta.url),files=readdirSync(dir).filter(f=>f.endsWith('.sql')).sort()
+  const activityMigration='20261006020000_record_account_activity.sql'
+  const dir=new URL('../supabase/migrations/',import.meta.url),files=readdirSync(dir).filter(f=>f.endsWith('.sql')&&f!==activityMigration).sort()
   const base=files.filter(f=>f.slice(0,14)<='20260914210000'),later=files.filter(f=>f.slice(0,14)>'20260914210000')
   expect(base).toHaveLength(99)
   expect(later).toHaveLength(225)
@@ -149,6 +157,10 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   expect(sql('select count(*) from cron.job where active').trim()).toBe('0')
   expect(sql('select count(*) from public.billing_sandbox_orders').trim()).toBe('0')
   expect(sql('select count(*) from public.platform_access_assignments').trim()).toBe('0')
+  if(accountActivityEnabled){
+   sql(readFileSync(new URL(activityMigration,dir),'utf8'))
+   await verifyAccountActivity({sql,databaseId})
+  }else{
   // Test admission cannot be provisioned by browser or Edge service roles.
   const admissionTables=['billing_sandbox_offers','billing_sandbox_application_scope',
    'billing_fiscal_acceptance_fixtures','billing_sandbox_scheduled_orders','billing_sandbox_settlement_schedule']
@@ -761,11 +773,12 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    expect(snapshot(),scenario.name+' retry preserves all rows including single dispatch').toEqual(before)
   }
   }
+  }
  }catch(error){failures.push(error)}finally{
   // IDs came only from successful creates in this invocation. -v removes their
   // anonymous image volumes; no volume prune, named-volume delete or name lookup.
   for(const id of ownedIds.reverse()){
-   try{docker(['rm','-f','-v',id])}catch{failures.push(Error('Own container cleanup failed: '+id))}
+   try{removeOwned(id)}catch{failures.push(Error('Own container cleanup failed: '+id))}
   }
  }
  if(failures.length)throw new AggregateError(failures,'Disposable baseline test or cleanup failed')
