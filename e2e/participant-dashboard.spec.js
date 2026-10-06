@@ -116,7 +116,7 @@ test('UX04: cancellation before package commit preserves previous package and pe
     try { await operation } catch (error) { errorName = error.name }
     return {
       errorName,
-      title: (await db.getQuestFromDB('q1', 'p1')).title,
+      title: (await db.getQuestFromDB('q1', 'p1', userId)).title,
       sameMetadata: JSON.stringify(metadata) === JSON.stringify(await db.getQuestPackageMetadata('q1', 'p1')),
       samePending: JSON.stringify(before) === JSON.stringify(await db.getPendingResults(userId)),
     }

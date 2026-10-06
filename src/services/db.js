@@ -7,7 +7,7 @@ import {
 } from './offlineMedia'
 
 const DB_NAME = 'QuestPlatformDB'
-const DB_VERSION = 14
+const DB_VERSION = 15
 export const OFFLINE_PACKAGE_VERSION = 2
 export const PARTICIPANT_PACKAGE_ACCESS_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -69,14 +69,14 @@ export function hasFreshParticipantPackageAccess(
   participantProfileId,
   now = Date.now()
 ) {
-  if (!participantProfileId) return true
+  if (!participantProfileId) return false
 
   const validatedAt = quest?.participantAccess?.[participantProfileId]
   if (!validatedAt) return false
 
   const validatedAtMs = new Date(validatedAt).getTime()
   return Number.isFinite(validatedAtMs) &&
-    now - validatedAtMs <= PARTICIPANT_PACKAGE_ACCESS_TTL_MS
+    now >= validatedAtMs && now - validatedAtMs <= PARTICIPANT_PACKAGE_ACCESS_TTL_MS
 }
 
 export function isActiveAttemptForParticipant(
@@ -189,6 +189,14 @@ export async function initDB() {
         db.createObjectStore('offlineStartPermits', { keyPath: ['userId', 'participantProfileId', 'questId'] })
       }
 
+      if (oldVersion < 15) {
+        let cursor = await questStore.openCursor()
+        while (cursor) {
+          await cursor.update({ ...cursor.value, participantAccessRevisions: cursor.value.participantAccessRevisions || {} })
+          cursor = await cursor.continue()
+        }
+      }
+
       if (oldVersion < 13) {
         let cursor = await pendingStore.openCursor()
         while (cursor) {
@@ -231,7 +239,7 @@ export async function initDB() {
 }
 
 // ---------- Профили участников ----------
-export async function saveParticipantProfiles(userId, profiles) {
+export async function saveParticipantProfiles(userId, profiles, signal = null) {
   if (!userId) return
 
   const safeProfiles = (profiles || []).map(profile => ({
@@ -242,6 +250,7 @@ export async function saveParticipantProfiles(userId, profiles) {
   })).filter(profile => profile.participant_profile_id)
 
   const db = await initDB()
+  signal?.throwIfAborted()
   await db.put('participantProfiles', {
     userId,
     profiles: safeProfiles,
@@ -257,12 +266,22 @@ export async function getParticipantProfiles(userId) {
 }
 
 // ---------- Квесты ----------
-export async function saveQuestToDB(questData, tasks, participantProfileId = null, signal = null) {
+// Capture before requesting server authorization, so a late response cannot undo a revocation.
+export async function beginParticipantPackageRefresh(questId, participantProfileId, signal = null) {
   signal?.throwIfAborted()
   const db = await initDB()
-  const existingQuest = await db.get('quests', questData.id)
-  const participantAccess = { ...(existingQuest?.participantAccess || {}) }
-  if (participantProfileId) participantAccess[participantProfileId] = new Date().toISOString()
+  const quest = await db.get('quests', questId)
+  signal?.throwIfAborted()
+  return { questId, participantProfileId, revision: quest?.participantAccessRevisions?.[participantProfileId] || null }
+}
+
+export async function saveQuestToDB(questData, tasks, participantProfileId = null, signal = null, accessSnapshot = null) {
+  signal?.throwIfAborted()
+  const refresh = participantProfileId
+    ? accessSnapshot || await beginParticipantPackageRefresh(questData.id, participantProfileId, signal)
+    : null
+  const validatedAt = new Date().toISOString()
+  const db = await initDB()
   const safeTasks = tasks.map(task => sanitizeParticipantTask(task, questData))
   const mediaManifest = collectOfflineMediaManifest(questData, safeTasks)
   const storageEstimate = await estimateOfflineStorage()
@@ -284,18 +303,35 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
       contentType: asset.contentType,
     }
   })
+  signal?.throwIfAborted()
+  const transaction = db.transaction(
+    ['quests', 'downloadedQuests', 'offlineAssets'],
+    'readwrite',
+  )
+  const questStore = transaction.objectStore('quests')
+  const currentQuest = await questStore.get(questData.id)
+  const participantAccessRevisions = { ...(currentQuest?.participantAccessRevisions || {}) }
+  if (refresh && (refresh.questId !== questData.id || refresh.participantProfileId !== participantProfileId ||
+    refresh.revision !== (participantAccessRevisions[participantProfileId] || null))) {
+    await transaction.done
+    throw Object.assign(new Error('quest access denied'), { code: 'OFFLINE_PACKAGE_ACCESS_REVOKED' })
+  }
+  // Merge only the current grants, never the snapshot taken before media downloads.
+  const participantAccess = { ...(currentQuest?.participantAccess || {}) }
+  if (participantProfileId) participantAccess[participantProfileId] = validatedAt
   const questWithTasks = {
     ...questData,
     tasks: safeTasks,
     downloadedAt: new Date().toISOString(),
     participantAccess,
+    participantAccessRevisions,
     offlineAssetRefs,
     offlineMediaFailures: failures,
   }
   const serializedPackage = JSON.stringify(questWithTasks)
   const packageSizeBytes = new TextEncoder().encode(serializedPackage).byteLength + assetBytes
   const downloadedAt = new Date().toISOString()
-  const existing = await db.get('downloadedQuests', questData.id)
+  const existing = await transaction.objectStore('downloadedQuests').get(questData.id)
   const packageMetadata = {
     questId: questData.id,
     packageVersion: OFFLINE_PACKAGE_VERSION,
@@ -304,12 +340,11 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
     downloadedAt,
     lastSyncDate: existing?.lastSyncDate || null,
   }
-  const oldAssets = await db.getAllFromIndex('offlineAssets', 'by_quest_id', questData.id)
-  signal?.throwIfAborted()
-  const transaction = db.transaction(
-    ['quests', 'downloadedQuests', 'offlineAssets'],
-    'readwrite',
-  )
+  const oldAssets = await transaction.objectStore('offlineAssets').index('by_quest_id').getAll(questData.id)
+  if (signal?.aborted) {
+    await transaction.done
+    signal.throwIfAborted()
+  }
   await Promise.all([
     transaction.objectStore('quests').put(questWithTasks),
     transaction.objectStore('downloadedQuests').put(packageMetadata),
@@ -321,6 +356,27 @@ export async function saveQuestToDB(questData, tasks, participantProfileId = nul
 }
 
 const offlineObjectUrls = new Map()
+
+export function releaseOfflineQuestUrls(questId) {
+  for (const url of offlineObjectUrls.get(questId) || []) URL.revokeObjectURL(url)
+  offlineObjectUrls.delete(questId)
+}
+
+// Revoke only the access grant. Attempts, review receipts and pending events survive.
+export async function revokeParticipantPackageAccess(questId, participantProfileId) {
+  if (!participantProfileId) return
+  const db = await initDB()
+  const tx = db.transaction('quests', 'readwrite')
+  const store = tx.objectStore('quests')
+  const quest = await store.get(questId)
+  const participantAccess = { ...quest?.participantAccess }
+  delete participantAccess[participantProfileId]
+  const participantAccessRevisions = { ...quest?.participantAccessRevisions, [participantProfileId]: createClientEventId() }
+  // Keep the revision even when there is no downloaded package or active grant yet.
+  await store.put({ ...quest, id: questId, participantAccess, participantAccessRevisions })
+  await tx.done
+  releaseOfflineQuestUrls(questId)
+}
 
 function applyOfflineAssetUrls(quest, assets) {
   if (!Array.isArray(quest.offlineAssetRefs) || quest.offlineAssetRefs.length === 0) {
@@ -395,10 +451,21 @@ export async function getQuestPackageMetadata(questId, participantProfileId = nu
   }
 }
 
-export async function getQuestFromDB(questId, participantProfileId = null) {
+export async function getQuestFromDB(questId, participantProfileId = null, actorUserId = null, signal = null) {
+  signal?.throwIfAborted()
+  if (!actorUserId || !participantProfileId) return null
   const db = await initDB()
-  const quest = await db.get('quests', questId)
-  if (!quest) return quest
+  // Serialize the grant check and legacy sanitization with revocation/profile updates.
+  const tx = db.transaction(['participantProfiles', 'quests', 'offlineAssets'], 'readwrite')
+  const profileRecord = await tx.objectStore('participantProfiles').get(actorUserId)
+  const profiles = profileRecord?.profiles || []
+  if (!profiles.some(profile => profile.participant_profile_id === participantProfileId && (
+    profile.relationship === 'self' || profile.relationship === 'group_manager' ||
+    profile.supervision_status === 'active'
+  ))) return null
+  signal?.throwIfAborted()
+  const quest = await tx.objectStore('quests').get(questId)
+  if (!quest) return null
   if (!hasFreshParticipantPackageAccess(quest, participantProfileId)) return null
 
   const safeTasks = (quest.tasks || []).map(task =>
@@ -407,8 +474,10 @@ export async function getQuestFromDB(questId, participantProfileId = null) {
   const sanitizedQuest = { ...quest, tasks: safeTasks }
 
   // Очищает от секретов также квесты, сохранённые старой версией приложения.
-  await db.put('quests', sanitizedQuest)
-  const assets = await db.getAllFromIndex('offlineAssets', 'by_quest_id', questId)
+  await tx.objectStore('quests').put(sanitizedQuest)
+  const assets = await tx.objectStore('offlineAssets').index('by_quest_id').getAll(questId)
+  await tx.done
+  signal?.throwIfAborted()
   const hydrated = applyOfflineAssetUrls(sanitizedQuest, assets)
   for (const failure of quest.offlineMediaFailures || []) {
     for (const target of failure.targets || []) {
