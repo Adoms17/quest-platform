@@ -1,5 +1,13 @@
 # PROFILE-01: никнейм, приватный аватар и термин «куратор»
 
+## Следующий этап: staging preparation, без удалённых изменений
+
+Локальный проверенный commit: `a9b90f47cfa3f0947f52dc423c50ae3ef808662e`.
+Read-only сверка staging/CI/access metadata и ограниченный manifest, backup/recovery,
+матрица remote acceptance, maintenance и Deno blocker оформлены отдельно:
+[PROFILE-01 staging preparation](PROFILE-01-staging-preparation-20261006.md).
+Это предложение для проверки границ, не выполненный deploy и не Done.
+
 ## Передача проверенного кандидата в локальный commit — 06.10.2026
 
 Координатор передал независимые production PASS и закрытие cleanup P2: reviewer
