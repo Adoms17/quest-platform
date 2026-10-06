@@ -68,9 +68,9 @@ function ProfileCard({ profileId }) {
       </form> : <button type="button" onClick={() => setEditing(true)} className="block py-3 text-blue-700">Изменить имя</button>)}
       {profile.profile_kind === 'dependent' && profile.supervision_status === 'active' && (inviting
         ? <ParticipantProfileInvite key={inviting} invitationKind={inviting} profile={profile} onClose={() => setInviting(false)} />
-        : <div className="flex flex-wrap gap-3"><button type="button" onClick={() => setInviting('supervisor')} className="py-3 text-blue-700">Пригласить взрослого</button><button type="button" onClick={() => setInviting('claim')} className="py-3 text-blue-700">Связать с аккаунтом</button></div>)}
+        : <div className="flex flex-wrap gap-3"><button type="button" onClick={() => setInviting('supervisor')} className="py-3 text-blue-700">Пригласить куратора</button><button type="button" onClick={() => setInviting('claim')} className="py-3 text-blue-700">Связать с аккаунтом</button></div>)}
       <Link to={`/participants/group/profiles/${encodeURIComponent(profileId)}/invitations`} className="block py-3 text-blue-700">Мои приглашения</Link>
-      <Link to={`/participants/group/profiles/${encodeURIComponent(profileId)}/supervisors`} className="block py-3 text-blue-700">Контролирующие взрослые</Link>
+      <Link to={`/participants/group/profiles/${encodeURIComponent(profileId)}/supervisors`} className="block py-3 text-blue-700">Кураторы</Link>
       <Link to={`/participants/group/profiles/${encodeURIComponent(profileId)}/audit`} className="block py-3 text-blue-700">Журнал управления</Link>
       <button type="button" disabled={saving} onClick={refresh} className="block py-3 text-blue-700 disabled:opacity-50">Обновить профиль</button>
     </>}

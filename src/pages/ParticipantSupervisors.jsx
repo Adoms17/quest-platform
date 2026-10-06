@@ -14,8 +14,8 @@ function Supervisors({ actorId, profileId }) {
   return <div className="mx-auto max-w-3xl space-y-5 break-words p-4 sm:p-6">
     <Link to={`/participants/group/profiles/${encodeURIComponent(profileId)}`} className="inline-block py-2 text-blue-700">К карточке участника</Link>
     <Link to="/participants/group/supervision" className="block py-2 text-blue-700">Мои связи контроля</Link>
-    <h1 className="text-2xl font-bold">Контролирующие взрослые</h1>
-    <p className="text-gray-600">Владелец профиля видит все связи контроля. Другим взрослым доступна только своя связь. Руководство группой — отдельное основание доступа.</p>
+    <h1 className="text-2xl font-bold">Кураторы</h1>
+    <p className="text-gray-600">Владелец профиля видит все связи контроля. Другим кураторам доступна только своя связь. Руководство группой — отдельное основание доступа.</p>
     <label className="block"><span className="mb-1 block font-medium">Найти по имени или email</span><input type="search" maxLength={200} value={search} onChange={event => setSearch(event.target.value)} className="w-full rounded-lg border p-3" /></label>
     {catalog.loading && <p role="status">Загрузка связей…</p>}
     {catalog.error && <div role="alert"><p>{catalog.denied ? 'Нет доступа к связям этого профиля.' : 'Не удалось загрузить связи.'}</p><button type="button" onClick={() => catalog.hasMore ? void catalog.loadMore() : setRevision(n => n + 1)} className="py-2 text-blue-700">Повторить</button></div>}
