@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { createServer as createViteServer } from 'vite'
 import { removeOwnedResource, runAcceptanceCleanup } from './offline-acceptance-cleanup.js'
+import { verifyAccountActivity } from './verify-account-activity.js'
 
 const enabled = process.env.RUN_ISOLATED_OFFLINE_ACCEPTANCE === '1'
 const root = fileURLToPath(new URL('../', import.meta.url))
@@ -103,7 +104,28 @@ test.skipIf(!enabled)('isolated real Auth/RLS/offline acceptance', async () => {
       alter default privileges for role postgres in schema public grant execute on functions to anon,authenticated,service_role;`)
     const migrationDirectory = new URL('../supabase/migrations/', import.meta.url)
     const migrations = readdirSync(migrationDirectory).filter(name => name.endsWith('.sql')).sort()
-    sql(migrations.map(name => `\n\\echo ${name}\n${readFileSync(new URL(name, migrationDirectory), 'utf8')}`).join('\n'))
+    const identityMigration = '20261006010000_participant_profile_identity.sql'
+    const historical = migrations.filter(name => name < identityMigration)
+    expect(historical).toHaveLength(324)
+    sql(historical.map(name => readFileSync(new URL(name, migrationDirectory), 'utf8')).join('\n'))
+    // Profile identity depends on the real Storage schema, supplied by Storage
+    // migrations, before the two new application migrations are replayed in order.
+    create('storage', 'supabase/storage-api:v1.70.3', ['--tmpfs', '/var/lib/storage:mode=1777'], {
+      DATABASE_URL: 'postgres://postgres@test-db:5432/postgres?sslmode=disable', AUTH_JWT_SECRET: secret,
+      STORAGE_BACKEND: 'file', FILE_STORAGE_BACKEND_PATH: '/var/lib/storage', TENANT_ID: owner, REGION: 'local',
+      FILE_SIZE_LIMIT: '1048576', DB_INSTALL_ROLES: 'true', DB_MIGRATIONS_STRATEGY: 'on_start', LOG_LEVEL: 'fatal', S3_PROTOCOL_ENABLED: 'false',
+    })
+    await ready(() => sql("select to_regclass('storage.objects') is not null") === 't', 'Storage schema')
+    sql(migrations.filter(name => name >= identityMigration).map(name => readFileSync(new URL(name, migrationDirectory), 'utf8')).join('\n'))
+    sql('create extension if not exists pgtap with schema extensions; grant usage on schema extensions to anon,authenticated,service_role;')
+    for (const suite of ['participant_identity', 'participant_avatar_cleanup_race', 'participant_profile_card', 'group_member_catalog', 'group_exit_actions']) {
+      const tap = sql('set search_path=public,extensions;\n' + readFileSync(new URL(`../supabase/tests/database/${suite}.test.sql`, import.meta.url), 'utf8'))
+      expect(tap, suite).not.toMatch(/not ok|Looks like|Bail out!/)
+      expect(tap, suite).toMatch(/1\.\.\d+/)
+      evidence.checks.push({name: suite, result: 'PASS', assertions: Number(tap.match(/1\.\.(\d+)/)[1])})
+    }
+    await verifyAccountActivity({sql, databaseId, dockerArgs: ['--config', configDirectory]})
+    evidence.checks.push({name: 'account activity SQL/RLS and concurrent writes', result: 'PASS'})
     expect(sql('select count(*) from cron.job where active')).toBe('0')
     evidence.checks.push({ name: 'migration replay', result: 'PASS', count: migrations.length })
     console.log(`Isolated real Auth ready; ${migrations.length} migrations applied; no active cron jobs.`)
@@ -160,7 +182,7 @@ test.skipIf(!enabled)('isolated real Auth/RLS/offline acceptance', async () => {
   } catch (error) { primaryError = error }
   // Async subprocess timeouts keep cleanup timers live even when Docker hangs.
   const cleanupDocker = args => new Promise((resolve, reject) => {
-    const child = spawn('docker', ['--config', configDirectory, ...args], {cwd: root, windowsHide: true, timeout: 10000, killSignal: 'SIGKILL', stdio: ['ignore', 'pipe', 'ignore']})
+    const child = spawn('docker', ['--config', configDirectory, ...args], {cwd: root, windowsHide: true, timeout: 20000, killSignal: 'SIGKILL', stdio: ['ignore', 'pipe', 'ignore']})
     let output = ''
     child.stdout.on('data', chunk => { output += chunk })
     child.on('error', reject)
@@ -172,8 +194,8 @@ test.skipIf(!enabled)('isolated real Auth/RLS/offline acceptance', async () => {
       {name: 'vite', run: () => vite?.close()},
       {name: 'proxy-connections', run: () => proxy?.closeAllConnections()},
       {name: 'proxy', run: () => proxy && new Promise((resolve, reject) => proxy.close(error => error ? reject(error) : resolve()))},
-      ...[...containers].reverse().map(id => ({name: id, timeoutMs: 25000, run: () => removeOwnedResource(cleanupDocker, owner, id)})),
-      ...(network ? [{name: network, timeoutMs: 25000, run: () => removeOwnedResource(cleanupDocker, owner, network, true)}] : []),
+      ...[...containers].reverse().map(id => ({name: id, timeoutMs: 45000, run: () => removeOwnedResource(cleanupDocker, owner, id)})),
+      ...(network ? [{name: network, timeoutMs: 45000, run: () => removeOwnedResource(cleanupDocker, owner, network, true)}] : []),
     ],
   })
 }, 480000)

@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { expect } from 'vitest'
 
-export async function verifyAccountActivity({ sql, databaseId }) {
+export async function verifyAccountActivity({ sql, databaseId, dockerArgs = [] }) {
   if (!/^[a-f0-9]{64}$/.test(databaseId)) throw new Error('Full disposable container ID required')
   sql('create extension if not exists pgtap with schema extensions; grant usage on schema extensions to anon,authenticated;')
   const tap = sql("set search_path=public,extensions;\n" + readFileSync(new URL('../supabase/tests/database/account_activity.test.sql', import.meta.url), 'utf8'))
@@ -21,7 +21,7 @@ export async function verifyAccountActivity({ sql, databaseId }) {
       for each row execute function public.count_activity_test_write();`)
 
   const concurrentSql = input => new Promise((resolve, reject) => {
-    const child = spawn('docker', ['exec', '-i', databaseId, 'psql', '-X', '-qAt', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1'], { windowsHide: true })
+    const child = spawn('docker', [...dockerArgs, 'exec', '-i', databaseId, 'psql', '-X', '-qAt', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1'], { windowsHide: true })
     let output='', error=''
     child.stdout.on('data', chunk => { output += chunk })
     child.stderr.on('data', chunk => { error += chunk })

@@ -8,13 +8,18 @@ import { syncPendingResults } from '../../src/services/sync'
 import { downloadParticipantQuest } from '../../src/services/participantDashboard'
 import { loadAvailableParticipantProfiles } from '../../src/services/participantProfileAccess'
 import QuestPlay from '../../src/pages/QuestPlay'
+import { useAccountActivity } from '../../src/hooks/useAccountActivity'
 
 const root = createRoot(document.getElementById('root'))
 const requireData = (result, operation) => {
   if (result.error) throw new Error(`${operation}: ${result.error.code || result.error.message}`)
   return result.data
 }
-const render = (session, path) => root.render(<MemoryRouter key={path} initialEntries={[path]}><Routes><Route path="/play/:id" element={<QuestPlay session={session} />} /></Routes></MemoryRouter>)
+export function ActiveQuest({session}) {
+  useAccountActivity(session?.user?.id)
+  return <QuestPlay session={session} />
+}
+const render = (session, path) => root.render(<MemoryRouter key={path} initialEntries={[path]}><Routes><Route path="/play/:id" element={<ActiveQuest session={session} />} /></Routes></MemoryRouter>)
 window.supabase = supabase
 window.db = db
 window.sync = () => syncPendingResults(null, {suppressErrorToast: true})

@@ -21,6 +21,37 @@ async function assertBDenied(page) {
   expect(result).toEqual({questDenied: '42501', quests: [], attempts: [], receipts: [], localQuest: null, pending: []})
 }
 
+test('real backend: nickname edit preserves offline grant and activity remains account-scoped', async ({page}) => {
+  const s = await page.evaluate(() => window.seedRealScenario())
+  const edited = await page.evaluate(async () => {
+    const {saveParticipantIdentity} = await import('/src/services/participantIdentityApi.js')
+    return saveParticipantIdentity(window.scenario.a.profileId, 0, 'IntegratedExplorer')
+  })
+  expect(edited.nickname).toBe('IntegratedExplorer')
+  await page.evaluate(s => window.showPlay(`/play/${s.questId}?participant=${s.profileId}`), s)
+  const visibleAccounts = () => page.evaluate(async () => {
+    const {data, error} = await supabase.from('account_activity').select('account_id')
+    if (error) throw new Error('Activity read failed')
+    return data.map(row => row.account_id)
+  })
+  await expect.poll(visibleAccounts).toEqual([s.aId])
+  await page.context().setOffline(true)
+  await page.evaluate(() => window.enqueueRealOffline())
+  await expect(page.getByRole('heading', {name: 'PRIVATE REAL OFFLINE A', exact: true})).toBeVisible()
+  await page.context().setOffline(false)
+  await page.evaluate(() => window.loginReal('b'))
+  await expect.poll(visibleAccounts).toEqual([s.bId])
+  await assertBDenied(page)
+  expect(await page.evaluate(async () => (await db.getPendingResults(window.scenario.a.id)).length)).toBe(2)
+  const denied = await page.evaluate(async () => {
+    const {error} = await supabase.rpc('save_participant_identity', {p_profile: window.scenario.a.profileId, p_revision: 1, p_nickname: 'ForeignEdit', p_upload: null, p_remove_avatar: false})
+    return error?.code
+  })
+  expect(denied).toBe('42501')
+  await page.evaluate(() => window.loginReal('a'))
+  expect((await page.evaluate(() => window.sync())).syncedEvents).toBe(2)
+})
+
 test('real backend: owner offline sync is idempotent and B cannot read A content/results', async ({ page }) => {
   const s = await page.evaluate(() => window.seedRealScenario())
   await page.context().setOffline(true)
