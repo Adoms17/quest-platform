@@ -35,7 +35,7 @@ insert into members_seen select (x->>'id')::uuid from jsonb_array_elements(p->'i
 exit when not (p->>'has_more')::boolean; c:=p->'next_cursor';
 end loop;end$$;
 select is((select count(*) from members_seen),1001::bigint,'1000 участников и создатель без пропусков и дублей');
-select ok(not exists(select 1 from jsonb_object_keys(pg_temp.members()->'items'->0) k where k not in ('id','display_name','profile_kind','member_role','is_current_user','sort_priority','sort_name')),'ограниченная проекция без контактов');
+select ok(not exists(select 1 from jsonb_object_keys(pg_temp.members()->'items'->0) k where k not in ('id','display_name','nickname','avatar_path','profile_kind','member_role','is_current_user','sort_priority','sort_name')),'ограниченная проекция без контактов');
 select ok(not (pg_temp.members() ? 'total'),'нет общего количества скрытых участников');
 reset role;
 select set_config('request.jwt.claim.sub','95000000-0000-4000-8000-000000000002',true);
