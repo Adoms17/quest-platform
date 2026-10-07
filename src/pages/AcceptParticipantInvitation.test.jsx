@@ -27,9 +27,9 @@ it('ошибка проверки оставляет приглашение до
   expect(mocks.accept).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: 'Принять приглашение' })).toBeEnabled()
 })
-it('приглашение контролирующего взрослого не блокируется очередью self', async () => {
+it('приглашение куратора не блокируется очередью self', async () => {
   mocks.preview.mockResolvedValue({ invitation_kind: 'supervisor' })
   fireEvent.click(await open())
-  await screen.findByText('Вы добавлены как контролирующий взрослый.')
+  await screen.findByText('Вы добавлены как куратор.')
   expect(mocks.check).not.toHaveBeenCalled()
 })

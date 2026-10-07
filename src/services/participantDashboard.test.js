@@ -1,15 +1,17 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ profiles: vi.fn(), quests: vi.fn(), packages: vi.fn(), attempts: vi.fn(), pending: vi.fn(), cached: vi.fn(), saveProfiles: vi.fn(), quest: vi.fn(), tasks: vi.fn(), save: vi.fn() }))
-vi.mock('./db', () => ({ OFFLINE_PACKAGE_VERSION: 2, getDownloadedQuestPackages: mocks.packages, getLocalParticipantAttempts: mocks.attempts, getParticipantProfiles: mocks.cached, getPendingResults: mocks.pending, saveParticipantProfiles: mocks.saveProfiles, saveQuestToDB: mocks.save }))
+const mocks = vi.hoisted(() => ({ profiles: vi.fn(), quests: vi.fn(), packages: vi.fn(), attempts: vi.fn(), pending: vi.fn(), cached: vi.fn(), saveProfiles: vi.fn(), quest: vi.fn(), tasks: vi.fn(), save: vi.fn(), revoke: vi.fn(), beginRefresh: vi.fn() }))
+vi.mock('./db', () => ({ OFFLINE_PACKAGE_VERSION: 2, getDownloadedQuestPackages: mocks.packages, getLocalParticipantAttempts: mocks.attempts, getParticipantProfiles: mocks.cached, getPendingResults: mocks.pending, saveParticipantProfiles: mocks.saveProfiles, saveQuestToDB: mocks.save, revokeParticipantPackageAccess: mocks.revoke, beginParticipantPackageRefresh: mocks.beginRefresh }))
 vi.mock('./participantGroupApi', () => ({ listMyParticipantProfiles: mocks.profiles }))
 vi.mock('./questApi', () => ({ listAccessiblePrivateQuests: mocks.quests, loadParticipantQuest: mocks.quest, loadParticipantTasks: mocks.tasks }))
 import { packageReadiness, buildParticipantQuestRows, loadParticipantDashboard, downloadParticipantQuest } from './participantDashboard'
 const profile = { participant_profile_id: 'p1', display_name: 'Саша', relationship: 'self' }
 const pkg = { questId: 'q1', participantProfileId: 'p1', title: 'Квест', packageVersion: 2, isFresh: true, expiresAt: '2026-10-01', is_open: true }
+const accessSnapshot = { questId: 'q1', participantProfileId: 'p1', revision: null }
 beforeEach(() => {
   vi.resetAllMocks(); vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
   mocks.profiles.mockResolvedValue([profile]); mocks.quests.mockResolvedValue([]); mocks.cached.mockResolvedValue([profile])
   mocks.packages.mockResolvedValue([pkg]); mocks.attempts.mockResolvedValue([]); mocks.pending.mockResolvedValue([])
+  mocks.beginRefresh.mockResolvedValue(accessSnapshot)
 })
 afterEach(() => vi.restoreAllMocks())
 describe('готовность и изоляция участника', () => {
@@ -56,12 +58,25 @@ describe('готовность и изоляция участника', () => {
     await downloadParticipantQuest('q1', 'p1', signal)
     expect(mocks.quest).toHaveBeenCalledWith('q1', 'p1', signal)
     expect(mocks.tasks).toHaveBeenCalledWith('q1', 'p1', signal)
-    expect(mocks.save).toHaveBeenCalledWith({ id: 'q1' }, [], 'p1', signal)
+    expect(mocks.beginRefresh).toHaveBeenCalledWith('q1', 'p1', signal)
+    expect(mocks.beginRefresh.mock.invocationCallOrder[0]).toBeLessThan(mocks.quest.mock.invocationCallOrder[0])
+    expect(mocks.save).toHaveBeenCalledWith({ id: 'q1' }, [], 'p1', signal, accessSnapshot)
   })
   it('отмена между проверкой доступа и записью не сохраняет пакет', async () => {
     const controller = new AbortController()
     mocks.quest.mockResolvedValue({ id: 'q1' }); mocks.tasks.mockImplementation(() => { controller.abort(); return [] })
     await expect(downloadParticipantQuest('q1', 'p1', controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
     expect(mocks.save).not.toHaveBeenCalled()
+  })
+  it('отказ доступа при обновлении пакета отзывает прежний offline grant', async () => {
+    mocks.quest.mockRejectedValue({ code: '42501', message: 'quest access denied' })
+    await expect(downloadParticipantQuest('q1', 'p1')).rejects.toMatchObject({ code: '42501' })
+    expect(mocks.revoke).toHaveBeenCalledWith('q1', 'p1')
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
+  it('сетевая ошибка не отзывает ранее подтверждённый grant', async () => {
+    mocks.quest.mockRejectedValue(new TypeError('Failed to fetch'))
+    await expect(downloadParticipantQuest('q1', 'p1')).rejects.toThrow('Failed to fetch')
+    expect(mocks.revoke).not.toHaveBeenCalled()
   })
 })

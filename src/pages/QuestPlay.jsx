@@ -12,6 +12,9 @@ import ParticipantProfileSelect from '../components/ParticipantProfileSelect'
 import toast from 'react-hot-toast'
 import {
   getQuestFromDB,
+  beginParticipantPackageRefresh,
+  releaseOfflineQuestUrls,
+  revokeParticipantPackageAccess,
   getQuestPackageMetadata,
   saveQuestToDB,
   getActiveLocalQuestAttempt,
@@ -38,7 +41,8 @@ import {
   usesAnyLocationVerification,
 } from '../services/verificationPolicy'
 import { isTransportError } from '../services/network'
-import { getQuestAccessErrorMessage } from '../services/questAccessErrors'
+import { loadAvailableParticipantProfiles } from '../services/participantProfileAccess'
+import { getQuestAccessErrorMessage, isQuestAccessDenied } from '../services/questAccessErrors'
 import { getUserErrorMessage } from '../services/userErrorMessage'
 import { measureOperation, recordOfflineMetric } from '../services/operationTiming'
 import TaskMedia from '../components/TaskMedia'
@@ -63,6 +67,13 @@ import {
 } from '../services/participantMode'
 
 export default function QuestPlay({ session }) {
+  const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  // Remount before rendering when the actor or route scope changes: no stale content.
+  return <QuestPlayContent key={JSON.stringify([session?.user?.id, id, searchParams.get('participant')])} session={session} />
+}
+
+function QuestPlayContent({ session }) {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const participantProfileId = searchParams.get('participant')
@@ -155,39 +166,6 @@ export default function QuestPlay({ session }) {
     existingParticipantMode?.participantProfileId === participantProfileId &&
     existingParticipantMode?.questId === id
   )
-  const offlineFallbackProfiles = useMemo(() => {
-    if (!participantProfileId) return []
-    if (participantProfileId === session?.user?.id) {
-      return [{
-        participant_profile_id: participantProfileId,
-        display_name: session.user.user_metadata?.username || session.user.email || 'Мой профиль',
-        relationship: 'self',
-        supervision_status: 'active',
-      }]
-    }
-
-    const isLockedProfile = existingParticipantMode?.actorUserId === session?.user?.id &&
-      existingParticipantMode?.participantProfileId === participantProfileId &&
-      existingParticipantMode?.questId === id
-    return [{
-      participant_profile_id: participantProfileId,
-      display_name: isLockedProfile
-        ? existingParticipantMode.participantDisplayName || 'Участник'
-        : 'Сохранённый профиль',
-      relationship: 'supervised',
-      supervision_status: 'active',
-    }]
-  }, [
-    existingParticipantMode?.actorUserId,
-    existingParticipantMode?.participantDisplayName,
-    existingParticipantMode?.participantProfileId,
-    existingParticipantMode?.questId,
-    id,
-    participantProfileId,
-    session?.user?.email,
-    session?.user?.id,
-    session?.user?.user_metadata?.username,
-  ])
 
   const handleParticipantChange = useCallback((nextParticipantProfileId) => {
     const nextSearchParams = new URLSearchParams(searchParams)
@@ -201,7 +179,14 @@ export default function QuestPlay({ session }) {
 
   const handleProfilesLoaded = useCallback(profiles => {
     setParticipantProfiles(profiles)
-  }, [])
+    if (participantProfileId && !profiles.some(profile => profile.participant_profile_id === participantProfileId)) {
+      setQuest(null)
+      setTasks([])
+      setHasStarted(false)
+      setError('quest access denied')
+      releaseOfflineQuestUrls(id)
+    }
+  }, [id, participantProfileId])
 
   const handleStart = async () => {
     if (!isOnlineRef.current && requiresOnlineQuestStart(
@@ -281,11 +266,30 @@ export default function QuestPlay({ session }) {
       try {
         let questData
         let tasksData
+        const accessSnapshot = participantProfileId
+          ? await beginParticipantPackageRefresh(id, participantProfileId, signal)
+          : null
+
+        const { profiles } = await loadAvailableParticipantProfiles(session?.user?.id, {
+          online: isOnlineRef.current, signal,
+        })
+        if (signal.aborted) return
+        setParticipantProfiles(profiles)
+        const profile = participantProfileId
+          ? profiles.find(item => item.participant_profile_id === participantProfileId)
+          : profiles.find(item => item.relationship === 'self')
+        if (!profile) throw new Error('quest access denied')
+        if (!participantProfileId) {
+          const params = new URLSearchParams(searchParams)
+          params.set('participant', profile.participant_profile_id)
+          setSearchParams(params, { replace: true })
+          return
+        }
 
         async function loadCachedQuest() {
           const localQuest = await measureOperation(
             'load-offline-package',
-            () => getQuestFromDB(id, participantProfileId),
+            () => getQuestFromDB(id, participantProfileId, session?.user?.id, signal),
           )
 
           if (!localQuest) {
@@ -309,6 +313,8 @@ export default function QuestPlay({ session }) {
             const entryAvailability = getQuestAvailability(entryStatus)
 
             if (!entryAvailability.isAvailable) {
+              await revokeParticipantPackageAccess(id, participantProfileId)
+              if (signal.aborted) return
               questData = entryStatus
               tasksData = []
               setQuest(questData)
@@ -325,6 +331,7 @@ export default function QuestPlay({ session }) {
               tasksData = await loadParticipantTasks(id, null, signal)
             }
             if (signal.aborted) return
+            if (!questData?.id || questData.id !== id) throw new Error('quest access denied')
 
             const effectiveParticipantProfileId = participantProfileId || session?.user?.id
             if (effectiveParticipantProfileId) {
@@ -342,11 +349,13 @@ export default function QuestPlay({ session }) {
                 () => saveQuestToDB(
                   questData,
                   tasksData,
-                  participantProfileId
+                  participantProfileId,
+                  signal,
+                  accessSnapshot
                 ),
               )
               recordOfflineMetric('package-source', 'network')
-              const preparedQuest = await getQuestFromDB(id, participantProfileId)
+              const preparedQuest = await getQuestFromDB(id, participantProfileId, session?.user?.id, signal)
               if (signal.aborted) return
               if (preparedQuest) {
                 questData = { ...questData, cover_image_url: preparedQuest.cover_image_url, cover_image_offline_unavailable: preparedQuest.cover_image_offline_unavailable, offline_overview_image_url: preparedQuest.offline_overview_image_url, offline_overview_image_url_bounds: preparedQuest.offline_overview_image_url_bounds }
@@ -358,10 +367,15 @@ export default function QuestPlay({ session }) {
               ) || packageMetadata)
               setOfflinePackageStatus('ready')
             } catch (cacheError) {
+              if (isQuestAccessDenied(cacheError)) throw cacheError
               console.warn('Не удалось сохранить квест для offline:', cacheError)
               setOfflinePackageStatus('unavailable')
             }
           } catch (remoteError) {
+            if (signal.aborted) return
+            if (isQuestAccessDenied(remoteError) && remoteError.code !== 'OFFLINE_PACKAGE_ACCESS_REVOKED') {
+              await revokeParticipantPackageAccess(id, participantProfileId)
+            }
             if (!isTransportError(remoteError)) throw remoteError
 
             isOnlineRef.current = false
@@ -414,9 +428,10 @@ export default function QuestPlay({ session }) {
     void loadQuest()
     return () => {
       abortController.abort()
+      releaseOfflineQuestUrls(id)
       if (questLoadKeyRef.current === loadKey) questLoadKeyRef.current = null
     }
-  }, [id, session, participantProfileId])
+  }, [id, session, participantProfileId, searchParams, setSearchParams])
 
   // ----- Доступность -----
   const { isAvailable, availabilityMessage, timeUntilStart } = useMemo(() => {
@@ -1172,7 +1187,6 @@ export default function QuestPlay({ session }) {
           onChange={handleParticipantChange}
           onProfilesLoaded={handleProfilesLoaded}
           userId={session?.user?.id}
-          fallbackProfiles={offlineFallbackProfiles}
           label="Участник квеста"
         />
         {selectedParticipantProfile?.relationship !== 'self' && !participantModeIsActive && (

@@ -19,6 +19,7 @@ import {
   PARTICIPANT_MODE_CHANGED_EVENT,
 } from './services/participantMode'
 import ParticipantModeBar from './components/ParticipantModeBar'
+import { useAccountActivity } from './hooks/useAccountActivity'
 
 const ParticipantQuests = lazy(() => import('./pages/ParticipantQuests'))
 const Login = lazy(() => import('./pages/Login'))
@@ -97,6 +98,7 @@ function LoginRedirect({ session }) {
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  useAccountActivity(session?.user?.id)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

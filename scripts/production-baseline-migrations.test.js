@@ -7,7 +7,35 @@ import {buildStageBillingGuard} from './build-stage-billing-guard.js'
 import {guardCatalogSql,buildGuardAdoption} from './build-billing-guard-adoption.js'
 import {buildGuardRelease} from './build-stage-guard-release.js'
 import {isolatedSandboxBootstrap} from './isolated-billing-bootstrap.js'
-const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'
+import {verifyAccountActivity} from './verify-account-activity.js'
+const accountActivityEnabled=process.env.QVESTA_TEST_ACCOUNT_ACTIVITY==='1'
+const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'||accountActivityEnabled
+const releaseMigrations=[
+ '20261006010000_participant_profile_identity.sql',
+ '20261006020000_record_account_activity.sql',
+]
+function migrationPlan(files){
+ const sorted=[...files].sort()
+ expect(new Set(sorted.map(f=>f.slice(0,14))).size,'unique migration versions').toBe(sorted.length)
+ const base=sorted.filter(f=>f.slice(0,14)<='20260914210000')
+ const historical=sorted.filter(f=>f.slice(0,14)>'20260914210000'&&f<releaseMigrations[0])
+ const release=sorted.filter(f=>f>=releaseMigrations[0])
+ expect(base).toHaveLength(99)
+ expect(historical).toHaveLength(225)
+ expect(release,'exact reviewed release migrations').toEqual(releaseMigrations)
+ expect([...base,...historical,...release]).toEqual(sorted)
+ return {base,later:[...historical,...release]}
+}
+
+test('migration plan retains the historical boundary and rejects missing, extra or duplicate release versions',()=>{
+ const files=readdirSync(new URL('../supabase/migrations/',import.meta.url)).filter(f=>f.endsWith('.sql'))
+ const plan=migrationPlan(files)
+ expect(plan.later).toHaveLength(227)
+ for(const file of releaseMigrations)expect(()=>migrationPlan(files.filter(f=>f!==file))).toThrow()
+ expect(()=>migrationPlan([...files,'20261006030000_unreviewed.sql'])).toThrow()
+ expect(()=>migrationPlan([...files,'20261006010000_duplicate.sql'])).toThrow()
+ expect(()=>migrationPlan(files.filter(f=>f!==plan.later[0]))).toThrow()
+})
 function docker(args,input){const r=spawnSync('docker',args,{input,encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});if(r.status!==0)throw Error(r.stderr||'Docker failed');return r.stdout}
 function assertIsolation(info,{id,owner,network,image,environment={}}){
  const require=(condition,message)=>{if(!condition)throw Error('Disposable container preflight: '+message)}
@@ -54,10 +82,15 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   if(!/^[a-f0-9]{64}$/.test(id))throw Error('Docker did not return a full container ID')
   ownedIds.push(id);return id
  }
- const inspect=(id,network,environment={})=>{
+  const inspect=(id,network,environment={})=>{
   const info=JSON.parse(docker(['inspect',id]))[0]
   const image=JSON.parse(docker(['image','inspect',info.Image]))[0].Config
   assertIsolation(info,{id,owner:name,network,image,environment})
+ }
+ const removeOwned=id=>{
+  const info=JSON.parse(docker(['inspect',id]))[0]
+  if(info.Id!==id||info.Config.Labels?.['qvesta.test.owner']!==name)throw Error('Cleanup ownership mismatch')
+  docker(['rm','-f','-v',id])
  }
  try{
   databaseId=create(['--network','none','--name',name,'--tmpfs','/tmp','--entrypoint','sh','supabase/postgres:17.6.1.165','-c','mkdir -p /tmp/test-pg /etc/postgresql-custom; chown postgres:postgres /tmp/test-pg /etc/postgresql-custom; gosu postgres initdb -D /tmp/test-pg -A trust >/dev/null && exec gosu postgres postgres -D /tmp/test-pg -c shared_preload_libraries=pg_cron,pg_net,supabase_vault -c vault.getkey_script=/usr/share/postgresql/extension/pgsodium_getkey -c cron.database_name=postgres']);
@@ -103,9 +136,7 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    expect(sql(`select to_regprocedure('${helper}') is not null`).trim(),helper+' supplied by Auth migrations').toBe('t')
   }
   const dir=new URL('../supabase/migrations/',import.meta.url),files=readdirSync(dir).filter(f=>f.endsWith('.sql')).sort()
-  const base=files.filter(f=>f.slice(0,14)<='20260914210000'),later=files.filter(f=>f.slice(0,14)>'20260914210000')
-  expect(base).toHaveLength(99)
-  expect(later).toHaveLength(225)
+  const {base,later}=migrationPlan(files)
   // Observed production defaults on 2026-10-01; applied ONLY inside this disposable container.
   // These precede historical migrations so their REVOKE/GRANT statements remain authoritative.
   sql(`alter default privileges for role postgres in schema public grant all on tables to anon,authenticated,service_role;
@@ -141,14 +172,51 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   const snapshot=()=>sql("select md5(row_to_json(o)::text) from public.organizations o where personal_owner_id=md5('production-baseline-fixture')::uuid").trim()
   const before=snapshot()
   expect(before).toMatch(/^[a-f0-9]{32}$/)
+  const applied=[...base]
   for(const file of later){
+   if(file===releaseMigrations[0]){
+    // Use real pinned Storage migrations, after the historical public-catalog
+    // fingerprint has been checked. Share only this network-none DB namespace.
+    const storageEnvironment={
+     DATABASE_URL:'postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable',
+     AUTH_JWT_SECRET:randomBytes(48).toString('hex'),STORAGE_BACKEND:'file',
+     FILE_STORAGE_BACKEND_PATH:'/var/lib/storage',TENANT_ID:name,REGION:'local',
+     FILE_SIZE_LIMIT:'1048576',DB_INSTALL_ROLES:'true',DB_MIGRATIONS_STRATEGY:'on_start',
+     LOG_LEVEL:'fatal',S3_PROTOCOL_ENABLED:'false',
+    }
+    let storageId
+    try{storageId=create(['--name',name+'-storage','--network','container:'+databaseId,
+     '--tmpfs','/var/lib/storage:mode=1777',
+     ...Object.entries(storageEnvironment).flatMap(([key,value])=>['-e',key+'='+value]),
+     'supabase/storage-api:v1.70.3'])}catch{throw Error('Isolated Storage container creation failed')}
+    inspect(storageId,'container:'+databaseId,storageEnvironment)
+    inspect(databaseId,'none')
+    docker(['start',storageId])
+    let storageReady=false
+    for(let i=0;i<80;i++){
+     try{
+      docker(['exec',storageId,'node','-e',"fetch('http://127.0.0.1:5000/status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"])
+      storageReady=true;break
+     }catch{await new Promise(r=>setTimeout(r,250))}
+    }
+    if(!storageReady)throw Error('Isolated Storage startup failed; diagnostics suppressed')
+    expect(sql("select to_regclass('storage.objects') is not null and to_regclass('storage.buckets') is not null").trim()).toBe('t')
+    inspect(storageId,'container:'+databaseId,storageEnvironment)
+   }
    try{sql(readFileSync(new URL(file,dir),'utf8'))}catch(error){throw Error('Migration '+file+' failed: '+error.message)}
+   applied.push(file)
   }
+  expect(applied,'every repository migration applied in order').toEqual(files)
+  expect(sql("select public from storage.buckets where id='participant-avatars'").trim()).toBe('f')
+  expect(sql("select relrowsecurity from pg_class where oid='public.account_activity'::regclass").trim()).toBe('t')
   expect(snapshot()).toBe(before)
   expect(sql("select s.status from public.organization_subscriptions s join public.organizations o on o.id=s.organization_id where o.personal_owner_id=md5('production-baseline-fixture')::uuid").trim()).toBe('transition')
   expect(sql('select count(*) from cron.job where active').trim()).toBe('0')
   expect(sql('select count(*) from public.billing_sandbox_orders').trim()).toBe('0')
   expect(sql('select count(*) from public.platform_access_assignments').trim()).toBe('0')
+  if(accountActivityEnabled){
+   await verifyAccountActivity({sql,databaseId})
+  }else{
   // Test admission cannot be provisioned by browser or Edge service roles.
   const admissionTables=['billing_sandbox_offers','billing_sandbox_application_scope',
    'billing_fiscal_acceptance_fixtures','billing_sandbox_scheduled_orders','billing_sandbox_settlement_schedule']
@@ -761,11 +829,12 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    expect(snapshot(),scenario.name+' retry preserves all rows including single dispatch').toEqual(before)
   }
   }
+  }
  }catch(error){failures.push(error)}finally{
   // IDs came only from successful creates in this invocation. -v removes their
   // anonymous image volumes; no volume prune, named-volume delete or name lookup.
   for(const id of ownedIds.reverse()){
-   try{docker(['rm','-f','-v',id])}catch{failures.push(Error('Own container cleanup failed: '+id))}
+   try{removeOwned(id)}catch{failures.push(Error('Own container cleanup failed: '+id))}
   }
  }
  if(failures.length)throw new AggregateError(failures,'Disposable baseline test or cleanup failed')

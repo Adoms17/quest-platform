@@ -1,7 +1,8 @@
-import { getDownloadedQuestPackages, getLocalParticipantAttempts, getParticipantProfiles, getPendingResults, saveParticipantProfiles, saveQuestToDB, OFFLINE_PACKAGE_VERSION } from './db'
+import { beginParticipantPackageRefresh, getDownloadedQuestPackages, getLocalParticipantAttempts, getParticipantProfiles, getPendingResults, revokeParticipantPackageAccess, saveParticipantProfiles, saveQuestToDB, OFFLINE_PACKAGE_VERSION } from './db'
 import { listMyParticipantProfiles } from './participantGroupApi'
 import { loadParticipantQuest, loadParticipantTasks } from './questApi'
 import { isTransportError } from './network'
+import { isQuestAccessDenied } from './questAccessErrors'
 
 export const PARTICIPANT_DASHBOARD_CHANGED = 'participant-dashboard-changed'
 
@@ -75,11 +76,19 @@ export function buildParticipantQuestRows(data, profileId, now = Date.now()) {
 
 export async function downloadParticipantQuest(questId, profileId, signal) {
   if (!navigator.onLine) throw new Error('Для скачивания подключитесь к интернету.')
-  const quest = await loadParticipantQuest(questId, profileId, signal)
-  const tasks = await loadParticipantTasks(questId, profileId, signal)
+  const accessSnapshot = await beginParticipantPackageRefresh(questId, profileId, signal)
+  let quest, tasks
+  try {
+    quest = await loadParticipantQuest(questId, profileId, signal)
+    tasks = await loadParticipantTasks(questId, profileId, signal)
+  } catch (error) {
+    signal?.throwIfAborted()
+    if (isQuestAccessDenied(error)) await revokeParticipantPackageAccess(questId, profileId)
+    throw error
+  }
   signal?.throwIfAborted()
   if (!quest?.id || quest.id !== questId) throw new Error('Не удалось проверить доступ к квесту.')
-  const metadata = await saveQuestToDB(quest, tasks, profileId, signal)
+  const metadata = await saveQuestToDB(quest, tasks, profileId, signal, accessSnapshot)
   window.dispatchEvent(new Event(PARTICIPANT_DASHBOARD_CHANGED))
   return metadata
 }

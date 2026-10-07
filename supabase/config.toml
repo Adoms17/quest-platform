@@ -385,6 +385,9 @@ deno_version = 2
 [functions.redeem-quest-code]
 verify_jwt = true
 
+[functions.participant-avatar]
+verify_jwt = true
+
 [edge_runtime.secrets]
 QUEST_ACCESS_FINGERPRINT_SECRET = "env(QUEST_ACCESS_FINGERPRINT_SECRET)"
 

@@ -6,6 +6,8 @@ import { updateParticipantProfileName } from '../services/participantGroupApi'
 import { getParticipantGroupErrorMessage } from '../services/participantGroupErrors'
 import ParticipantProfileInvite from '../components/ParticipantProfileInvite'
 import ParticipantSupervisionControl from '../components/ParticipantSupervisionControl'
+import ParticipantIdentityEditor from '../components/ParticipantIdentityEditor'
+import ParticipantAvatar from '../components/ParticipantAvatar'
 
 export default function ParticipantProfileCard({ session }) {
   const { profileId } = useParams()
@@ -50,6 +52,8 @@ function ProfileCard({ profileId }) {
     {!profile && !error && <p role="status">Загрузка профиля…</p>}
     {error && <div role="alert" className="rounded-lg border bg-white p-4"><p>{error}</p><button type="button" onClick={refresh} className="mt-2 py-2 text-blue-700">Повторить</button></div>}
     {profile && <>
+      <div className="flex items-center gap-3"><ParticipantAvatar profileId={profile.id} path={profile.avatar_path} name={profile.display_name}/>{profile.nickname&&<p>Никнейм: {profile.nickname}</p>}</div>
+      <ParticipantIdentityEditor profile={profile} onSaved={()=>{toast.success('Никнейм и аватар сохранены');refresh()}} onReload={refresh}/>
       <section className="space-y-2 rounded-xl border bg-white p-4">
         <h2 className="font-semibold">Доступ к профилю</h2>
         <p>{profile.is_self ? 'Мой профиль' : profile.supervision_status === 'active' ? 'Отдельный контроль активен' : profile.supervision_status === 'suspended' ? 'Отдельный контроль приостановлен' : 'Доступ через группу или связь с аккаунтом'}</p>
@@ -68,9 +72,9 @@ function ProfileCard({ profileId }) {
       </form> : <button type="button" onClick={() => setEditing(true)} className="block py-3 text-blue-700">Изменить имя</button>)}
       {profile.profile_kind === 'dependent' && profile.supervision_status === 'active' && (inviting
         ? <ParticipantProfileInvite key={inviting} invitationKind={inviting} profile={profile} onClose={() => setInviting(false)} />
-        : <div className="flex flex-wrap gap-3"><button type="button" onClick={() => setInviting('supervisor')} className="py-3 text-blue-700">Пригласить взрослого</button><button type="button" onClick={() => setInviting('claim')} className="py-3 text-blue-700">Связать с аккаунтом</button></div>)}
+        : <div className="flex flex-wrap gap-3"><button type="button" onClick={() => setInviting('supervisor')} className="py-3 text-blue-700">Пригласить куратора</button><button type="button" onClick={() => setInviting('claim')} className="py-3 text-blue-700">Связать с аккаунтом</button></div>)}
       <Link to={`/participants/group/profiles/${encodeURIComponent(profileId)}/invitations`} className="block py-3 text-blue-700">Мои приглашения</Link>
-      <Link to={`/participants/group/profiles/${encodeURIComponent(profileId)}/supervisors`} className="block py-3 text-blue-700">Контролирующие взрослые</Link>
+      <Link to={`/participants/group/profiles/${encodeURIComponent(profileId)}/supervisors`} className="block py-3 text-blue-700">Кураторы</Link>
       <Link to={`/participants/group/profiles/${encodeURIComponent(profileId)}/audit`} className="block py-3 text-blue-700">Журнал управления</Link>
       <button type="button" disabled={saving} onClick={refresh} className="block py-3 text-blue-700 disabled:opacity-50">Обновить профиль</button>
     </>}

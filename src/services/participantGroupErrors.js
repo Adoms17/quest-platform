@@ -1,11 +1,11 @@
 import { getUserErrorMessage } from './userErrorMessage'
 
 const participantGroupErrorMessages = {
-  'last participant supervisor cannot be revoked': 'Нельзя отозвать доступ последнего контролирующего взрослого, пока у ребёнка нет собственного аккаунта.',
-  'participant profile is not orphaned': 'Восстановление не требуется: у профиля уже есть аккаунт или контролирующий взрослый.',
+  'last participant supervisor cannot be revoked': 'Нельзя отозвать доступ последнего куратора, пока у ребёнка нет собственного аккаунта.',
+  'participant profile is not orphaned': 'Восстановление не требуется: у профиля уже есть аккаунт или куратор.',
   'participant supervision denied': 'У вас нет доступа к управлению этим профилем участника.',
-  'participant supervision recovery denied': 'Восстановить доступ может только создатель профиля, оставшегося без контролирующего взрослого.',
-  'participant supervision management denied': 'У вас нет права управлять контролирующими взрослыми этого профиля.',
+  'participant supervision recovery denied': 'Восстановить доступ может только создатель профиля, оставшегося без куратора.',
+  'participant supervision management denied': 'У вас нет права управлять кураторами этого профиля.',
   'participant group management denied': 'У вас нет права управлять выбранной группой.',
   'participant group leader requires account': 'Руководителем группы может быть только профиль с собственным аккаунтом.',
   'participant group invitation denied': 'У вас нет права создать приглашение в выбранную группу.',
