@@ -51,3 +51,31 @@ test('disabled preparation returns no-store without auth or database',async()=>{
  const response=await createSubscriptionRefundPreparationEndpoint({})(new Request('https://example.test',{method:'POST'}))
  expect(response.status).toBe(503);expect(response.headers.get('Cache-Control')).toBe('no-store')
 })
+
+test.each(['2026-02-30T10:00:00Z','2026-10-01','2026-10-01T10:00:00','infinity','2026-10-01T24:00:00Z'])('rejects invalid or timezone-missing receipt %s',async receivedAt=>{
+ const s=setup();expect((await s.handler(s.request({...payload,receiptSource:'email',receivedAt}))).status).toBe(400);expect(s.service.rpc).not.toHaveBeenCalled()
+})
+test('email offset is normalized but future validation stays authoritative in SQL',async()=>{
+ const s=setup();await s.handler(s.request({...payload,receiptSource:'email',receivedAt:'2026-09-16T03:00:00+03:00'}))
+ expect(s.service.rpc.mock.calls[0][1]).toMatchObject({p_receipt_source:'email',p_received_at:'2026-09-16T00:00:00.000Z'})
+ s.service.rpc.mockResolvedValue({error:{code:'PT400'}})
+ expect((await s.handler(s.request({...payload,receiptSource:'email',receivedAt:'9999-12-01T00:00:00Z'}))).status).toBe(400)
+})
+test('in-app input cannot backdate, and reserve cannot accept receipt fields',async()=>{
+ const s=setup();expect((await s.handler(s.request({...payload,receiptSource:'inapp',receivedAt:'2026-09-16T00:00:00Z'}))).status).toBe(400)
+ expect((await s.handler(s.request({action:'reserve',organizationId:id,orderId:id,requestId:id,receiptSource:'email',receivedAt:null}))).status).toBe(400)
+ await s.handler(s.request({...payload,receiptSource:'inapp',receivedAt:null}))
+ expect(s.service.rpc.mock.calls[0][1]).toMatchObject({p_receipt_source:'inapp',p_received_at:null})
+})
+test('changed receipt yields explicit conflict; unknown response retries exact payload',async()=>{
+ const s=setup();const body={...payload,receiptSource:'email',receivedAt:'2026-09-16T00:00:00Z'}
+ s.service.rpc.mockRejectedValueOnce(Error('lost')).mockResolvedValueOnce({data:{request_id:id}})
+ expect((await s.handler(s.request(body))).status).toBe(503);expect((await s.handler(s.request(body))).status).toBe(200)
+ expect(s.service.rpc.mock.calls[0]).toEqual(s.service.rpc.mock.calls[1])
+ s.service.rpc.mockResolvedValue({error:{code:'PT409'}})
+ const response=await s.handler(s.request({...body,receivedAt:'2026-09-17T00:00:00Z'}));expect(response.status).toBe(409);expect(await response.json()).toEqual({error:'receipt_conflict'})
+})
+test('email recording retains fresh-MFA authentication requirement',async()=>{
+ const s=setup();const now=Math.floor(Date.now()/1000);s.auth.getClaims.mockResolvedValue({data:{claims:{sub:id,role:'authenticated',aal:'aal2',exp:now+300,amr:[{method:'totp',timestamp:now-600}]}}})
+ expect((await s.handler(s.request({...payload,receiptSource:'email',receivedAt:'2026-09-16T00:00:00Z'}))).status).toBe(401);expect(s.service.rpc).not.toHaveBeenCalled()
+})

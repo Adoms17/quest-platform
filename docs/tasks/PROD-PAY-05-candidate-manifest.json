@@ -3,8 +3,8 @@
   "textNormalization": "utf8-lf",
   "status": "local-candidate-not-deployable",
   "baselineMigration": "20260914210000",
-  "historicalMigrationCount": 326,
-  "historicalChainSha256": "122cb2906d65d53e963b0672cc5dcc559367b0593d2113e52d50613deac3dc0c",
+  "historicalMigrationCount": 327,
+  "historicalChainSha256": "3cdadfe87ddb381fbcf9a45213548e0dd11e3414cf2ae8af38f9dce8baed7aa7",
   "files": [
     {
       "path": "scripts/production-sandbox-guard.candidate.sql",

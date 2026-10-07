@@ -13,6 +13,7 @@ const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'||accountActivity
 const releaseMigrations=[
  '20261006010000_participant_profile_identity.sql',
  '20261006020000_record_account_activity.sql',
+ '20261007030000_subscription_refund_received_at.sql',
 ]
 function migrationPlan(files){
  const sorted=[...files].sort()
@@ -30,7 +31,7 @@ function migrationPlan(files){
 test('migration plan retains the historical boundary and rejects missing, extra or duplicate release versions',()=>{
  const files=readdirSync(new URL('../supabase/migrations/',import.meta.url)).filter(f=>f.endsWith('.sql'))
  const plan=migrationPlan(files)
- expect(plan.later).toHaveLength(227)
+ expect(plan.later).toHaveLength(228)
  for(const file of releaseMigrations)expect(()=>migrationPlan(files.filter(f=>f!==file))).toThrow()
  expect(()=>migrationPlan([...files,'20261006030000_unreviewed.sql'])).toThrow()
  expect(()=>migrationPlan([...files,'20261006010000_duplicate.sql'])).toThrow()
