@@ -243,6 +243,7 @@ test('акция: создание → утверждение с MFA → вып�
  await page.getByRole('button',{name:'Утвердить акцию…'}).click()
  await page.getByLabel('Новый код MFA').fill('123456')
  await page.getByRole('button',{name:'Подтвердить утверждение акции'}).click()
+ await expect(page.getByRole('article',{name:'Сохранённые условия акции'}).getByText('Утверждена',{exact:true})).toBeVisible()
  await expect(page.getByRole('button',{name:'Редактировать акцию',exact:true})).toBeVisible()
  await page.route('**/rest/v1/rpc/read_platform_discount_campaigns',route=>route.fulfill({json:{items:[campaign],next_cursor:null}}))
  await page.getByRole('button',{name:'Организации',exact:true}).click()
