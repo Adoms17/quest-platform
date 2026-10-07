@@ -33,6 +33,7 @@ jobs:
         run: |
           docker pull supabase/postgres:17.6.1.165
           docker pull supabase/gotrue:v2.196.0
+          docker pull supabase/storage-api:v1.70.3
       - name: Full historical schema and environment isolation
         env:
           QVESTA_TEST_PRODUCTION_BASELINE: '1'

@@ -40,4 +40,6 @@ Final combined rerun PASS: 326 migrations, all six SQL/RLS suites (156 assertion
 
 ## Release boundary
 
+Update 2026-10-07: DB/Edge deployment, Cloudflare mapping and basic owner authenticated UI smoke have since completed. The paragraph below records the historical local-integration boundary. Current evidence, remaining CI/security gates and working state are in [the release checklist](staging-owner-packet-20261007/RELEASE-CHECKLIST-20261007.md). Owner UI observations are not direct API denial assertions or full adversarial acceptance.
+
 This is a local candidate for independent review, not a staging-ready release. Backup/audit, Cloudflare mapping and security approvals remain open, as do the profile release blockers documented in the source branch. No push, merge, deployment, remote SQL, Supabase CLI operation or security-setting change was performed. Candidate worktree and ignored evidence/build caches are retained for review.

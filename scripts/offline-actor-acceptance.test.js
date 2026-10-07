@@ -10,6 +10,7 @@ import { createRequire } from 'node:module'
 import { createServer as createViteServer } from 'vite'
 import { removeOwnedResource, runAcceptanceCleanup } from './offline-acceptance-cleanup.js'
 import { verifyAccountActivity } from './verify-account-activity.js'
+import { verifyStagingOwnerPacket } from './verify-staging-owner-packet.js'
 
 const enabled = process.env.RUN_ISOLATED_OFFLINE_ACCEPTANCE === '1'
 const root = fileURLToPath(new URL('../', import.meta.url))
@@ -116,7 +117,13 @@ test.skipIf(!enabled)('isolated real Auth/RLS/offline acceptance', async () => {
       FILE_SIZE_LIMIT: '1048576', DB_INSTALL_ROLES: 'true', DB_MIGRATIONS_STRATEGY: 'on_start', LOG_LEVEL: 'fatal', S3_PROTOCOL_ENABLED: 'false',
     })
     await ready(() => sql("select to_regclass('storage.objects') is not null") === 't', 'Storage schema')
-    sql(migrations.filter(name => name >= identityMigration).map(name => readFileSync(new URL(name, migrationDirectory), 'utf8')).join('\n'))
+    if (process.env.RUN_OWNER_PACKET_ACCEPTANCE === '1') {
+      verifyStagingOwnerPacket({sql, historical})
+      evidence.checks.push({name: 'owner packet target/history/collision/atomic rollback/apply/retry', result: 'PASS'})
+    } else {
+      sql(migrations.filter(name => name >= identityMigration).map(name => readFileSync(new URL(name, migrationDirectory), 'utf8')).join('\n'))
+    }
+    if (process.env.RUN_OWNER_PACKET_ACCEPTANCE !== '1') {
     sql('create extension if not exists pgtap with schema extensions; grant usage on schema extensions to anon,authenticated,service_role;')
     for (const suite of ['participant_identity', 'participant_avatar_cleanup_race', 'participant_profile_card', 'group_member_catalog', 'group_exit_actions']) {
       const tap = sql('set search_path=public,extensions;\n' + readFileSync(new URL(`../supabase/tests/database/${suite}.test.sql`, import.meta.url), 'utf8'))
@@ -179,6 +186,7 @@ test.skipIf(!enabled)('isolated real Auth/RLS/offline acceptance', async () => {
     })
     evidence.checks.push({name: 'real browser acceptance', result: result === 0 ? 'PASS' : 'FAIL'})
     expect(result).toBe(0)
+    }
   } catch (error) { primaryError = error }
   // Async subprocess timeouts keep cleanup timers live even when Docker hangs.
   const cleanupDocker = args => new Promise((resolve, reject) => {
