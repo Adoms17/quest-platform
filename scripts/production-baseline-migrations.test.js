@@ -8,8 +8,10 @@ import {guardCatalogSql,buildGuardAdoption} from './build-billing-guard-adoption
 import {buildGuardRelease} from './build-stage-guard-release.js'
 import {isolatedSandboxBootstrap} from './isolated-billing-bootstrap.js'
 import {verifyAccountActivity} from './verify-account-activity.js'
+import {verifyFiscalAcceptedResponseLoss} from './verify-fiscal-accepted-response-loss.js'
+const acceptedResponseLossEnabled=process.env.QVESTA_TEST_ACCEPTED_RESPONSE_LOSS==='1'
 const accountActivityEnabled=process.env.QVESTA_TEST_ACCOUNT_ACTIVITY==='1'
-const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'||accountActivityEnabled
+const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'||accountActivityEnabled||acceptedResponseLossEnabled
 const releaseMigrations=[
  '20261006010000_participant_profile_identity.sql',
  '20261006020000_record_account_activity.sql',
@@ -76,6 +78,7 @@ test('disposable preflight rejects shared resources and unexpected credentials w
 })
 test.skipIf(!enabled)('production baseline 99 migrations preserves existing organization across historical chain',async()=>{
  const name='qvesta-release-test-'+randomUUID().replaceAll('-','');let databaseId,authId
+ let acceptedResponseLossVerified=false
  const ownedIds=[]
  const failures=[]
  const create=args=>{
@@ -769,6 +772,65 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   {
   const binding=readSuite('subscription_fiscal_refund_binding').split('-- LINKED_LIFECYCLE_CHECKS')
   expect(binding).toHaveLength(2)
+  if(acceptedResponseLossEnabled){
+   const reservedFixture=paid.replace('select * from finish();rollback;',()=>
+    readSuite('platform_order_documents')+'\n'+modeledPrefix+'\n'+binding[0]+`\n
+    select * from finish();
+    select 'LOSS_COMMAND|'||current_setting('test.link.request');
+    commit;`)
+   expect(reservedFixture).not.toBe(paid)
+   const reserved=sql('set search_path=public,extensions;'+reservedFixture)
+   expect(reserved).not.toMatch(/not ok|Looks like/)
+   const ids=reserved.split(/\r?\n/).filter(line=>line.startsWith('LOSS_COMMAND|'))
+   expect(ids).toHaveLength(1)
+   const commandId=ids[0].slice('LOSS_COMMAND|'.length)
+   expect(commandId).toMatch(/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/)
+   const actorId=sql("select md5('discount-checkout-owner')::uuid").trim()
+   const tables=['billing_sandbox_orders','billing_sandbox_payment_results','billing_sandbox_refunds',
+    'billing_subscription_fiscal_ledgers','billing_subscription_fiscal_operations',
+    'billing_subscription_fiscal_operation_status','subscription_refund_requests',
+    'subscription_refund_dispatches','subscription_refund_period_bindings','subscription_refund_reservations',
+    'subscription_refund_applications','organization_subscriptions','billing_period_confirmations',
+    'billing_review_resolutions']
+   const snapshot=()=>JSON.parse(sql(`select jsonb_build_object(${tables.map(table=>
+    `'${table}',(select coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]'::jsonb) from public.${table} t)`
+   ).join(',')})`).trim())
+   const quote=value=>value==null?'null':"'"+JSON.stringify(value).replaceAll("'","''")+"'::jsonb"
+   const connections=[]
+   const result=await verifyFiscalAcceptedResponseLoss({commandId,actorId,shopId:'123',snapshot,
+    createService:()=>({rpc:async(name,args)=>{
+     expect(name).toBe('subscription_fiscal_refund_from_gateway')
+     expect(args.p_actor_user_id).toBe(actorId);expect(args.p_command_id).toBe(commandId)
+     expect(args.p_shop_id).toBe('123')
+     expect(['status','claim','before_send','record','review']).toContain(args.p_action)
+     // Each docker exec starts a separate psql backend; COMMIT survives the next call.
+     const lines=sql(`begin;set local role service_role;
+      select 'BACKEND|'||pg_backend_pid();
+      select public.subscription_fiscal_refund_from_gateway('${actorId}'::uuid,
+       ${Number(args.p_mfa_at)},${Number(args.p_expires_at)},'123','${args.p_action}',
+       '${commandId}'::uuid,${quote(args.p_result)});commit;`).trim().split(/\r?\n/)
+     expect(lines[0]).toMatch(/^BACKEND\|\d+$/)
+     connections.push(Number(lines[0].slice('BACKEND|'.length)))
+     return {data:JSON.parse(lines[1])}
+    }})
+   })
+   expect(new Set(connections).size).toBe(connections.length)
+   expect(connections.every(Number.isSafeInteger)).toBe(true)
+   expect(result).toMatchObject({acceptedCount:1,postCount:1})
+   const {before,afterLoss}=result
+   expect(before.subscription_refund_dispatches).toHaveLength(0)
+   expect(before.billing_sandbox_refunds[0]).toMatchObject({state:'reserved',provider_refund_id:null})
+   expect(afterLoss.subscription_refund_dispatches).toHaveLength(1)
+   expect(afterLoss.billing_sandbox_refunds).toHaveLength(1)
+   expect(afterLoss.billing_sandbox_refunds[0]).toMatchObject({state:'sending',provider_refund_id:null,fiscal_command_id:commandId})
+   expect(afterLoss.billing_subscription_fiscal_operation_status).toHaveLength(1)
+   expect(afterLoss.billing_subscription_fiscal_operation_status[0]).toMatchObject({state:'unknown',requires_review:false})
+   for(const table of tables.filter(t=>!['billing_sandbox_refunds','billing_subscription_fiscal_operation_status','subscription_refund_dispatches'].includes(t)))
+    expect(afterLoss[table],table+' unchanged after accepted/lost response').toEqual(before[table])
+   expect(afterLoss.subscription_refund_applications).toHaveLength(0)
+   acceptedResponseLossVerified=true
+   console.log('ACCEPTED_RESPONSE_LOSS: accepted=1 POST=1 retry_POST=0 new_backend_each_RPC=true unknown=true access_unchanged=true snapshot_tables=14')
+  }else{
   const persistenceFixture=paid.replace('select * from finish();rollback;',()=>
    readSuite('platform_order_documents')+'\n'+modeledPrefix+'\n'+binding[0]+'\n'+
    readSuite('subscription_fiscal_presend_commit'))
@@ -831,6 +893,7 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   }
   }
   }
+  }
  }catch(error){failures.push(error)}finally{
   // IDs came only from successful creates in this invocation. -v removes their
   // anonymous image volumes; no volume prune, named-volume delete or name lookup.
@@ -839,4 +902,5 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   }
  }
  if(failures.length)throw new AggregateError(failures,'Disposable baseline test or cleanup failed')
-},180000)
+ if(acceptedResponseLossEnabled)expect(acceptedResponseLossVerified,'accepted-response-loss branch must execute').toBe(true)
+},acceptedResponseLossEnabled?600000:180000)
