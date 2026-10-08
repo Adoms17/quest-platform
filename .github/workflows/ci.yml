@@ -38,6 +38,12 @@ jobs:
         env:
           QVESTA_TEST_PRODUCTION_BASELINE: '1'
         run: npm run test -- scripts/production-baseline-migrations.test.js
+      - name: Accepted response loss with durable retry
+        env:
+          QVESTA_TEST_PRODUCTION_BASELINE: '1'
+          QVESTA_TEST_ACCEPTED_RESPONSE_LOSS: '1'
+          QVESTA_TEST_ACCOUNT_ACTIVITY: '0'
+        run: npm run test -- scripts/production-baseline-migrations.test.js --reporter=verbose
 
   validate:
     runs-on: ubuntu-latest

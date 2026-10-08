@@ -103,6 +103,30 @@ Final lint rerun exit0 (same eight warnings); whitespace check PASS. The complet
 application/PWA build already passed on these test-only changes; no runtime source
 changed afterward. No production bug identified; unknown is intentionally retained.
 
-Deliverable remains uncommitted in the dedicated worktree for independent review.
-Only the four files listed above belong to this change; original refund worktree
-and QA exports are untouched. No external acceptance claims follow from this run.
+The four-file change above was committed as
+33d791d180fa2d5d07463e53eab2109770ec846c and published by the owner in draft PR #165.
+Original refund worktree and QA exports are untouched. No external acceptance
+claims follow from this run.
+
+## CI opt-in follow-up (pending independent review)
+
+PR #165 CI passed for 33d791d180fa2d5d07463e53eab2109770ec846c, but its SQL job
+did not enable the accepted-response-loss branch. That result covers the default
+presend scenario, not the opted-in DB scenario documented above.
+
+The proposed .github/workflows/ci.yml change preserves the existing full historical
+schema/environment-isolation step and adds `Accepted response loss with durable
+retry` in the same production-billing-sql job. A separate invocation is necessary:
+the accepted-response-loss and existing presend branches are mutually exclusive.
+The added step sets PRODUCTION_BASELINE=1, ACCEPTED_RESPONSE_LOSS=1 and
+ACCOUNT_ACTIVITY=0 (all with the QVESTA_TEST_ prefix), using verbose reporting.
+The branch-executed assertion prevents a silent bypass; CI evidence must include
+the ACCEPTED_RESPONSE_LOSS marker above and 3 passing tests with zero skipped.
+
+The opted-in test already has a 600s timeout; the job retains its 15-minute limit.
+Each invocation creates its own isolated fixture and performs ownership-checked
+cleanup in finally; cleanup failures fail the test. Forced runner termination can
+interrupt finally, so the disposable hosted runner remains the outer boundary.
+No workflow permissions, credentials, provider traffic or deployment are added.
+The earlier local DB PASS remains the available execution evidence until the
+updated workflow runs for a reviewed, published commit. No new DB run is claimed.
