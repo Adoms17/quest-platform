@@ -211,6 +211,45 @@ it('storage failure after provider success is not reported as completion',async(
  expect((await s.handler(s.request())).status).toBe(503)
  await s.handler(s.request());expect(s.posts()).toHaveLength(1)
 })
+it('provider accepts before response loss; a new handler observes the effect but never resends',async()=>{
+ const s=setup(),fetch=s.fetchImpl.getMockImplementation(),rpc=s.service.rpc.getMockImplementation()
+ const events=[],claims=[];let accepted=0
+ const log=vi.spyOn(console,'error').mockImplementation(()=>{})
+ const network=vi.fn(()=>{throw Error('real network forbidden')})
+ vi.stubGlobal('fetch',network)
+ try{
+  s.service.rpc.mockImplementation(async(name,args)=>{
+   const result=await rpc(name,args)
+   if(args.p_action==='claim')claims.push(structuredClone(result.data))
+   return result
+  })
+  s.fetchImpl.mockImplementation(async(url,options)=>{
+   const response=await fetch(url,options) // Fake provider commits paidBack before the throw.
+   if(options.method==='POST'){
+    const result=await response.json()
+    expect(result.status).toBe('succeeded');accepted++;events.push('accepted','response_lost')
+    throw Error('synthetic lost response after acceptance')
+   }
+   if(url.includes('/payments/'))events.push((await response.json()).refunded_amount.value)
+   return response
+  })
+  const immutable=structuredClone(s.operation)
+  expect(await (await s.handler(s.request())).json()).toMatchObject({state:'sending',operationState:'unknown',accessEffect:'not_applied'})
+  expect(accepted).toBe(1);expect(events).toEqual(['0.00','accepted','response_lost'])
+  const afterLoss=structuredClone(s.current),boundary=s.fetchImpl.mock.calls.length
+  const retry=createSubscriptionFiscalRefundEndpoint({...s.options,service:{rpc:s.service.rpc},transport:{fetchImpl:s.fetchImpl}})
+  expect(retry).not.toBe(s.handler)
+  expect(await (await retry(s.request())).json()).toMatchObject({state:'sending',operationState:'unknown',accessEffect:'not_applied',requiresReview:false})
+  expect(events).toEqual(['0.00','accepted','response_lost','10.00'])
+  expect(accepted).toBe(1);expect(s.posts()).toHaveLength(1)
+  expect(s.fetchImpl.mock.calls.slice(boundary).map(([,options])=>options.method)).toEqual(['GET','GET'])
+  expect(claims.map(c=>c.action)).toEqual(['send','reconcile'])
+  expect(claims[1]).toEqual({...claims[0],action:'reconcile'})
+  expect(s.operation).toEqual(immutable);expect(s.current).toEqual(afterLoss)
+  expect(s.service.rpc.mock.calls.some(([,args])=>['record','review'].includes(args.p_action))).toBe(false)
+  expect(network).not.toHaveBeenCalled()
+ }finally{log.mockRestore();vi.unstubAllGlobals()}
+})
 it('scope denial stops before provider calls',async()=>{
  const s=setup();s.service.rpc.mockResolvedValue({error:{code:'42501'}})
  expect((await s.handler(s.request())).status).toBe(403);expect(s.fetchImpl).not.toHaveBeenCalled()
