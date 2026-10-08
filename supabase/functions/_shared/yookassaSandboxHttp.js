@@ -4,7 +4,7 @@ import { buildSandboxPaymentRequest, buildSandboxRecurringRequest, validateSandb
 
 // Только для серверного вызывающего слоя с заказом, загруженным из БД.
 // Ответ нужно сохранить до передачи confirmationUrl клиенту. Здесь нет выдачи прав.
-export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000, beforeRefundSend, beforeFiscalSend, beforeRecurringSend, receipts, refundReceipts } = {}) {
+function sandboxTransport({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, timeoutMs = 15000 } = {}) {
   if (enabled !== true || typeof shopId !== 'string' || !/^\d+$/.test(shopId)
     || typeof secretKey !== 'string' || !/^[\x21-\x7e]+$/.test(secretKey)
     || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30000) throw new SandboxPaymentError('sandbox_configuration_unavailable')
@@ -44,6 +44,25 @@ export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, 
     const info = await request('me')
     if (info?.account_id !== shopId || info.test !== true || info.status !== 'enabled') throw new SandboxPaymentError('sandbox_shop_unverified')
   }
+  return { request, verifyShop }
+}
+
+// Separate export: never spread into the deployed client's method set. No write hooks.
+export function createSandboxRecoveryReadTransport(config, options = {}) {
+  const { request } = sandboxTransport(config, { fetchImpl: options.fetchImpl, timeoutMs: options.timeoutMs })
+  const id = value => {
+    if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) throw new SandboxPaymentError('invalid_recovery_id')
+    return value
+  }
+  return Object.freeze({
+    shop: () => request('me'),
+    payment: value => request(`payments/${id(value)}`),
+    refund: value => request(`refunds/${id(value)}`),
+  })
+}
+
+export function createSandboxHttpClient({ enabled = false, shopId, secretKey }, { fetchImpl = fetch, now = Date.now, timeoutMs = 15000, beforeRefundSend, beforeFiscalSend, beforeRecurringSend, receipts, refundReceipts } = {}) {
+  const { request, verifyShop } = sandboxTransport({ enabled, shopId, secretKey }, { fetchImpl, timeoutMs })
   function snapshot(order) {
     const saved = structuredClone(order)
     validateOrder(saved)
