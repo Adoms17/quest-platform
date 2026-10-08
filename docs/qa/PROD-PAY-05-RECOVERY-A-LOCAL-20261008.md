@@ -7,6 +7,8 @@ The prior **2 PASS / 1 FAIL** (169.34s) and its schema correction are recorded b
 Independent final static review: **PASS, limited local prototype**, as reported by
 the coordinator; final code hashes matched and reported defects were closed.
 No agent full-chain rerun. Publication status is recorded in the completion handoff.
+CI-only amendment below is uncommitted and awaiting independent review; its new
+Recovery A step has not yet run in CI.
 Historical 3/3 DB results below do not validate the current revision.
 
 2026-10-08, ADOMS-HOME. Branch `codex/fiscal-recovery-a-20261008`, worktree
@@ -264,12 +266,63 @@ draft PR to staging; it does not authorize merge or deployment.
 
 ## CI coverage and publication boundary
 
-The existing CI runs focused tests through `npm test`, and runs the baseline and
-accepted-response-loss integration modes in `production-billing-sql`.
-It does **not** set `QVESTA_TEST_RECOVERY_A=1`; therefore the Recovery A DB scenario
-is not executed in CI. Its full-chain evidence remains the successful owner run
-above. CI success must not be reported as a Recovery A integration rerun.
-No workflow changes are included. The eight-file scope is scripts and QA documents
-only: no production runtime, automatic migration, deployment wiring or dependencies.
+Published commit `10ed5d772bd662959a66ffa570332afd2f5499d6` in draft
+[PR166](https://github.com/Adoms17/quest-platform/pull/166) contains eight script/QA
+files. Its [CI run](https://github.com/Adoms17/quest-platform/actions/runs/37833559192)
+finished SUCCESS at 19:49:01 UTC: baseline 3 PASS / 80.26s and accepted-response-loss
+3 PASS / 79.94s, both without skips; unit 2369 PASS / 134 skipped (including 42
+verifier and 79 endpoint tests); e2e 293 PASS / 34 skipped. CodeQL also succeeded.
+That workflow did **not** enable Recovery A: its DB log has only the
+`ACCEPTED_RESPONSE_LOSS` marker, not `RECOVERY_A`. These results are not a Recovery A
+DB rerun. Its full-chain evidence remains the successful owner run above.
+
+### Authorized CI-only amendment, pending independent review
+
+Local and remote HEAD were both verified as `10ed5d772bd662959a66ffa570332afd2f5499d6`
+with a clean worktree before editing. Only `.github/workflows/ci.yml` and this report
+are changed; the aggregate PR scope will become nine files after publication.
+
+The existing `production-billing-sql` job gains a separate final step,
+`Recovery A with durable evidence and exact replay`, running the same verbose
+baseline test command with explicit flags:
+
+```yaml
+QVESTA_TEST_PRODUCTION_BASELINE: '1'
+QVESTA_TEST_RECOVERY_A: '1'
+QVESTA_TEST_ACCEPTED_RESPONSE_LOSS: '0'
+QVESTA_TEST_ACCOUNT_ACTIVITY: '0'
+```
+
+Recovery A itself enables the accepted-loss branch through the harness's OR
+condition; disabling the independent loss flag does not disable that prerequisite.
+Account activity is explicitly off. Existing historical and accepted-loss steps
+are unchanged. Job timeout increases from 15 to 30 minutes to cover preparation
+and three serial harness runs (existing per-test caps: 180s, 600s, 600s).
+The unchanged harness creates unique owner-labeled containers and checks exact IDs
+and ownership before finally cleanup; cleanup failure fails the test. No new
+permissions, secrets, runtime, automatic migrations or deployment wiring.
+
+Local validation of the amendment: YAML parsed with the existing Playwright-bundled
+YAML parser (no added dependency), zero parse warnings/errors and duplicate-key
+checks enabled. Semantic comparison with HEAD confirmed that only the added step
+and timeout differ; all existing jobs, steps, triggers and permissions match.
+`git diff --check` PASS; `npm run lint` PASS with eight existing warnings;
+`npm run build` PASS, 80 PWA precache entries. No local Docker/integration run.
+
+Workflow SHA256:
+`7B62E170175588C6E9355396FEA608BC605A9FBB4767F622F7832EA12C94F034`.
+Commit/push are held for independent review. No new CI run is claimed yet.
+
+After review and publication, acceptance requires an exact-new-SHA terminal CI
+run with all three DB steps successful, each 3 PASS / 0 skipped. The new step must
+show both `RECOVERY_A: POST=1 accepted=1 evidence_before_suppression=true
+exact_retry=true concurrent_duplicate=true applications=1 ACL_denials=true` and
+`PRE_RECOVERY_ACCEPTED_RESPONSE_LOSS: accepted=1 POST=1 retry_POST=0
+new_backend_each_RPC=true unknown=true access_unchanged=true snapshot_tables=14`.
+Final step success must follow mandatory lock-barrier/parity/replay checks and
+ownership-checked cleanup; markers alone are insufficient. Report validate/CodeQL
+and skipped tests separately; a timeout, skipped new step or missing marker is not
+Recovery A acceptance.
+
 Recovery B, public-runtime/JWT/provider authenticity and hosted acceptance remain
 outside this proof. No hosted recovery or production GO.
