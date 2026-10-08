@@ -473,14 +473,15 @@ test('статистика: организация и платформа, инт
  await expect(page.getByRole('table',{name:/Показатели по/})).toHaveCount(0)
 })
 
-test('subscription refund visual flow',async({page},testInfo)=>{
+for(const legacy of [false,true]) test(legacy?'subscription refund legacy recovery':'subscription refund visual flow',async({page},testInfo)=>{
  await mockApi(page,'aal2')
  let reserves=0,sends=0
  await page.route('**/rest/v1/rpc/read_platform_organization_payments',r=>r.fulfill({json:{items:[{id:'order',amount_minor:1000,payment_status:'succeeded',created_at:'2026-09-22',refunded_minor:0,refund_pending_minor:0,refund_review_minor:0}],next_cursor:null}}))
  await page.route('**/functions/v1/admin-subscription-refund-prepare',r=>{
   const body=r.request().postDataJSON()
-  if(body.action==='request')return r.fulfill({json:{request_id:'request',amount_minor:500,currency:'RUB',period_start:'2026-09-01T00:00:00Z',period_end:'2026-10-01T00:00:00Z'}})
-  reserves++;return r.fulfill({json:{request_id:'request',refund_id:'refund'}})
+  if(body.action==='request'&&legacy){expect(body.receiptSource).toBe('inapp');expect(body.receivedAt).toBeNull();return r.fulfill({json:{request_id:'legacy-request',amount_minor:500,currency:'RUB',period_start:'2026-09-01T00:00:00Z',period_end:'2026-10-01T00:00:00Z',requested_at:'2026-09-18T00:00:00Z',registered_at:'2026-09-18T00:00:00Z',received_at:null,receipt_source:null,policy:'subscription-prorata-v1',reserved:false,access_effect:'unchanged'}})}
+  if(body.action==='request'){expect(body.receiptSource).toBe('email');expect(Number.isFinite(Date.parse(body.receivedAt))).toBe(true);return r.fulfill({json:{request_id:'request',amount_minor:500,currency:'RUB',period_start:'2026-09-01T00:00:00Z',period_end:'2026-10-01T00:00:00Z',received_at:body.receivedAt,registered_at:'2026-10-07T00:00:00Z',receipt_source:body.receiptSource}})}
+  reserves++;expect(body.requestId).toBe(legacy?'legacy-request':'request');return r.fulfill({json:{request_id:body.requestId,refund_id:'refund'}})
  })
  await page.route('**/functions/v1/admin-subscription-refund',r=>{
   sends++;return r.fulfill({json:{refundId:'refund',state:'succeeded',accessEffect:sends===1?'not_applied':'applied'}})
@@ -491,9 +492,12 @@ test('subscription refund visual flow',async({page},testInfo)=>{
  await page.getByRole('button',{name:'Тарифы и оплата',exact:true}).click()
  await page.getByRole('button',{name:'Загрузить платежи',exact:true}).click()
  const section=page.getByRole('region',{name:'Возврат подписки',exact:true})
+ if(legacy)await section.locator('[name=receiptSource]').selectOption('inapp')
+ else await section.getByLabel('Время получения письма').fill('2026-09-16T00:00')
  await section.getByLabel('Код MFA для возврата подписки').fill('123456')
  await section.getByRole('button',{name:'Получить расчёт возврата подписки'}).click()
  await expect(section).toContainText('К возврату: 5,00')
+ if(legacy)await expect(section).toContainText('Время получения обращения неизвестно')
  expect(reserves).toBe(0)
  await section.screenshot({path:testInfo.outputPath('subscription-quote.png')})
  for(let i=0;i<2;i++){
@@ -593,8 +597,8 @@ test('fiscal refund receipt status and repeat check',async({page},testInfo)=>{
  let reserves=0,checks=0
  await page.route('**/rest/v1/rpc/read_platform_organization_payments',r=>r.fulfill({json:{items:[{id:'order',amount_minor:1000,payment_status:'succeeded',created_at:'2026-09-22',refunded_minor:0,refund_pending_minor:0,refund_review_minor:0}],next_cursor:null}}))
  await page.route('**/functions/v1/admin-subscription-refund-prepare',r=>{
-  expect(r.request().postDataJSON().action).toBe('request')
-  return r.fulfill({json:{request_id:'request',amount_minor:500,currency:'RUB',period_start:'2026-09-01T00:00:00Z',period_end:'2026-10-01T00:00:00Z'}})
+  const body=r.request().postDataJSON();expect(body.action).toBe('request');expect(body.receiptSource).toBe('email')
+  return r.fulfill({json:{request_id:'request',amount_minor:500,currency:'RUB',period_start:'2026-09-01T00:00:00Z',period_end:'2026-10-01T00:00:00Z',received_at:body.receivedAt,registered_at:'2026-10-07T00:00:00Z',receipt_source:body.receiptSource}})
  })
  await page.route('**/functions/v1/admin-subscription-fiscal-refund',r=>{
   const body=r.request().postDataJSON()
@@ -608,6 +612,7 @@ test('fiscal refund receipt status and repeat check',async({page},testInfo)=>{
  await page.getByRole('button',{name:'Тарифы и оплата',exact:true}).click()
  await page.getByRole('button',{name:'Загрузить платежи',exact:true}).click()
  const section=page.getByRole('region',{name:'Возврат подписки',exact:true})
+ await section.getByLabel('Время получения письма').fill('2026-09-16T00:00')
  await section.getByLabel('Код MFA для возврата подписки').fill('123456')
  await section.getByRole('button',{name:'Получить расчёт возврата подписки'}).click()
  await expect(section).toContainText('К возврату: 5,00');expect(reserves).toBe(0)
