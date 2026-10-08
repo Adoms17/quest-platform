@@ -1,8 +1,9 @@
 // Test-only orchestration; service factories must point at an isolated fixture.
 import assert from 'node:assert/strict'
 import {createSubscriptionFiscalRefundEndpoint} from '../supabase/functions/_shared/subscriptionFiscalRefundEndpoint.js'
+import {observeLossBoundary} from './fiscal-recovery-a-verifier.js'
 
-export async function verifyFiscalAcceptedResponseLoss({commandId,actorId,shopId,createService,snapshot}) {
+export async function verifyFiscalAcceptedResponseLoss({commandId,actorId,shopId,createService,snapshot,onPost,afterAccepted,onSuppressed}) {
  const before=await snapshot(), trace=[], claims=[], accepted=[], posts=[]
  const services=[], rawFetch=globalThis.fetch
  let operation, networkCalls=0, afterLoss
@@ -15,6 +16,7 @@ export async function verifyFiscalAcceptedResponseLoss({commandId,actorId,shopId
   assert.ok(operation,'claim must precede provider transport')
   const item=operation.body.receipt?.items?.[0]??operation.expectedItems?.[0]
   if(method==='POST'){
+   onPost?.(structuredClone(operation),refundId)
    posts.push({path,key:options.headers['Idempotence-Key'],body:options.body})
    assert.equal(path,'/v3/refunds')
    assert.equal(posts.length,1,'no second refund POST, even with the same key')
@@ -23,6 +25,7 @@ export async function verifyFiscalAcceptedResponseLoss({commandId,actorId,shopId
    // Provider state changes FIRST. The application receives no refund ID/body.
    accepted.push({id:refundId,paymentId:operation.paymentId,amountMinor:operation.amountMinor})
    trace.push('provider_accepted')
+   await afterAccepted?.(structuredClone(operation),refundId)
    trace.push('response_lost')
    throw Error('synthetic response lost AFTER provider acceptance')
   }
@@ -57,7 +60,7 @@ export async function verifyFiscalAcceptedResponseLoss({commandId,actorId,shopId
   return createSubscriptionFiscalRefundEndpoint({enabled:true,allowedOrigins:['https://example.test'],
    auth:{getClaims:async()=>({data:{claims:{sub:actorId,role:'authenticated',aal:'aal2',exp:epoch+300,
     amr:[{method:'totp',timestamp:epoch}]}}}),getUser:async()=>({data:{user:{id:actorId}}})},
-   service:{rpc},providerConfig:{enabled:true,shopId,secretKey:'synthetic'},transport:{fetchImpl}})
+   service:{rpc},providerConfig:{enabled:true,shopId,secretKey:'synthetic'},transport:{fetchImpl:onSuppressed?observeLossBoundary(fetchImpl,onSuppressed):fetchImpl}})
  }
  const request=()=>new Request('https://example.test',{method:'POST',headers:{
   authorization:'Bearer synthetic',origin:'https://example.test'},body:JSON.stringify({action:'execute',commandId})})

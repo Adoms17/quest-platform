@@ -9,7 +9,9 @@ import {buildGuardRelease} from './build-stage-guard-release.js'
 import {isolatedSandboxBootstrap} from './isolated-billing-bootstrap.js'
 import {verifyAccountActivity} from './verify-account-activity.js'
 import {verifyFiscalAcceptedResponseLoss} from './verify-fiscal-accepted-response-loss.js'
-const acceptedResponseLossEnabled=process.env.QVESTA_TEST_ACCEPTED_RESPONSE_LOSS==='1'
+import {prepareRecoveryA} from './verify-fiscal-recovery-a.js'
+const recoveryAEnabled=process.env.QVESTA_TEST_RECOVERY_A==='1'
+const acceptedResponseLossEnabled=process.env.QVESTA_TEST_ACCEPTED_RESPONSE_LOSS==='1'||recoveryAEnabled
 const accountActivityEnabled=process.env.QVESTA_TEST_ACCOUNT_ACTIVITY==='1'
 const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'||accountActivityEnabled||acceptedResponseLossEnabled
 const releaseMigrations=[
@@ -797,7 +799,9 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    ).join(',')})`).trim())
    const quote=value=>value==null?'null':"'"+JSON.stringify(value).replaceAll("'","''")+"'::jsonb"
    const connections=[]
+   const recovery=recoveryAEnabled?prepareRecoveryA({sql,commandId,actorId}):null
    const result=await verifyFiscalAcceptedResponseLoss({commandId,actorId,shopId:'123',snapshot,
+    ...recovery?.callbacks,
     createService:()=>({rpc:async(name,args)=>{
      expect(name).toBe('subscription_fiscal_refund_from_gateway')
      expect(args.p_actor_user_id).toBe(actorId);expect(args.p_command_id).toBe(commandId)
@@ -828,8 +832,9 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
    for(const table of tables.filter(t=>!['billing_sandbox_refunds','billing_subscription_fiscal_operation_status','subscription_refund_dispatches'].includes(t)))
     expect(afterLoss[table],table+' unchanged after accepted/lost response').toEqual(before[table])
    expect(afterLoss.subscription_refund_applications).toHaveLength(0)
+   if(recovery)await recovery.verify({asyncSql,snapshot})
    acceptedResponseLossVerified=true
-   console.log('ACCEPTED_RESPONSE_LOSS: accepted=1 POST=1 retry_POST=0 new_backend_each_RPC=true unknown=true access_unchanged=true snapshot_tables=14')
+   console.log((recovery?'PRE_RECOVERY_':'')+'ACCEPTED_RESPONSE_LOSS: accepted=1 POST=1 retry_POST=0 new_backend_each_RPC=true unknown=true access_unchanged=true snapshot_tables=14')
   }else{
   const persistenceFixture=paid.replace('select * from finish();rollback;',()=>
    readSuite('platform_order_documents')+'\n'+modeledPrefix+'\n'+binding[0]+'\n'+
