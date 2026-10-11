@@ -135,7 +135,7 @@ export function run({ binary, work, url, mode, packageRoot = base, invoke, diagn
 }
 export function stageUrl(password) {
   if (typeof password !== 'string' || !password.length) fail('Existing stage DB password required; no temporary-role fallback')
-  return `postgresql://postgres:${encodeURIComponent(password)}@db.${TARGET}.supabase.co:5432/postgres?sslmode=require`
+  return `postgresql://postgres.${TARGET}:${encodeURIComponent(password)}@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require`
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const diagnostic = { phase: 'entry' }
