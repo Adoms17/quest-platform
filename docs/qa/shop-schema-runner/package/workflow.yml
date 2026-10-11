@@ -1,0 +1,67 @@
+name: Shop schema stage six (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [preview, apply]
+        default: preview
+        required: true
+      approved_sha:
+        type: string
+        required: true
+      package_sha256:
+        type: string
+        required: true
+      exclusive_schema_window:
+        description: Sole writer confirmed, including Dashboard and other database clients (required for apply)
+        type: boolean
+        default: false
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: supabase-staging
+  cancel-in-progress: false
+jobs:
+  schema:
+    if: github.repository == 'Adoms17/quest-platform' && github.ref == 'refs/heads/shop-schema-stage-six'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+      - name: Verify approved bytes before loading database credential
+        env:
+          APPROVED_SHA: ${{ inputs.approved_sha }}
+          PACKAGE_SHA: ${{ inputs.package_sha256 }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_SHA" = "$APPROVED_SHA"
+          cd docs/qa/shop-schema-runner/package
+          test "$(sha256sum package-hashes.json | cut -d ' ' -f 1)" = "$PACKAGE_SHA"
+          cmp workflow.yml ../../../../.github/workflows/deploy-staging.yml
+          node --input-type=module -e 'import {verifyPackage} from "./runner.mjs"; verifyPackage()'
+      - name: Install pinned official CLI only (no repository lifecycle scripts)
+        run: npm install --prefix docs/qa/shop-schema-runner/package --ignore-scripts --no-save --package-lock=false supabase@2.116.0
+      - name: Preview or apply exact six, no credential fallback
+        env:
+          APPROVED_SHA: ${{ inputs.approved_sha }}
+          APPROVED_PACKAGE_SHA256: ${{ inputs.package_sha256 }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          OPERATION: ${{ inputs.operation }}
+          EXCLUSIVE_SCHEMA_WINDOW: ${{ inputs.exclusive_schema_window }}
+        run: node docs/qa/shop-schema-runner/package/runner.mjs "$OPERATION"
+      - name: Preserve sanitized outcome only
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: shop-schema-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/shop-schema-result.json
+          if-no-files-found: warn
