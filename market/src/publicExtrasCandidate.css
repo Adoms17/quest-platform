@@ -1,0 +1,9 @@
+.candidate-cover { margin: 0; overflow-wrap: anywhere; }
+.candidate-cover img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; }
+.candidate-cover-fallback { min-height: 140px; display: grid; place-items: center; background: #eef2fa; color: #384568; border-radius: 16px; }
+.candidate-demo { overflow-wrap: anywhere; }
+.candidate-demo fieldset { margin: 0; padding: 12px; min-width: 0; border: 1px solid #7886a6; border-radius: 12px; }
+.candidate-demo label { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.candidate-demo input { flex-shrink: 0; }
+.candidate-demo button, .candidate-demo summary { min-height: 44px; padding: 10px 16px; margin: 8px 8px 8px 0; cursor: pointer; }
+.candidate-demo :focus-visible { outline: 3px solid #1249d8; outline-offset: 3px; }

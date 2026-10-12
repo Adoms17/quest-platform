@@ -1,0 +1,824 @@
+{
+  "generatedAt": "2026-10-12T17:12:55.195Z",
+  "expectedBaseline": "220ce8bd660ef860c29500775cbd4fc911010a28",
+  "worktree": "M:/Dev/Projects/quest-platform/market-public-foundation.local",
+  "git": {
+    "verifiedHead": null,
+    "headMatchesBaseline": null,
+    "trackedDiffAgainstBaseline": null,
+    "baselineAndOldFilesComparison": "UNVERIFIED: ordinary Git denied; no trust override",
+    "checks": [
+      {
+        "directory": "M:/Dev/Projects/quest-platform/market-public-foundation.local",
+        "args": [
+          "rev-parse",
+          "HEAD"
+        ],
+        "startedAt": "2026-10-12T17:12:55.073Z",
+        "finishedAt": "2026-10-12T17:12:55.119Z",
+        "exitCode": 128,
+        "error": "fatal: detected dubious ownership in repository at 'M:/Dev/Projects/quest-platform/market-public-foundation.local'\n'M:/Dev/Projects/quest-platform/market-public-foundation.local/.git' is owned by:\n\tADOMS-HOME/������� (S-1-5-21-880815417-1211536696-326703404-1001)\nbut the current user is:\n\tADOMS-HOME/CodexSandboxOffline (S-1-5-21-880815417-1211536696-326703404-1011)\nTo add an exception for this directory, call:\n\n\tgit config --global --add safe.directory M:/Dev/Projects/quest-platform/market-public-foundation.local"
+      },
+      {
+        "directory": "M:/Dev/Projects/quest-platform/fiscal-recovery-evidence-e1.local",
+        "args": [
+          "show",
+          "9da42e406406abd2538dabda1cb9c38b5a7c240d:docs/qa/shop-schema-runner/package/manifest.json"
+        ],
+        "startedAt": "2026-10-12T17:12:55.119Z",
+        "finishedAt": "2026-10-12T17:12:55.162Z",
+        "exitCode": 128,
+        "error": "fatal: detected dubious ownership in repository at 'M:/Dev/Projects/quest-platform/fiscal-recovery-evidence-e1.local'\n'M:/Dev/Projects/quest-platform/fiscal-recovery-evidence-e1.local/.git' is owned by:\n\tADOMS-HOME/������� (S-1-5-21-880815417-1211536696-326703404-1001)\nbut the current user is:\n\tADOMS-HOME/CodexSandboxOffline (S-1-5-21-880815417-1211536696-326703404-1011)\nTo add an exception for this directory, call:\n\n\tgit config --global --add safe.directory M:/Dev/Projects/quest-platform/fiscal-recovery-evidence-e1.local"
+      }
+    ],
+    "note": "Historical executor Git denial retained; later user-provided baseline verification is recorded separately."
+  },
+  "source": {
+    "worktree": "M:/Dev/Projects/quest-platform/fiscal-recovery-evidence-e1.local",
+    "expectedTrackedRef": "9da42e406406abd2538dabda1cb9c38b5a7c240d",
+    "packagePath": "docs/qa/shop-schema-session-pooler/package",
+    "trackedPackagePath": "docs/qa/shop-schema-runner/package",
+    "packageDigest": "d989a519ae22ad2f7913898997d7b7c0b92586359e0bb81a9341444968e31f2c",
+    "manifestHashMatches": true,
+    "migrations": [
+      {
+        "path": "supabase/migrations/20261010010000_shop_acquisitions_and_lineage.sql",
+        "sha256": "a821cd30d8da342825eb8475f941651ce02f17bcecb9f95b1561180bf22b84f9",
+        "sourceMatches": true,
+        "payloadMatches": true,
+        "trackedMatches": null,
+        "trackedManifestMatches": null
+      },
+      {
+        "path": "supabase/migrations/20261010020000_shop_orders_and_fulfillment.sql",
+        "sha256": "0001c30f055e1f279334acd4acf66aa25890a8c83d25534625d2d4a7fc59e73f",
+        "sourceMatches": true,
+        "payloadMatches": true,
+        "trackedMatches": null,
+        "trackedManifestMatches": null
+      },
+      {
+        "path": "supabase/migrations/20261010030000_shop_order_screen_reads.sql",
+        "sha256": "cd89a1ecba9631515cc29221ffaef302f02a1e3dc0436ecedcd1f0891e1ba8b6",
+        "sourceMatches": true,
+        "payloadMatches": true,
+        "trackedMatches": null,
+        "trackedManifestMatches": null
+      },
+      {
+        "path": "supabase/migrations/20261010040000_shop_payment_attempts.sql",
+        "sha256": "9dd7b7be3c2f47526520e3f9e4ab8d867810cb50ce1cd12d758c7d6e6518467f",
+        "sourceMatches": true,
+        "payloadMatches": true,
+        "trackedMatches": null,
+        "trackedManifestMatches": null
+      },
+      {
+        "path": "supabase/migrations/20261010050000_shop_payment_reconciliation.sql",
+        "sha256": "0b53aa8505f94a665bcfaf613ffe7d7ff7d420edf2b371b3887eba7891887c71",
+        "sourceMatches": true,
+        "payloadMatches": true,
+        "trackedMatches": null,
+        "trackedManifestMatches": null
+      },
+      {
+        "path": "supabase/migrations/20261010060000_shop_public_catalog.sql",
+        "sha256": "b2e69036cd4ea602a600f6afb41fd3319edca48d283a7a39364fd39b9856106a",
+        "sourceMatches": true,
+        "payloadMatches": true,
+        "trackedMatches": null,
+        "trackedManifestMatches": null
+      }
+    ],
+    "remoteApply194": "Historical reported evidence only; no remote rerun"
+  },
+  "isolation": {
+    "candidateMarkersAbsentInAvailableBundle": true,
+    "note": "Bundle scan is not a Git baseline comparison"
+  },
+  "validation": [
+    {
+      "name": "focused",
+      "command": [
+        "node",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test",
+        "--",
+        "tests/publicExtras.test.jsx"
+      ],
+      "cwd": "M:\\Dev\\Projects\\quest-platform\\market-public-foundation.local\\market",
+      "startedAt": "2026-10-12T17:09:13.387Z",
+      "finishedAt": "2026-10-12T17:09:16.813Z",
+      "exitCode": 0,
+      "signal": null,
+      "verifiedCommit": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "expectedBaseline": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "gitHeadExitCode": 0,
+      "inputs": [
+        {
+          "path": "market/src/publicExtrasContract.js",
+          "sha256": "0fccb7367804fca28c485ab9c510d6eb7a5d3eb5e6ba170af8dc215a0f7ed74c"
+        },
+        {
+          "path": "market/src/PublicCoverCandidate.jsx",
+          "sha256": "c80d96596ca12824d79d0f55a87e2dada91af45b254fbf044b9aaaf2589a542c"
+        },
+        {
+          "path": "market/src/PublicDemoCandidate.jsx",
+          "sha256": "bf2f2341f3bfe0b466c8bf9dbb4d4bea3fffae5e55e9ec4c9a80a3ac1522fbe5"
+        },
+        {
+          "path": "market/src/publicExtrasCandidate.css",
+          "sha256": "7673d91cd91146e7b523bcc8b5a46d0dc90c533bef7ce1cecc94b6c2b9983f00"
+        },
+        {
+          "path": "market/tests/publicExtras.test.jsx",
+          "sha256": "163584075ad40cbc5f9acd5cac9b756132d82f6fd856825d63cf8b3bbcf16bd8"
+        },
+        {
+          "path": "market/tests/publicExtrasFixtures.js",
+          "sha256": "20f971d186389dec654b896091b82f66e692c8b7ad931633d8c46eac2a1a54a4"
+        },
+        {
+          "path": "market/foundation.playwright.config.mjs",
+          "sha256": "b1185990c5c8a392098bb8857ffc2a12a88f3a5da5b3db4b35e68ae34d29a496"
+        },
+        {
+          "path": "market/tests/foundation-browser/foundation.spec.js",
+          "sha256": "476dbdee0830f72d34b211b8147ff0bc4a146a39149da49cabe7de2d4af1ebe8"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.jsx",
+          "sha256": "1653a7aa67af0fc64e641cbf2004ddf1b10f9f0a2349ee6781956b6aecd37df7"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.html",
+          "sha256": "88211d0ba7c1dab1f238a365bcb223239bef3a443564b3dd0e1330cca876ad1a"
+        },
+        {
+          "path": "market/package.json",
+          "sha256": "a4c3cbb51f837b739d1621a42fc2fb2505ce57d6ff3ed20cde45838792523d0c"
+        },
+        {
+          "path": "market/vitest.config.mjs",
+          "sha256": "54f2cbe7e3b6e308ea1d564b8aebfc3415b3801d69ebd3c8e584f8755e2c416a"
+        },
+        {
+          "path": "market/vite.config.mjs",
+          "sha256": "4dbed078db4d213c0e656f75d7af46b024b1e19b9967cc291b8236f1bf8d44ff"
+        },
+        {
+          "path": "package.json",
+          "sha256": "59f59bc7d9570cc652afa6181604afe5ee5979ebb382440a75f776b76866a2f8"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "076c29d3c44af33097cb987c2117756fc9f15b6f5f23c3cd80a7e3e21985c848"
+        },
+        {
+          "path": "vite.config.js",
+          "sha256": "ff5c34d428b2ff04e7d75009c65e03642e1a83ef9fe02ccbdcba73d6b6834db2"
+        },
+        {
+          "path": "market/qa/run-foundation-checks.mjs",
+          "sha256": "eadd9320c87fd874e892dcd2fefdb6e16b060b79f57e31bc598afed4c4a3e26e"
+        }
+      ],
+      "log": "market/qa/review-fix/focused.log",
+      "logSha256": "4740389bd31c73050b67c09ffa87fcaf16e9dbe669e478e0dde2bd85e6ea902b",
+      "logVerified": true,
+      "inputHashesMatch": true,
+      "result": "PASS"
+    },
+    {
+      "name": "browser",
+      "command": [
+        "node",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test:e2e",
+        "--",
+        "--config",
+        "foundation.playwright.config.mjs"
+      ],
+      "cwd": "M:\\Dev\\Projects\\quest-platform\\market-public-foundation.local\\market",
+      "startedAt": "2026-10-12T17:09:16.814Z",
+      "finishedAt": "2026-10-12T17:09:22.614Z",
+      "exitCode": 0,
+      "signal": null,
+      "verifiedCommit": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "expectedBaseline": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "gitHeadExitCode": 0,
+      "inputs": [
+        {
+          "path": "market/src/publicExtrasContract.js",
+          "sha256": "0fccb7367804fca28c485ab9c510d6eb7a5d3eb5e6ba170af8dc215a0f7ed74c"
+        },
+        {
+          "path": "market/src/PublicCoverCandidate.jsx",
+          "sha256": "c80d96596ca12824d79d0f55a87e2dada91af45b254fbf044b9aaaf2589a542c"
+        },
+        {
+          "path": "market/src/PublicDemoCandidate.jsx",
+          "sha256": "bf2f2341f3bfe0b466c8bf9dbb4d4bea3fffae5e55e9ec4c9a80a3ac1522fbe5"
+        },
+        {
+          "path": "market/src/publicExtrasCandidate.css",
+          "sha256": "7673d91cd91146e7b523bcc8b5a46d0dc90c533bef7ce1cecc94b6c2b9983f00"
+        },
+        {
+          "path": "market/tests/publicExtras.test.jsx",
+          "sha256": "163584075ad40cbc5f9acd5cac9b756132d82f6fd856825d63cf8b3bbcf16bd8"
+        },
+        {
+          "path": "market/tests/publicExtrasFixtures.js",
+          "sha256": "20f971d186389dec654b896091b82f66e692c8b7ad931633d8c46eac2a1a54a4"
+        },
+        {
+          "path": "market/foundation.playwright.config.mjs",
+          "sha256": "b1185990c5c8a392098bb8857ffc2a12a88f3a5da5b3db4b35e68ae34d29a496"
+        },
+        {
+          "path": "market/tests/foundation-browser/foundation.spec.js",
+          "sha256": "476dbdee0830f72d34b211b8147ff0bc4a146a39149da49cabe7de2d4af1ebe8"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.jsx",
+          "sha256": "1653a7aa67af0fc64e641cbf2004ddf1b10f9f0a2349ee6781956b6aecd37df7"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.html",
+          "sha256": "88211d0ba7c1dab1f238a365bcb223239bef3a443564b3dd0e1330cca876ad1a"
+        },
+        {
+          "path": "market/package.json",
+          "sha256": "a4c3cbb51f837b739d1621a42fc2fb2505ce57d6ff3ed20cde45838792523d0c"
+        },
+        {
+          "path": "market/vitest.config.mjs",
+          "sha256": "54f2cbe7e3b6e308ea1d564b8aebfc3415b3801d69ebd3c8e584f8755e2c416a"
+        },
+        {
+          "path": "market/vite.config.mjs",
+          "sha256": "4dbed078db4d213c0e656f75d7af46b024b1e19b9967cc291b8236f1bf8d44ff"
+        },
+        {
+          "path": "package.json",
+          "sha256": "59f59bc7d9570cc652afa6181604afe5ee5979ebb382440a75f776b76866a2f8"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "076c29d3c44af33097cb987c2117756fc9f15b6f5f23c3cd80a7e3e21985c848"
+        },
+        {
+          "path": "vite.config.js",
+          "sha256": "ff5c34d428b2ff04e7d75009c65e03642e1a83ef9fe02ccbdcba73d6b6834db2"
+        },
+        {
+          "path": "market/qa/run-foundation-checks.mjs",
+          "sha256": "eadd9320c87fd874e892dcd2fefdb6e16b060b79f57e31bc598afed4c4a3e26e"
+        }
+      ],
+      "log": "market/qa/review-fix/browser.log",
+      "logSha256": "7ca0461fc2ecc72163ab6a7fabd2950633597932bc7ca378791182bec1907839",
+      "logVerified": true,
+      "inputHashesMatch": true,
+      "result": "PASS"
+    },
+    {
+      "name": "market-lint",
+      "command": [
+        "node",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "lint"
+      ],
+      "cwd": "M:\\Dev\\Projects\\quest-platform\\market-public-foundation.local\\market",
+      "startedAt": "2026-10-12T17:09:22.615Z",
+      "finishedAt": "2026-10-12T17:09:23.092Z",
+      "exitCode": 0,
+      "signal": null,
+      "verifiedCommit": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "expectedBaseline": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "gitHeadExitCode": 0,
+      "inputs": [
+        {
+          "path": "market/src/publicExtrasContract.js",
+          "sha256": "0fccb7367804fca28c485ab9c510d6eb7a5d3eb5e6ba170af8dc215a0f7ed74c"
+        },
+        {
+          "path": "market/src/PublicCoverCandidate.jsx",
+          "sha256": "c80d96596ca12824d79d0f55a87e2dada91af45b254fbf044b9aaaf2589a542c"
+        },
+        {
+          "path": "market/src/PublicDemoCandidate.jsx",
+          "sha256": "bf2f2341f3bfe0b466c8bf9dbb4d4bea3fffae5e55e9ec4c9a80a3ac1522fbe5"
+        },
+        {
+          "path": "market/src/publicExtrasCandidate.css",
+          "sha256": "7673d91cd91146e7b523bcc8b5a46d0dc90c533bef7ce1cecc94b6c2b9983f00"
+        },
+        {
+          "path": "market/tests/publicExtras.test.jsx",
+          "sha256": "163584075ad40cbc5f9acd5cac9b756132d82f6fd856825d63cf8b3bbcf16bd8"
+        },
+        {
+          "path": "market/tests/publicExtrasFixtures.js",
+          "sha256": "20f971d186389dec654b896091b82f66e692c8b7ad931633d8c46eac2a1a54a4"
+        },
+        {
+          "path": "market/foundation.playwright.config.mjs",
+          "sha256": "b1185990c5c8a392098bb8857ffc2a12a88f3a5da5b3db4b35e68ae34d29a496"
+        },
+        {
+          "path": "market/tests/foundation-browser/foundation.spec.js",
+          "sha256": "476dbdee0830f72d34b211b8147ff0bc4a146a39149da49cabe7de2d4af1ebe8"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.jsx",
+          "sha256": "1653a7aa67af0fc64e641cbf2004ddf1b10f9f0a2349ee6781956b6aecd37df7"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.html",
+          "sha256": "88211d0ba7c1dab1f238a365bcb223239bef3a443564b3dd0e1330cca876ad1a"
+        },
+        {
+          "path": "market/package.json",
+          "sha256": "a4c3cbb51f837b739d1621a42fc2fb2505ce57d6ff3ed20cde45838792523d0c"
+        },
+        {
+          "path": "market/vitest.config.mjs",
+          "sha256": "54f2cbe7e3b6e308ea1d564b8aebfc3415b3801d69ebd3c8e584f8755e2c416a"
+        },
+        {
+          "path": "market/vite.config.mjs",
+          "sha256": "4dbed078db4d213c0e656f75d7af46b024b1e19b9967cc291b8236f1bf8d44ff"
+        },
+        {
+          "path": "package.json",
+          "sha256": "59f59bc7d9570cc652afa6181604afe5ee5979ebb382440a75f776b76866a2f8"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "076c29d3c44af33097cb987c2117756fc9f15b6f5f23c3cd80a7e3e21985c848"
+        },
+        {
+          "path": "vite.config.js",
+          "sha256": "ff5c34d428b2ff04e7d75009c65e03642e1a83ef9fe02ccbdcba73d6b6834db2"
+        },
+        {
+          "path": "market/qa/run-foundation-checks.mjs",
+          "sha256": "eadd9320c87fd874e892dcd2fefdb6e16b060b79f57e31bc598afed4c4a3e26e"
+        }
+      ],
+      "log": "market/qa/review-fix/market-lint.log",
+      "logSha256": "a22bbe8c44a1370f0214e2c05f36ceb176bd55b8d9a54af8e19052358d71ae05",
+      "logVerified": true,
+      "inputHashesMatch": true,
+      "result": "PASS"
+    },
+    {
+      "name": "market-build",
+      "command": [
+        "node",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "build"
+      ],
+      "cwd": "M:\\Dev\\Projects\\quest-platform\\market-public-foundation.local\\market",
+      "startedAt": "2026-10-12T17:09:23.092Z",
+      "finishedAt": "2026-10-12T17:09:23.981Z",
+      "exitCode": 0,
+      "signal": null,
+      "verifiedCommit": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "expectedBaseline": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "gitHeadExitCode": 0,
+      "inputs": [
+        {
+          "path": "market/src/publicExtrasContract.js",
+          "sha256": "0fccb7367804fca28c485ab9c510d6eb7a5d3eb5e6ba170af8dc215a0f7ed74c"
+        },
+        {
+          "path": "market/src/PublicCoverCandidate.jsx",
+          "sha256": "c80d96596ca12824d79d0f55a87e2dada91af45b254fbf044b9aaaf2589a542c"
+        },
+        {
+          "path": "market/src/PublicDemoCandidate.jsx",
+          "sha256": "bf2f2341f3bfe0b466c8bf9dbb4d4bea3fffae5e55e9ec4c9a80a3ac1522fbe5"
+        },
+        {
+          "path": "market/src/publicExtrasCandidate.css",
+          "sha256": "7673d91cd91146e7b523bcc8b5a46d0dc90c533bef7ce1cecc94b6c2b9983f00"
+        },
+        {
+          "path": "market/tests/publicExtras.test.jsx",
+          "sha256": "163584075ad40cbc5f9acd5cac9b756132d82f6fd856825d63cf8b3bbcf16bd8"
+        },
+        {
+          "path": "market/tests/publicExtrasFixtures.js",
+          "sha256": "20f971d186389dec654b896091b82f66e692c8b7ad931633d8c46eac2a1a54a4"
+        },
+        {
+          "path": "market/foundation.playwright.config.mjs",
+          "sha256": "b1185990c5c8a392098bb8857ffc2a12a88f3a5da5b3db4b35e68ae34d29a496"
+        },
+        {
+          "path": "market/tests/foundation-browser/foundation.spec.js",
+          "sha256": "476dbdee0830f72d34b211b8147ff0bc4a146a39149da49cabe7de2d4af1ebe8"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.jsx",
+          "sha256": "1653a7aa67af0fc64e641cbf2004ddf1b10f9f0a2349ee6781956b6aecd37df7"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.html",
+          "sha256": "88211d0ba7c1dab1f238a365bcb223239bef3a443564b3dd0e1330cca876ad1a"
+        },
+        {
+          "path": "market/package.json",
+          "sha256": "a4c3cbb51f837b739d1621a42fc2fb2505ce57d6ff3ed20cde45838792523d0c"
+        },
+        {
+          "path": "market/vitest.config.mjs",
+          "sha256": "54f2cbe7e3b6e308ea1d564b8aebfc3415b3801d69ebd3c8e584f8755e2c416a"
+        },
+        {
+          "path": "market/vite.config.mjs",
+          "sha256": "4dbed078db4d213c0e656f75d7af46b024b1e19b9967cc291b8236f1bf8d44ff"
+        },
+        {
+          "path": "package.json",
+          "sha256": "59f59bc7d9570cc652afa6181604afe5ee5979ebb382440a75f776b76866a2f8"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "076c29d3c44af33097cb987c2117756fc9f15b6f5f23c3cd80a7e3e21985c848"
+        },
+        {
+          "path": "vite.config.js",
+          "sha256": "ff5c34d428b2ff04e7d75009c65e03642e1a83ef9fe02ccbdcba73d6b6834db2"
+        },
+        {
+          "path": "market/qa/run-foundation-checks.mjs",
+          "sha256": "eadd9320c87fd874e892dcd2fefdb6e16b060b79f57e31bc598afed4c4a3e26e"
+        }
+      ],
+      "log": "market/qa/review-fix/market-build.log",
+      "logSha256": "07c6c64ea8a4ed21aff84d2f4d2e190e0e3156368d82c87211502056506d6b21",
+      "logVerified": true,
+      "inputHashesMatch": true,
+      "result": "PASS"
+    },
+    {
+      "name": "root-lint",
+      "command": [
+        "node",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "lint"
+      ],
+      "cwd": "M:\\Dev\\Projects\\quest-platform\\market-public-foundation.local",
+      "startedAt": "2026-10-12T17:09:23.982Z",
+      "finishedAt": "2026-10-12T17:09:24.574Z",
+      "exitCode": 0,
+      "signal": null,
+      "verifiedCommit": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "expectedBaseline": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "gitHeadExitCode": 0,
+      "inputs": [
+        {
+          "path": "market/src/publicExtrasContract.js",
+          "sha256": "0fccb7367804fca28c485ab9c510d6eb7a5d3eb5e6ba170af8dc215a0f7ed74c"
+        },
+        {
+          "path": "market/src/PublicCoverCandidate.jsx",
+          "sha256": "c80d96596ca12824d79d0f55a87e2dada91af45b254fbf044b9aaaf2589a542c"
+        },
+        {
+          "path": "market/src/PublicDemoCandidate.jsx",
+          "sha256": "bf2f2341f3bfe0b466c8bf9dbb4d4bea3fffae5e55e9ec4c9a80a3ac1522fbe5"
+        },
+        {
+          "path": "market/src/publicExtrasCandidate.css",
+          "sha256": "7673d91cd91146e7b523bcc8b5a46d0dc90c533bef7ce1cecc94b6c2b9983f00"
+        },
+        {
+          "path": "market/tests/publicExtras.test.jsx",
+          "sha256": "163584075ad40cbc5f9acd5cac9b756132d82f6fd856825d63cf8b3bbcf16bd8"
+        },
+        {
+          "path": "market/tests/publicExtrasFixtures.js",
+          "sha256": "20f971d186389dec654b896091b82f66e692c8b7ad931633d8c46eac2a1a54a4"
+        },
+        {
+          "path": "market/foundation.playwright.config.mjs",
+          "sha256": "b1185990c5c8a392098bb8857ffc2a12a88f3a5da5b3db4b35e68ae34d29a496"
+        },
+        {
+          "path": "market/tests/foundation-browser/foundation.spec.js",
+          "sha256": "476dbdee0830f72d34b211b8147ff0bc4a146a39149da49cabe7de2d4af1ebe8"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.jsx",
+          "sha256": "1653a7aa67af0fc64e641cbf2004ddf1b10f9f0a2349ee6781956b6aecd37df7"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.html",
+          "sha256": "88211d0ba7c1dab1f238a365bcb223239bef3a443564b3dd0e1330cca876ad1a"
+        },
+        {
+          "path": "market/package.json",
+          "sha256": "a4c3cbb51f837b739d1621a42fc2fb2505ce57d6ff3ed20cde45838792523d0c"
+        },
+        {
+          "path": "market/vitest.config.mjs",
+          "sha256": "54f2cbe7e3b6e308ea1d564b8aebfc3415b3801d69ebd3c8e584f8755e2c416a"
+        },
+        {
+          "path": "market/vite.config.mjs",
+          "sha256": "4dbed078db4d213c0e656f75d7af46b024b1e19b9967cc291b8236f1bf8d44ff"
+        },
+        {
+          "path": "package.json",
+          "sha256": "59f59bc7d9570cc652afa6181604afe5ee5979ebb382440a75f776b76866a2f8"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "076c29d3c44af33097cb987c2117756fc9f15b6f5f23c3cd80a7e3e21985c848"
+        },
+        {
+          "path": "vite.config.js",
+          "sha256": "ff5c34d428b2ff04e7d75009c65e03642e1a83ef9fe02ccbdcba73d6b6834db2"
+        },
+        {
+          "path": "market/qa/run-foundation-checks.mjs",
+          "sha256": "eadd9320c87fd874e892dcd2fefdb6e16b060b79f57e31bc598afed4c4a3e26e"
+        }
+      ],
+      "log": "market/qa/review-fix/root-lint.log",
+      "logSha256": "615de8fd3d082edeaf0d4f8b60e67385d014dc2c51864f5a31d4924f4b2a2c7c",
+      "logVerified": true,
+      "inputHashesMatch": true,
+      "result": "PASS"
+    },
+    {
+      "name": "root-build",
+      "command": [
+        "node",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "build"
+      ],
+      "cwd": "M:\\Dev\\Projects\\quest-platform\\market-public-foundation.local",
+      "startedAt": "2026-10-12T17:09:24.574Z",
+      "finishedAt": "2026-10-12T17:09:28.700Z",
+      "exitCode": 0,
+      "signal": null,
+      "verifiedCommit": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "expectedBaseline": "220ce8bd660ef860c29500775cbd4fc911010a28",
+      "gitHeadExitCode": 0,
+      "inputs": [
+        {
+          "path": "market/src/publicExtrasContract.js",
+          "sha256": "0fccb7367804fca28c485ab9c510d6eb7a5d3eb5e6ba170af8dc215a0f7ed74c"
+        },
+        {
+          "path": "market/src/PublicCoverCandidate.jsx",
+          "sha256": "c80d96596ca12824d79d0f55a87e2dada91af45b254fbf044b9aaaf2589a542c"
+        },
+        {
+          "path": "market/src/PublicDemoCandidate.jsx",
+          "sha256": "bf2f2341f3bfe0b466c8bf9dbb4d4bea3fffae5e55e9ec4c9a80a3ac1522fbe5"
+        },
+        {
+          "path": "market/src/publicExtrasCandidate.css",
+          "sha256": "7673d91cd91146e7b523bcc8b5a46d0dc90c533bef7ce1cecc94b6c2b9983f00"
+        },
+        {
+          "path": "market/tests/publicExtras.test.jsx",
+          "sha256": "163584075ad40cbc5f9acd5cac9b756132d82f6fd856825d63cf8b3bbcf16bd8"
+        },
+        {
+          "path": "market/tests/publicExtrasFixtures.js",
+          "sha256": "20f971d186389dec654b896091b82f66e692c8b7ad931633d8c46eac2a1a54a4"
+        },
+        {
+          "path": "market/foundation.playwright.config.mjs",
+          "sha256": "b1185990c5c8a392098bb8857ffc2a12a88f3a5da5b3db4b35e68ae34d29a496"
+        },
+        {
+          "path": "market/tests/foundation-browser/foundation.spec.js",
+          "sha256": "476dbdee0830f72d34b211b8147ff0bc4a146a39149da49cabe7de2d4af1ebe8"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.jsx",
+          "sha256": "1653a7aa67af0fc64e641cbf2004ddf1b10f9f0a2349ee6781956b6aecd37df7"
+        },
+        {
+          "path": "market/tests/foundation-browser/harness.html",
+          "sha256": "88211d0ba7c1dab1f238a365bcb223239bef3a443564b3dd0e1330cca876ad1a"
+        },
+        {
+          "path": "market/package.json",
+          "sha256": "a4c3cbb51f837b739d1621a42fc2fb2505ce57d6ff3ed20cde45838792523d0c"
+        },
+        {
+          "path": "market/vitest.config.mjs",
+          "sha256": "54f2cbe7e3b6e308ea1d564b8aebfc3415b3801d69ebd3c8e584f8755e2c416a"
+        },
+        {
+          "path": "market/vite.config.mjs",
+          "sha256": "4dbed078db4d213c0e656f75d7af46b024b1e19b9967cc291b8236f1bf8d44ff"
+        },
+        {
+          "path": "package.json",
+          "sha256": "59f59bc7d9570cc652afa6181604afe5ee5979ebb382440a75f776b76866a2f8"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "076c29d3c44af33097cb987c2117756fc9f15b6f5f23c3cd80a7e3e21985c848"
+        },
+        {
+          "path": "vite.config.js",
+          "sha256": "ff5c34d428b2ff04e7d75009c65e03642e1a83ef9fe02ccbdcba73d6b6834db2"
+        },
+        {
+          "path": "market/qa/run-foundation-checks.mjs",
+          "sha256": "eadd9320c87fd874e892dcd2fefdb6e16b060b79f57e31bc598afed4c4a3e26e"
+        }
+      ],
+      "log": "market/qa/review-fix/root-build.log",
+      "logSha256": "9692b40969ef87c94daa76253469d4705f2d0a0048b678793ef1f3d33a77d411",
+      "logVerified": true,
+      "inputHashesMatch": true,
+      "result": "PASS"
+    }
+  ],
+  "files": [
+    {
+      "path": "market/src/publicExtrasContract.js",
+      "sha256": "0fccb7367804fca28c485ab9c510d6eb7a5d3eb5e6ba170af8dc215a0f7ed74c"
+    },
+    {
+      "path": "market/src/PublicCoverCandidate.jsx",
+      "sha256": "c80d96596ca12824d79d0f55a87e2dada91af45b254fbf044b9aaaf2589a542c"
+    },
+    {
+      "path": "market/src/PublicDemoCandidate.jsx",
+      "sha256": "bf2f2341f3bfe0b466c8bf9dbb4d4bea3fffae5e55e9ec4c9a80a3ac1522fbe5"
+    },
+    {
+      "path": "market/src/publicExtrasCandidate.css",
+      "sha256": "7673d91cd91146e7b523bcc8b5a46d0dc90c533bef7ce1cecc94b6c2b9983f00"
+    },
+    {
+      "path": "market/tests/publicExtras.test.jsx",
+      "sha256": "163584075ad40cbc5f9acd5cac9b756132d82f6fd856825d63cf8b3bbcf16bd8"
+    },
+    {
+      "path": "market/tests/publicExtrasFixtures.js",
+      "sha256": "20f971d186389dec654b896091b82f66e692c8b7ad931633d8c46eac2a1a54a4"
+    },
+    {
+      "path": "market/foundation.playwright.config.mjs",
+      "sha256": "b1185990c5c8a392098bb8857ffc2a12a88f3a5da5b3db4b35e68ae34d29a496"
+    },
+    {
+      "path": "market/tests/foundation-browser/harness.jsx",
+      "sha256": "1653a7aa67af0fc64e641cbf2004ddf1b10f9f0a2349ee6781956b6aecd37df7"
+    },
+    {
+      "path": "market/tests/foundation-browser/harness.html",
+      "sha256": "88211d0ba7c1dab1f238a365bcb223239bef3a443564b3dd0e1330cca876ad1a"
+    },
+    {
+      "path": "market/tests/foundation-browser/foundation.spec.js",
+      "sha256": "476dbdee0830f72d34b211b8147ff0bc4a146a39149da49cabe7de2d4af1ebe8"
+    },
+    {
+      "path": "market/qa/verify-foundation.mjs",
+      "sha256": "8eca7e74be39f8c8ab93ea648df36176a8c2c579bdb46ef9ab6f0f99cd68bb19"
+    },
+    {
+      "path": "market/qa/run-foundation-checks.mjs",
+      "sha256": "eadd9320c87fd874e892dcd2fefdb6e16b060b79f57e31bc598afed4c4a3e26e"
+    },
+    {
+      "path": "market/FOUNDATION-REVIEW.md",
+      "sha256": "bdc47a68d5c15a223654f921a50eda780f7963d7a927801e3d850b6038b55f06"
+    }
+  ],
+  "remoteVerification": "NOT RUN",
+  "sqlExecution": "NOT RUN",
+  "backendCandidate": "NOT IMPLEMENTED",
+  "userRun": {
+    "evidenceType": "User-executed; executor verified saved log and input hashes; no test rerun",
+    "startedAt": "2026-10-12T17:09:13.387Z",
+    "finishedAt": "2026-10-12T17:09:28.700Z",
+    "userVerifiedHead": "220ce8bd660ef860c29500775cbd4fc911010a28",
+    "focusedTests": "10/10",
+    "browserTests": "1/1",
+    "fullRegressionPostFix": "NOT RUN",
+    "trackedBaselineDiffAndStatus": "VERIFIED_FROM_USER_PROVIDED_EVIDENCE: Sentinel_765334e848bc8191982d9e9ebf4e5cc4",
+    "acceptance": "Bounded foundation ready for commit review; not full-suite or integration acceptance"
+  },
+  "reviewReadyAllowlist": [
+    "market/src/publicExtrasContract.js",
+    "market/src/PublicCoverCandidate.jsx",
+    "market/src/PublicDemoCandidate.jsx",
+    "market/src/publicExtrasCandidate.css",
+    "market/tests/publicExtras.test.jsx",
+    "market/tests/publicExtrasFixtures.js",
+    "market/foundation.playwright.config.mjs",
+    "market/tests/foundation-browser/harness.jsx",
+    "market/tests/foundation-browser/harness.html",
+    "market/tests/foundation-browser/foundation.spec.js",
+    "market/qa/verify-foundation.mjs",
+    "market/qa/run-foundation-checks.mjs",
+    "market/FOUNDATION-REVIEW.md",
+    "market/foundation-manifest.json"
+  ],
+  "supportingEvidence": [
+    {
+      "path": "market/qa/review-fix/runs.json",
+      "sha256": "e464e5d320fc169e7e63b2e262c4d3db9d183cd6b259dca5522688b717eff75f"
+    },
+    {
+      "path": "market/qa/review-fix/git-head.log",
+      "sha256": "9ea95752fc73cfa82d33cc83a2e89092cb363e0c6980ddfe219f69d41ca2d98d"
+    },
+    {
+      "path": "market/qa/review-fix/focused.log",
+      "sha256": "4740389bd31c73050b67c09ffa87fcaf16e9dbe669e478e0dde2bd85e6ea902b"
+    },
+    {
+      "path": "market/qa/review-fix/browser.log",
+      "sha256": "7ca0461fc2ecc72163ab6a7fabd2950633597932bc7ca378791182bec1907839"
+    },
+    {
+      "path": "market/qa/review-fix/market-lint.log",
+      "sha256": "a22bbe8c44a1370f0214e2c05f36ceb176bd55b8d9a54af8e19052358d71ae05"
+    },
+    {
+      "path": "market/qa/review-fix/market-build.log",
+      "sha256": "07c6c64ea8a4ed21aff84d2f4d2e190e0e3156368d82c87211502056506d6b21"
+    },
+    {
+      "path": "market/qa/review-fix/root-lint.log",
+      "sha256": "615de8fd3d082edeaf0d4f8b60e67385d014dc2c51864f5a31d4924f4b2a2c7c"
+    },
+    {
+      "path": "market/qa/review-fix/root-build.log",
+      "sha256": "9692b40969ef87c94daa76253469d4705f2d0a0048b678793ef1f3d33a77d411"
+    },
+    {
+      "path": "market/qa/foundation-browser/demo-390.png",
+      "sha256": "7eaf1832eaf6a6c7d5965b64d47142ff35af5484f4f9448dfec3b93e651511fa"
+    }
+  ],
+  "userProvidedBaselineEvidence": {
+    "source": "Sentinel_765334e848bc8191982d9e9ebf4e5cc4",
+    "observedAt": "2026-10-12T17:21:00Z",
+    "timestampPrecision": "minute",
+    "evidenceType": "User-provided Git output; not executor rerun",
+    "head": "220ce8bd660ef860c29500775cbd4fc911010a28",
+    "commands": [
+      "git status --short --untracked-files=all",
+      "git diff --stat 220ce8bd660ef860c29500775cbd4fc911010a28"
+    ],
+    "trackedDiffStat": "",
+    "trackedChanges": false,
+    "untrackedCount": 17,
+    "untrackedFiles": [
+      "market/FOUNDATION-REVIEW.md",
+      "market/foundation-manifest.json",
+      "market/foundation.playwright.config.mjs",
+      "market/qa/foundation-browser/.last-run.json",
+      "market/qa/foundation-browser/demo-390.png",
+      "market/qa/review-fix/runs.json",
+      "market/qa/run-foundation-checks.mjs",
+      "market/qa/verify-foundation.mjs",
+      "market/src/PublicCoverCandidate.jsx",
+      "market/src/PublicDemoCandidate.jsx",
+      "market/src/publicExtrasCandidate.css",
+      "market/src/publicExtrasContract.js",
+      "market/tests/foundation-browser/foundation.spec.js",
+      "market/tests/foundation-browser/harness.html",
+      "market/tests/foundation-browser/harness.jsx",
+      "market/tests/publicExtras.test.jsx",
+      "market/tests/publicExtrasFixtures.js"
+    ],
+    "baselinePreservation": "VERIFIED_FROM_USER_PROVIDED_EVIDENCE"
+  },
+  "commitReviewExclusions": [
+    "market/qa/foundation-browser/.last-run.json",
+    "market/qa/foundation-browser/demo-390.png",
+    "market/qa/review-fix/runs.json"
+  ],
+  "independentReview": {
+    "p2": "resolved",
+    "provenance": "Reported by coordinator; no new review claimed"
+  },
+  "reconciledAt": "2026-10-12T17:23:02.837Z"
+}
