@@ -245,6 +245,9 @@ dt { font-weight: 700; }dd { margin: 0; color: var(--muted); }
 .public-market .standalone-example .check-label { min-height: 48px; margin-block: 8px; }
 .public-market .standalone-example form, .public-market .standalone-example fieldset { width: 100%; }
 .public-market .quick-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.public-market .quick-filters button:disabled { cursor: not-allowed; }
+.public-market .public-filter-controls { min-width: 0; }
+.public-market .public-filter-controls > p { margin: 8px 0 0; }
 .public-market .catalog-tools { flex-wrap: wrap; }
 .public-market .catalog-tools .search-form { flex: 1 1 300px; }
 .public-market .quick-filters .button { padding-inline: 12px; }
@@ -267,6 +270,7 @@ dt { font-weight: 700; }dd { margin: 0; color: var(--muted); }
 .public-market .public-no-matches h2, .public-market .public-no-matches p { margin: 0; }
 .public-market .public-no-matches .button { max-width: 100%; overflow-wrap: anywhere; }
 @media (max-width: 760px) {
+  .public-market .public-filter-controls { width: 100%; }
   .public-market .quick-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
   .public-market .catalog-tools .search-form { flex-basis: auto; }
   .public-market .quick-filters .button { font-size: .875rem; padding-inline: 6px; }

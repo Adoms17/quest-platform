@@ -1,4 +1,13 @@
 import { publicClaimFields } from '../src/publicCatalogContract.js'
+export function minimalPublicRow(index = 3) {
+  const row = publicRow(index)
+  for (const [section, fields] of Object.entries(row.payload)) {
+    for (const key of Object.keys(fields)) {
+      if (section !== 'card' || !['title', 'description'].includes(key)) fields[key] = { status: 'unknown', value: null }
+    }
+  }
+  return row
+}
 export function publicRow(index = 1, overrides = {}) {
   const payload = Object.fromEntries(Object.entries(publicClaimFields).map(([section, fields]) => [section, Object.fromEntries(Object.keys(fields).map(key => [key, { status: 'unknown', value: null }]))]))
   const confirmed = value => ({ status: 'confirmed', value })

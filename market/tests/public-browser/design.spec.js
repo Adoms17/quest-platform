@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { publicRow } from '../publicDesignData.mjs'
+const screenshots = process.env.MARKET_PUBLIC_BUILT_TEST ? 'qa/filter-availability/screens' : 'qa/public-design'
 const rows = [publicRow(1), publicRow(2)]
 test.beforeEach(async ({ context }) => {
   await context.route('**/*', async route => {
@@ -46,7 +47,7 @@ test('public UI viewport matrix: catalog, details, demo, no overflow and local f
         await expect(page.locator('.standalone-example').getByRole('radio')).toHaveCount(3)
         await expect(page.locator('.product-demo').getByRole('button', { name: /Проверить/ })).toHaveCount(0)
       }
-      await page.screenshot({ path: `qa/public-design/${name}-${width}.png`, fullPage: true })
+      await page.screenshot({ path: `${screenshots}/${name}-${width}.png`, fullPage: true })
     }
   }
   expect(errors).toEqual([])
@@ -74,7 +75,7 @@ test('quick filters preserve other groups, discard drafts, and return keyboard f
       await page.keyboard.press('Enter')
       await expect(dialog.getByLabel(label, { exact: true })).not.toBeChecked()
       await dialog.getByLabel(label, { exact: true }).check()
-      await page.screenshot({ path: `qa/public-design/quick-${id}-${width}.png`, fullPage: true })
+      await page.screenshot({ path: `${screenshots}/quick-${id}-${width}.png`, fullPage: true })
       await dialog.getByRole('button', { name: 'Показать 1 квест', exact: true }).click()
       await expect(trigger).toBeFocused()
       expect(new URL(page.url()).searchParams.get('print')).toBe('none')
@@ -105,7 +106,7 @@ test('loading, error/retry, empty, missing and withdrawn stay distinct without f
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.locator('.empty-illustration, .standalone-example')).toHaveCount(0)
   await expect(page.getByRole('article')).toHaveCount(0)
-  await page.screenshot({ path: 'qa/public-design/error.png', fullPage: true })
+  await page.screenshot({ path: `${screenshots}/error.png`, fullPage: true })
   scenario = 'empty'
   await page.getByRole('button', { name: 'Повторить загрузку' }).click()
   await expect(page.getByRole('heading', { name: 'Каталог пока пуст' })).toBeVisible()
@@ -138,7 +139,7 @@ test('keyboard skip link, reduced motion, tap targets, long data and 200 percent
   await page.setViewportSize({ width: 1440, height: 1024 })
   await page.evaluate(() => { document.documentElement.style.zoom = '2' })
   expect(await page.evaluate(() => document.documentElement.getBoundingClientRect().width <= innerWidth)).toBe(true)
-  await page.screenshot({ path: 'qa/public-design/css-zoom-200.png', fullPage: true })
+  await page.screenshot({ path: `${screenshots}/css-zoom-200.png`, fullPage: true })
 })
 test('mobile filter dialog keyboard, draft cancel/apply, printing Any, URL Back and Forward', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -154,13 +155,13 @@ test('mobile filter dialog keyboard, draft cancel/apply, printing Any, URL Back 
   await page.keyboard.press('Tab')
   await expect(dialog.getByRole('button', { name: 'Закрыть фильтры' })).toBeFocused()
   await dialog.getByLabel('Помещение А', { exact: true }).check()
-  await page.screenshot({ path: 'qa/public-design/filters-390.png', fullPage: true })
+  await page.screenshot({ path: `${screenshots}/filters-390.png`, fullPage: true })
   await page.keyboard.press('Escape')
   await expect(trigger).toBeFocused()
   await trigger.click()
   await expect(dialog.getByLabel('Помещение А', { exact: true })).not.toBeChecked()
   await dialog.getByLabel('Без печати', { exact: true }).check()
-  await page.screenshot({ path: 'qa/public-design/filters-no-print-390.png', fullPage: true })
+  await page.screenshot({ path: `${screenshots}/filters-no-print-390.png`, fullPage: true })
   await dialog.getByRole('button', { name: 'Показать 1 квест' }).click()
   await expect(trigger).toBeFocused()
   await expect(page.getByRole('article')).toHaveCount(1)
@@ -176,7 +177,7 @@ test('zero matches can remove printing without losing search or venue', async ({
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/?q=Проверочный&venue=Помещение+А&print=none')
   await expect(page.getByRole('heading', { name: 'По этим условиям квестов нет' })).toBeVisible()
-  await page.screenshot({ path: 'qa/public-design/zero-matches-390.png', fullPage: true })
+  await page.screenshot({ path: `${screenshots}/zero-matches-390.png`, fullPage: true })
   await page.getByRole('button', { name: 'Убрать условие «Без печати»' }).click()
   await expect(page.getByRole('article')).toHaveCount(1)
   await expect(page.getByRole('searchbox')).toHaveValue('Проверочный')
@@ -257,12 +258,12 @@ test('standalone example is independent, keyboard usable and performs no request
   await expect(example.getByRole('radio', { name: 'Фонарь' })).toBeChecked()
   await example.getByRole('button', { name: 'Проверить', exact: true }).click()
   await expect(example.getByRole('status')).toContainText('не определяет стороны света')
-  await page.screenshot({ path: 'qa/public-design/demo-feedback-retry-390.png', fullPage: true })
+  await page.screenshot({ path: `${screenshots}/demo-feedback-retry-390.png`, fullPage: true })
   await first.check()
   await example.getByRole('button', { name: 'Проверить', exact: true }).click()
   await expect(example.getByRole('status')).toContainText('Верно!')
   await expect(page.locator('.product-demo')).toContainText(rows[0].payload.demo.publicDemo.value.question)
-  await page.screenshot({ path: 'qa/public-design/demo-feedback-correct-390.png', fullPage: true })
+  await page.screenshot({ path: `${screenshots}/demo-feedback-correct-390.png`, fullPage: true })
   await example.getByRole('button', { name: 'Начать заново' }).click()
   await expect(first).toBeFocused()
   await expect(first).not.toBeChecked()
@@ -298,7 +299,7 @@ test('price sorting preserves filters, history, pinned return and rejects mixed 
   await expect(sort).toHaveValue('price-desc')
   await page.reload()
   await expect(sort).toHaveValue('price-desc')
-  await page.screenshot({ path: 'qa/public-design/sort-price-desc.png', fullPage: true })
+  await page.screenshot({ path: `${screenshots}/sort-price-desc.png`, fullPage: true })
   priced[1].offer.currency = 'USD'
   await page.reload()
   await expect(sort).toHaveValue('default')

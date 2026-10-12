@@ -20,7 +20,8 @@ export function catalogItem(item) {
 }
 export function catalogOptions(items) {
   const venues = Object.fromEntries(items.flatMap(item => item.venues).map(value => [value, value]))
-  return { ...filterOptions(items, venues), printing: items.some(item => item.print) }
+  // Printing choices describe a query, not a claim about unpublished metadata.
+  return { ...filterOptions(items, venues), printing: true, printingUnknown: !items.some(item => item.print) }
 }
 export const compatibilityLabels = {
   age: 'Возраст', reading: 'Чтение', knowledge: 'Знания', group: 'Размер группы',
