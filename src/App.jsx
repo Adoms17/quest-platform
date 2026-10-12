@@ -24,6 +24,9 @@ import { useAccountActivity } from './hooks/useAccountActivity'
 const ParticipantQuests = lazy(() => import('./pages/ParticipantQuests'))
 const Login = lazy(() => import('./pages/Login'))
 const QuestList = lazy(() => import('./pages/QuestList'))
+const ShopPurchases = lazy(() => import('./pages/ShopPurchases'))
+const ShopCheckout = lazy(() => import('./pages/ShopCheckout'))
+const ShopOrder = lazy(() => import('./pages/ShopOrder'))
 const QuestCreate = lazy(() => import('./pages/QuestCreate'))
 const QuestEdit = lazy(() => import('./pages/QuestEdit'))
 const QuestPlay = lazy(() => import('./pages/QuestPlay'))
@@ -179,6 +182,9 @@ function App() {
         <LazyRouteErrorBoundary>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
           <Routes>
+        <Route path="/organization/shop/offers/:offerId" element={<ProtectedRoute session={session}><Layout session={session}><ShopCheckout session={session} /></Layout></ProtectedRoute>} />
+        <Route path="/organization/shop/orders/:orderId" element={<ProtectedRoute session={session}><Layout session={session}><ShopOrder session={session} /></Layout></ProtectedRoute>} />
+        <Route path="/organization/purchases" element={<ProtectedRoute session={session}><Layout session={session}><ShopPurchases session={session} /></Layout></ProtectedRoute>} />
         <Route path="/home" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantQuests key={session?.user?.id} session={session} home /></Layout></ProtectedRoute>} />
         <Route path="/my-quests" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantQuests key={session?.user?.id} session={session} /></Layout></ProtectedRoute>} />
         <Route
