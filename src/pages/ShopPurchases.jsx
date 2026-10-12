@@ -22,11 +22,13 @@ function PurchaseLibrary({ organization }) {
   const [busyId, setBusyId] = useState(null)
   const active = useRef(false)
   const busy = useRef(false)
+  const issuance = useRef(null)
+  const [retryItem, setRetryItem] = useState(null)
   const canCreate = hasOrganizationPermission(organization, 'quests.create') && hasOrganizationPermission(organization, 'quests.update')
   const canRead = hasOrganizationPermission(organization, 'quests.read')
   useEffect(() => {
     active.current = true
-    return () => { active.current = false }
+    return () => { active.current = false; issuance.current?.abort() }
   }, [])
   useEffect(() => {
     if (!canRead) return
@@ -41,16 +43,25 @@ function PurchaseLibrary({ organization }) {
   const open = async item => {
     if (busy.current) return
     busy.current = true
+    const controller = new AbortController()
+    issuance.current = controller
     setBusyId(item.acquisition_id)
+    setRetryItem(null)
     setError(null)
     try {
-      const questId = await issueShopCopy(organization.id, item.acquisition_id)
-      if (active.current) navigate(`/quests/${questId}/edit`)
+      const questId = await issueShopCopy(organization.id, item.acquisition_id, controller.signal)
+      if (active.current && !controller.signal.aborted) navigate(`/quests/${questId}/edit`)
     } catch (cause) {
-      if (active.current) setError(getUserErrorMessage(cause, 'Не удалось открыть рабочую копию. Повторите запрос.'))
+      if (active.current && !controller.signal.aborted) {
+        setRetryItem(item)
+        setError(cause?.code === 'SHOP_COPY_OUTCOME_UNKNOWN'
+          ? 'Ответ сервера не получен вовремя. Копия могла быть создана; операция не отменена. Повторите запрос для этой же покупки, чтобы открыть её копию.'
+          : getUserErrorMessage(cause, 'Не удалось открыть рабочую копию. Повторите запрос.'))
+      }
     } finally {
       busy.current = false
-      if (active.current) setBusyId(null)
+      if (active.current && !controller.signal.aborted) setBusyId(null)
+      if (issuance.current === controller) issuance.current = null
     }
   }
   return <section className="p-6 max-w-4xl mx-auto">
@@ -59,7 +70,9 @@ function PurchaseLibrary({ organization }) {
     <p className="my-4">Создайте закрытую рабочую копию и адаптируйте её в редакторе. Открытие для участников выполняется отдельно и учитывает тариф организации.</p>
     {hasOrganizationPermission(organization, 'billing.manage') && <ShopPendingOrders key={organization.id} organizationId={organization.id} />}
     {!canRead ? <p role="alert">Нет доступа к покупкам этой организации.</p> : <>
-      {error && <div role="alert"><p>{error}</p><button className="underline" onClick={() => { setError(null); setItems(null); setReload(value => value + 1) }}>Повторить загрузку</button></div>}
+      {error && <div role="alert"><p>{error}</p>{retryItem
+        ? <button className="underline" disabled={!canCreate || busyId !== null} onClick={() => open(retryItem)}>Повторить запрос копии</button>
+        : <button className="underline" onClick={() => { setError(null); setItems(null); setReload(value => value + 1) }}>Повторить загрузку</button>}</div>}
       {!items && !error && <p role="status">Загрузка покупок…</p>}
       {items?.length === 0 && <p>У этой организации пока нет приобретённых квестов.</p>}
       <ul className="space-y-4 mt-4">{items?.map(item => <li key={item.acquisition_id} className="border rounded-lg p-4">

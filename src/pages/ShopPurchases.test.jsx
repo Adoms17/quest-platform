@@ -25,7 +25,7 @@ it('shows loading, issues a copy once on double click, and goes to editor', asyn
   const button = await screen.findByRole('button', { name: 'Создать рабочую копию' })
   fireEvent.click(button); fireEvent.click(button)
   expect(api.issueShopCopy).toHaveBeenCalledTimes(1)
-  expect(api.issueShopCopy).toHaveBeenCalledWith('org-a', 'purchase')
+  expect(api.issueShopCopy).toHaveBeenCalledWith('org-a', 'purchase', expect.any(AbortSignal))
   await act(async () => finish('copy'))
   expect(await screen.findByRole('heading', { name: 'Real editor destination' })).toBeVisible()
 })
