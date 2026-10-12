@@ -204,3 +204,84 @@ dt { font-weight: 700; }dd { margin: 0; color: var(--muted); }
 .snapshot-identity dd { font-size: .8rem; margin-bottom: .6rem; }
 .preview-claim { overflow-wrap: anywhere; margin-block: .3rem; }
 .preview-claim small { display: block; font-size: .8rem; }
+
+/* Public catalog uses confirmed claims; missing media is stated, never invented. */
+.public-market main { min-height: 65vh; padding-bottom: 48px; }
+.public-market .catalog-intro { padding-top: 26px; }
+.public-market .catalog-intro h1 { font-size: clamp(2rem, 4vw, 3.2rem); }
+.public-market .catalog-intro .eyebrow { margin-bottom: 8px; }
+.public-market .catalog-intro .lead { margin-bottom: 0; }
+.public-market .quest-card h2 a { color: inherit; text-decoration: none; }
+.public-market .quest-card h2 a:hover { text-decoration: underline; }
+.public-market .quest-card h2 a { display: inline-flex; align-items: center; min-height: 44px; }
+.public-market .public-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.public-market .public-media { min-height: 150px; padding: 24px; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--soft); color: var(--muted); border-bottom: 1px solid var(--line); }
+.public-market .public-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin: 0; }
+.public-market .public-price strong { font-size: 1.75rem; color: #10183f; }
+.public-market .public-price span { color: var(--muted); font-size: .875rem; }
+.public-market .card-action { flex-direction: row; align-items: center; }
+.public-market .card-action .button { width: auto; }
+.public-market .public-product { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+.public-market .public-product .public-media { border: 1px solid var(--line); border-radius: 16px; min-height: 220px; }
+.public-market .public-compatibility { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 24px; }
+.public-market .public-compatibility h2 { font-size: 1.5rem; }
+.public-market .public-compatibility dl { margin: 0 0 24px; }
+.public-market .public-compatibility dl > div { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 1.5fr); gap: 16px; border-bottom: 1px solid var(--line); padding: 10px 0; }
+.public-market :where(dd, .card-description, .reading, .venue, .preparation, .demo-task, .public-price) { overflow-wrap: anywhere; }
+.public-market .public-checkout { margin-top: 24px; }
+.public-market .public-compatibility-all { margin-bottom: 24px; }
+.public-market .public-compatibility-all summary { padding-block: 10px; color: var(--blue); }
+.public-market .public-checkout .button { margin-block: 16px; }
+.public-market .detail-sections { margin-top: 32px; }
+.public-market .chip .icon { width: 16px; height: 16px; }
+.public-market .site-header nav { justify-content: flex-end; }
+.public-market .catalog-sort { display: flex; flex-direction: column; gap: 4px; font-size: .875rem; max-width: 100%; }
+.public-market .catalog-sort select { min-height: 48px; max-width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 10px; color: inherit; background: white; }
+.public-market select:focus-visible { outline: 3px solid var(--blue); outline-offset: 4px; }
+.public-market .empty-illustration { width: 240px; height: auto; max-width: 100%; }
+.public-market .purchase-terms { margin-block: 16px; padding: 16px; border-radius: 12px; background: var(--soft); font-size: .875rem; }
+.public-market .purchase-terms p:last-child { margin-bottom: 0; }
+.public-market .standalone-example input[type=radio] { width: 20px; padding: 0; }
+.public-market .standalone-example .check-label { min-height: 48px; margin-block: 8px; }
+.public-market .standalone-example form, .public-market .standalone-example fieldset { width: 100%; }
+.public-market .quick-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.public-market .catalog-tools { flex-wrap: wrap; }
+.public-market .catalog-tools .search-form { flex: 1 1 300px; }
+.public-market .quick-filters .button { padding-inline: 12px; }
+.public-market .filter-dialog .filter-fields { grid-template-columns: 1fr; margin-top: 24px; }
+.public-market .filter-fields fieldset[hidden] { display: none; }
+.public-market .public-demo-badge { display: block; width: fit-content; padding: 6px 12px; border-radius: 8px; color: #315719; background: #edf6e7; font-size: .875rem; font-weight: 700; }
+.public-market .public-demo-notice { padding: 16px; background: var(--soft); border-radius: 12px; }
+.public-market .demo-task { margin-block: 24px; background: white; border: 1px solid var(--line); }
+/* Approved M02 tiles retain native checkbox/radio and focus semantics. */
+.public-market .filter-fields fieldset { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px; }
+.public-market .filter-fields legend, .public-market .filter-fields small { width: 100%; }
+.public-market .check-label { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: white; cursor: pointer; }
+.public-market .check-label:has(input:checked) { border-color: var(--blue); background: var(--soft); color: #0649c9; }
+.public-market .check-label:has(input:focus-visible) { outline: 3px solid var(--blue); outline-offset: 3px; }
+.public-market .public-compatibility-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.public-market .public-compatibility .public-compatibility-summary > div { grid-template-columns: minmax(0, 1fr); gap: 4px; border: 0; padding: 12px; border-radius: 10px; background: var(--soft); }
+.public-market .public-compatibility-summary dt { font-size: .875rem; }
+.public-market .public-no-matches { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px; }
+.public-market .public-no-matches > .icon { width: 48px; height: 48px; }
+.public-market .public-no-matches h2, .public-market .public-no-matches p { margin: 0; }
+.public-market .public-no-matches .button { max-width: 100%; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .public-market .quick-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .public-market .catalog-tools .search-form { flex-basis: auto; }
+  .public-market .quick-filters .button { font-size: .875rem; padding-inline: 6px; }
+  .public-market .quick-filters .icon { display: none; }
+  .public-market .filter-dialog .filter-actions { flex-direction: column; align-items: stretch; }
+  .public-market .filter-dialog .filter-actions .text-button { border: 1px solid var(--blue); border-radius: 10px; text-decoration: none; }
+  .public-market .site-header { flex-wrap: nowrap; gap: 12px; }
+  .public-market .site-header .brand { font-size: 1.2rem; gap: 4px; }
+  .public-market .brand img { width: 30px; height: 30px; }
+  .public-market .site-header nav { flex-basis: auto; gap: 6px 12px; }
+  .public-market .public-grid, .public-market .public-product { grid-template-columns: 1fr; }
+  .public-market .public-product { gap: 20px; }
+  .public-market .public-product .public-media { min-height: 120px; }
+  .public-market .public-media { min-height: 100px; }
+  .public-market .public-price strong { font-size: 1.5rem; }
+  .public-market .card-action { gap: 16px; }
+  .public-market .card-action .button { padding-inline: 16px; }
+}

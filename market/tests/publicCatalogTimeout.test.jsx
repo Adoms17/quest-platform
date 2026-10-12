@@ -37,6 +37,8 @@ it('turns an actual adapter timeout into a recoverable UI error and retries once
   await act(async () => requests[1].resolve({ ok: true, json: async () => [] }))
   expect(screen.getByRole('status')).toHaveTextContent('0')
   expect(screen.queryByRole('alert')).toBeNull()
+  // Shared page-position restoration schedules one animation frame after load.
+  await act(async () => vi.advanceTimersByTimeAsync(32))
   expect(vi.getTimerCount()).toBe(0)
 })
 
@@ -53,6 +55,7 @@ it('aborts the actual fetch and clears its timer when leaving a loading route', 
   expect(fetcher).toHaveBeenCalledTimes(2)
   expect(vi.getTimerCount()).toBe(1)
   await act(async () => requests[1].resolve({ ok: true, json: async () => [] }))
+  await act(async () => vi.advanceTimersByTimeAsync(32))
   expect(vi.getTimerCount()).toBe(0)
   await act(async () => vi.advanceTimersByTimeAsync(1000))
   expect(screen.queryByRole('alert')).toBeNull()

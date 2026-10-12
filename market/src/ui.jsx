@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { rangeLabel } from './fixtures'
 
-export function Icon({ name }) { return <img className="icon" src={`/assets/icons/${name}.svg`} alt="" aria-hidden="true" /> }
+import Icon from './Icon'
+export { Icon }
 export function Cover({ quest }) {
   return <div className={`cover ${quest.tone}`} aria-hidden="true">
     <span className="cover-label">УЧЕБНАЯ ИСТОРИЯ</span><span className="orbit orbit-one" /><span className="orbit orbit-two" />

@@ -2,7 +2,7 @@ import { useContext, useLayoutEffect, useRef } from 'react'
 import { useLocation, useNavigationType } from 'react-router-dom'
 import { NavigationContext } from './navigationContext'
 
-export function usePagePosition(ready, title) {
+export function usePagePosition(ready, title, surface = 'учебная витрина') {
   const { key, pathname, hash, state } = useLocation()
   const action = useNavigationType()
   const history = useContext(NavigationContext)
@@ -10,7 +10,7 @@ export function usePagePosition(ready, title) {
   const lastEntry = useRef(null)
   useLayoutEffect(() => {
     if (!ready) return
-    document.title = `${title} — Квеста · учебная витрина`
+    document.title = `${title} — Квеста · ${surface}`
     const previous = history.current.get(state?.restoreKey || key)
     const frame = requestAnimationFrame(() => {
       if (hash && document.getElementById(hash.slice(1))) {
@@ -35,5 +35,5 @@ export function usePagePosition(ready, title) {
     window.addEventListener('scroll', save, { passive: true })
     document.addEventListener('focusin', save)
     return () => { cancelAnimationFrame(frame); window.removeEventListener('scroll', save); document.removeEventListener('focusin', save) }
-  }, [ready, key, pathname, hash, state, action, history, title])
+  }, [ready, key, pathname, hash, state, action, history, title, surface])
 }
