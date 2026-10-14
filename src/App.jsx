@@ -5,7 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AppToaster from './components/Toaster'
 import Navbar from './components/Navbar'
 import QuestWorkspaceNav from './components/QuestWorkspaceNav'
-import { getAppEntry, getLoginDestination } from './services/appNavigation'
+import { getAppEntry } from './services/appNavigation'
 import LazyRouteErrorBoundary from './components/LazyRouteErrorBoundary'
 import { selectAuthSession } from './services/authSession'
 import { isTransportError } from './services/network'
@@ -22,7 +22,7 @@ import ParticipantModeBar from './components/ParticipantModeBar'
 import { useAccountActivity } from './hooks/useAccountActivity'
 
 const ParticipantQuests = lazy(() => import('./pages/ParticipantQuests'))
-const Login = lazy(() => import('./pages/Login'))
+const Login = lazy(() => import('./components/LoginEntry'))
 const QuestList = lazy(() => import('./pages/QuestList'))
 const ShopPurchases = lazy(() => import('./pages/ShopPurchases'))
 const ShopCheckout = lazy(() => import('./pages/ShopCheckout'))
@@ -91,11 +91,6 @@ function Layout({ children, session }) {
       </main>
     </>
   )
-}
-
-function LoginRedirect({ session }) {
-  const location = useLocation()
-  return <Navigate to={getLoginDestination(location.state?.from, session.user.id)} replace />
 }
 
 function App() {
@@ -190,11 +185,7 @@ function App() {
         <Route
           path="/login"
           element={
-            session ? (
-              <LoginRedirect session={session} />
-            ) : (
-              <Login setSession={setSession} />
-            )
+            <Login session={session} setSession={setSession} />
           }
         />
         <Route

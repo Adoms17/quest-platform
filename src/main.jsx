@@ -2,9 +2,14 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { DIAGNOSTIC_PATH, diagnosticScope } from './diagnostics/shopOffDiagnostic'
+import { RECOVERY_PATH } from './services/passwordRecovery'
 
 const root = createRoot(document.getElementById('root'))
-if (window.location.pathname === DIAGNOSTIC_PATH) {
+if (window.location.pathname === RECOVERY_PATH) {
+  import('./recoveryEntry.jsx').then(({ default: RecoveryEntry }) => {
+    root.render(<StrictMode><RecoveryEntry /></StrictMode>)
+  })
+} else if (window.location.pathname === DIAGNOSTIC_PATH) {
   // Do not mount App: its account activity, organization reads and offline sync
   // are unrelated side effects. Disabled/production entry never imports SDK.
   window.addEventListener('hashchange', diagnosticScope.close)
