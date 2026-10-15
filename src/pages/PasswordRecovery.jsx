@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import AppBrand from '../components/AppBrand'
+import RecoveryMfa from '../components/RecoveryMfa'
 import { INVALID_RECOVERY, RECOVERY_LOGIN } from '../services/passwordRecovery'
 
 export default function PasswordRecovery({ recovery }) {
@@ -11,7 +12,12 @@ export default function PasswordRecovery({ recovery }) {
   const alive = useRef(false)
   useEffect(() => {
     alive.current = true
-    recovery.initialize().then(valid => { if (alive.current) setState(valid ? 'ready' : 'invalid') })
+    recovery.initialize().then(valid => {
+      if (!alive.current) return
+      const message = recovery.initializationError()
+      setError(valid ? '' : message)
+      setState(valid ? 'ready' : message === INVALID_RECOVERY ? 'invalid' : 'unknown')
+    })
     return () => { alive.current = false }
   }, [recovery])
 
@@ -29,7 +35,7 @@ export default function PasswordRecovery({ recovery }) {
       setPassword('')
       setConfirmation('')
       setError(result.error || '')
-      setState(result.terminal ? 'unknown' : result.error === INVALID_RECOVERY ? 'invalid' : result.error ? 'ready' : 'complete')
+      setState(result.mfa ? 'mfa' : result.terminal ? 'unknown' : result.error === INVALID_RECOVERY ? 'invalid' : result.error ? 'ready' : 'complete')
     }
     pending.current = false
   }
@@ -41,6 +47,9 @@ export default function PasswordRecovery({ recovery }) {
       {state === 'invalid' && <p role="alert">{INVALID_RECOVERY}</p>}
       {state === 'unknown' && <p role="alert">{error}</p>}
       {state === 'complete' && <p role="status">Пароль изменён. Войдите с новым паролем.</p>}
+      {state === 'mfa' && <RecoveryMfa recovery={recovery}
+        onVerified={() => { setError(''); setState('ready') }}
+        onTerminal={message => { setError(message); setState('unknown') }} />}
       {['ready', 'saving'].includes(state) && <form onSubmit={submit} className="mt-5 space-y-3">
         <label className="block">Новый пароль<input className="mt-1 w-full rounded-lg border p-3" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={event => setPassword(event.target.value)} /></label>
         <label className="block">Повторите пароль<input className="mt-1 w-full rounded-lg border p-3" type="password" autoComplete="new-password" required value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label>
