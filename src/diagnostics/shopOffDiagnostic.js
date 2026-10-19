@@ -1,9 +1,11 @@
-// Temporary diagnostic only. No credentials, order identities or persistence.
+// Temporary, single-use availability diagnostic. No credential inspection.
 export const DIAGNOSTIC_PATH = '/__stage/shop-off-diagnostic'
 export const STAGE_ORIGIN = 'https://stage.qvesta.ru'
 export const STAGE_BACKEND = 'https://jeugfyaqzfgdvfhdxfht.supabase.co'
 export const DEADLINE_MS = 15000
-const ENDPOINTS = ['shop-checkout', 'shop-reconcile']
+export const ORDER_ID = 'afa9d8ae-ccc2-4cd0-babd-9d3b440f60a1'
+const ENDPOINT = 'shop-checkout'
+const BODY = JSON.stringify({ orderId: ORDER_ID, action: 'availability' })
 
 export function diagnosticAllowed({ mode, flag, backend, origin, pathname, search = '', hash = '' }) {
   return mode === 'staging' && flag === 'true' && backend === STAGE_BACKEND
@@ -38,27 +40,43 @@ export function createDiagnosticClient(createClient, url, publicKey, fetcher, en
   })
 }
 
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
+const ERRORS = {
+  configuration_unavailable: [503, 'handler_off'],
+  origin_denied: [403, 'handler_origin'],
+  authentication_required: [401, 'handler_auth'],
+  invalid_request: [400, 'handler_request'],
+  invalid_order_id: [503, 'handler_context'],
+  storage_unavailable: [503, 'handler_context'],
+  contract_unavailable: [503, 'handler_context'],
+  receipt_unavailable: [503, 'handler_context'],
+  request_mismatch: [503, 'handler_context'],
+  request_unavailable: [503, 'handler_unknown'],
+}
+const GATEWAY = {
+  UNAUTHORIZED_NO_AUTH_HEADER: 'Missing authorization header',
+  UNAUTHORIZED_INVALID_JWT_FORMAT: 'Invalid JWT',
+}
+const empty = outcome => ({ status: null, code: 'UNKNOWN', layer: 'unknown', requestId: null, outcome })
+
 export function safeResult(status, payload, requestId) {
-  const result = { status: Number.isInteger(status) ? status : null, code: 'UNKNOWN', layer: 'unknown',
-    requestId: typeof requestId === 'string' && /^[a-f0-9-]{36}$/i.test(requestId) ? requestId : null }
+  const http = Number.isInteger(status) && status >= 200 && status <= 599 ? status : null
+  const result = { ...empty(http !== null && http >= 300 ? 'http_error' : 'invalid_response'),
+    status: http, requestId: typeof requestId === 'string' && UUID.test(requestId) ? requestId : null }
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return result
   const keys = Object.keys(payload).sort().join(',')
-  if (status === 503 && keys === 'error' && payload.error === 'configuration_unavailable') {
-    return { ...result, code: 'configuration_unavailable', layer: 'handler_off' }
+  if (http === 200 && keys === 'orderId,status' && payload.orderId === ORDER_ID && payload.status === 'available') {
+    return { ...result, code: 'available', layer: 'handler_available', outcome: 'unexpected_available_while_off' }
   }
-  if (status === 403 && keys === 'error' && payload.error === 'origin_denied') {
-    return { ...result, code: 'origin_denied', layer: 'handler_origin' }
+  if (keys === 'error' && Object.hasOwn(ERRORS, payload.error) && ERRORS[payload.error][0] === http) {
+    return { ...result, code: payload.error, layer: ERRORS[payload.error][1] }
   }
-  const gateway = {
-    UNAUTHORIZED_NO_AUTH_HEADER: 'Missing authorization header',
-    UNAUTHORIZED_INVALID_JWT_FORMAT: 'Invalid JWT',
-  }
-  if (status === 401 && keys === 'code,message' && Object.hasOwn(gateway, payload.code)
-    && payload.message === gateway[payload.code]) return { ...result, code: payload.code, layer: 'gateway_signature' }
+  if (http === 401 && keys === 'code,message' && Object.hasOwn(GATEWAY, payload.code)
+    && payload.message === GATEWAY[payload.code]) return { ...result, code: payload.code, layer: 'gateway_signature' }
   return result
 }
 
-async function boundedResult(response) {
+async function boundedResult(response, signal) {
   const id = response.headers.get('sb-request-id') || response.headers.get('x-request-id')
   if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
     void response.body?.cancel().catch(() => {})
@@ -66,11 +84,16 @@ async function boundedResult(response) {
   }
   const reader = response.body?.getReader()
   if (!reader) return safeResult(response.status, null, id)
-  let text = '', size = 0
-  const decoder = new TextDecoder()
+  let text = '', size = 0, abort
+  const decoder = new TextDecoder('utf-8', { fatal: true })
   try {
+    const interrupted = new Promise((_, reject) => {
+      abort = () => { void reader.cancel().catch(() => {}); reject(new Error('Stopped')) }
+      signal.addEventListener('abort', abort, { once: true })
+      if (signal.aborted) abort()
+    })
     while (true) {
-      const { value, done } = await reader.read()
+      const { value, done } = await Promise.race([reader.read(), interrupted])
       if (done) break
       size += value.byteLength
       if (size > 2048) { void reader.cancel().catch(() => {}); return safeResult(response.status, null, id) }
@@ -78,24 +101,43 @@ async function boundedResult(response) {
     }
     return safeResult(response.status, JSON.parse(text + decoder.decode()), id)
   } catch { return safeResult(response.status, null, id) }
-  finally { reader.releaseLock() }
+  finally { signal.removeEventListener('abort', abort); reader.releaseLock() }
 }
 
-// SDK supplies headers internally; this guard never reads or logs them. All
-// non-probe fetches (including auth refresh, RPC and storage) are blocked here.
+// SDK supplies headers internally. Never inspect credentials. Only one exact
+// availability body with the runner's abort signal can cross this fetch guard.
 export function createDiagnosticFetch(fetcher, environment, scope = createDiagnosticScope(environment)) {
-  let sent = 0
+  let sent = false
   return async (url, options = {}) => {
-    if (!scope.allowed() || !diagnosticAllowed(environment()) || sent >= 2 || options.signal?.aborted
-      || String(url) !== `${STAGE_BACKEND}/functions/v1/${ENDPOINTS[sent]}`
-      || options.method !== 'POST' || options.body !== '{}') throw new Error('Diagnostic transport closed')
-    sent += 1
-    const response = await fetcher(url, { ...options, redirect: 'error', credentials: 'omit', cache: 'no-store' })
-    const result = await boundedResult(response)
-    // Only a normalized safe record reaches SDK parsing or the UI. Even 2xx
-    // cannot expose an arbitrary response body or trigger the second request.
-    return new Response(JSON.stringify(result), { status: response.status, headers: { 'Content-Type': 'application/json' } })
+    if (!scope.allowed() || !diagnosticAllowed(environment()) || sent || !options.signal || options.signal.aborted
+      || String(url) !== `${STAGE_BACKEND}/functions/v1/${ENDPOINT}`
+      || options.method !== 'POST' || options.body !== BODY) throw new Error('Diagnostic transport closed')
+    sent = true // Consumed before transport, including network errors.
+    let result
+    try {
+      const response = await fetcher(url, { ...options, redirect: 'error', credentials: 'omit', cache: 'no-store' })
+      result = await boundedResult(response, options.signal)
+    } catch { result = empty('network_error') }
+    // Internal SDK envelope, not the remote status: only result.status is shown.
+    // Raw bodies and headers never reach the SDK or UI.
+    return new Response(JSON.stringify(result), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
+}
+
+function normalizedResult(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return empty('invalid_response')
+  const status = Number.isInteger(value.status) && value.status >= 200 && value.status <= 599 ? value.status : null
+  const requestId = typeof value.requestId === 'string' && UUID.test(value.requestId) ? value.requestId : null
+  let row = { ...empty(status !== null && status >= 300 ? 'http_error' : 'invalid_response'), status, requestId }
+  if (status === null && value.outcome === 'network_error') return empty('network_error')
+  if (Object.hasOwn(ERRORS, value.code) && ERRORS[value.code][0] === status) {
+    row = { ...row, code: value.code, layer: ERRORS[value.code][1] }
+  } else if (status === 401 && Object.hasOwn(GATEWAY, value.code)) {
+    row = { ...row, code: value.code, layer: 'gateway_signature' }
+  } else if (status === 200 && value.code === 'available' && value.outcome === 'unexpected_available_while_off') {
+    row = { ...row, code: 'available', layer: 'handler_available', outcome: 'unexpected_available_while_off' }
+  }
+  return row
 }
 
 export function createDiagnosticRun() {
@@ -104,34 +146,26 @@ export function createDiagnosticRun() {
     used: () => used,
     async run({ invoke, environment, signal, onResult }) {
       if (used || signal.aborted || !diagnosticAllowed(environment())) return
-      used = true // Survives component remount; never unlock on errors/unmount.
-      for (const endpoint of ENDPOINTS) {
-        if (signal.aborted || !diagnosticAllowed(environment())) break
-        const controller = new AbortController()
-        let timer, cancel
-        let row = { status: null, code: 'UNKNOWN', layer: 'unknown', requestId: null }
-        try {
-          const interrupted = new Promise((_, reject) => {
-            cancel = () => { controller.abort(); reject(new Error('Diagnostic stopped')) }
-            signal.addEventListener('abort', cancel, { once: true })
-            timer = setTimeout(cancel, DEADLINE_MS)
-          })
-          const read = async () => {
-            const value = await invoke(endpoint, { method: 'POST', body: {}, signal: controller.signal })
-            return value.response ? await value.response.json() : null
-          }
-          const value = await Promise.race([read(), interrupted])
-          if (value && ['UNKNOWN', 'configuration_unavailable', 'origin_denied',
-            'UNAUTHORIZED_NO_AUTH_HEADER', 'UNAUTHORIZED_INVALID_JWT_FORMAT'].includes(value.code)) {
-            row = { status: Number.isInteger(value.status) ? value.status : null, code: value.code,
-              layer: ['unknown', 'handler_off', 'handler_origin', 'gateway_signature'].includes(value.layer) ? value.layer : 'unknown',
-              requestId: typeof value.requestId === 'string' && /^[a-f0-9-]{36}$/i.test(value.requestId) ? value.requestId : null }
-          }
-        } catch { /* Never surface SDK error/context, credentials or raw payload. */ }
-        finally { clearTimeout(timer); signal.removeEventListener('abort', cancel) }
-        if (signal.aborted) break
-        onResult({ endpoint, ...row })
-        if (row.status !== 503 || row.code !== 'configuration_unavailable' || row.layer !== 'handler_off') break
+      used = true // Shared across double clicks and remounts in this document.
+      const started = performance.now(), controller = new AbortController()
+      let timer, cancel, row = empty('client_error')
+      try {
+        const interrupted = new Promise(resolve => {
+          cancel = () => { resolve(empty('canceled')); controller.abort() }
+          signal.addEventListener('abort', cancel, { once: true })
+          timer = setTimeout(() => { resolve(empty('timeout')); controller.abort() }, DEADLINE_MS)
+        })
+        const read = async () => {
+          const value = await invoke(ENDPOINT, { method: 'POST', body: { orderId: ORDER_ID, action: 'availability' }, signal: controller.signal })
+          // Fetch guard supplies a sanitized envelope. A pre-fetch SDK/auth
+          // failure has no established HTTP or network outcome.
+          return value?.error ? empty('client_error') : normalizedResult(value?.data)
+        }
+        row = await Promise.race([read(), interrupted])
+      } catch { /* Never expose SDK errors, context or payload. */ }
+      finally { clearTimeout(timer); signal.removeEventListener('abort', cancel); controller.abort() }
+      if (!signal.aborted && diagnosticAllowed(environment())) {
+        onResult({ endpoint: ENDPOINT, stage: 'availability', ...row, durationMs: Math.max(0, Math.round(performance.now() - started)) })
       }
     },
   }
