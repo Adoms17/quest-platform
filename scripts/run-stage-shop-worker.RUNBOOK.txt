@@ -1,0 +1,94 @@
+Manual staging SHOP worker runner
+
+Workflow .github/workflows/shop-worker-manual.yml is manual-only; publication does not invoke it. No deployment, secret provisioning, invocation or scheduler is performed by the runner.
+Do not run the CLI against stage until publication, existing secure credential
+injection and the exact worker invocation scope are separately approved.
+
+Reuse: tariff runner fixed endpoint, one fetch POST, redirect:error, timeout and
+counter-only output conventions. Separate SHOP endpoint/auth/summary, no tariff
+refund/subscription runner reuse or modification. Requires installed Node with
+fetch/Web Streams; no new dependencies. No dotenv or credentials on command line.
+
+Future invocation: node scripts/run-stage-shop-worker.mjs (no arguments).
+Approved protected manual workflow must supply through environment:
+SHOP_RUN_ENVIRONMENT=staging; SUPABASE_PROJECT_ID=jeugfyaqzfgdvfhdxfht;
+SHOP_APPROVED_SHA=reviewed exact 40-character commit SHA;
+SHOP_PREFLIGHT_ACK=exclusive-staging-global-consumer.
+GitHub-provided context must be Adoms17/quest-platform, refs/heads/staging,
+workflow_dispatch, GITHUB_RUN_ATTEMPT=1, numeric GITHUB_RUN_ID and the same GITHUB_SHA.
+Workflow checkout must pin that SHA; variables alone do not authenticate the caller.
+Do not manually fabricate context to bypass guards. The workflow uses shop-staging-manual, an
+approved protected environment, contents:read, exclusive concurrency and no schedule.
+
+Separate future injected secrets: SHOP_GATEWAY_JWT (gateway-accepted JWT) and
+SHOP_RECONCILIATION_WORKER_TOKEN (64 lowercase hex, matching Supabase token).
+No real values have been obtained or configured. JWT syntax check is NOT signature,
+expiry or project verification; unchanged staging gateway must validate the token.
+Never log env, request headers or raw response. Do not use tariff worker token as
+an assumed substitute, disable JWT, or use production credentials.
+
+Before authorized use: fresh read-only project/revision/config/ledger inventory,
+confirm all eligible orders/facts/unfinished fulfillment across the project belong
+to the approved scope; sole operator, no concurrent schedule/UI recovery/writer.
+SHOP_PAYMENT_ENABLED=false, offer OFF; SHOP_PAYMENT_CONFIGURATION_APPROVED=true
+and SHOP_RECONCILIATION_ENABLED=true only under the separate window approval.
+No flags are changed by this CLI. The acknowledgment is operator attestation,
+not an automated DB check or a lock. If inventory/concurrency cannot be established,
+do not invoke. Preserve existing order/attempt/provider ID and all dirty work.
+
+One CLI execution sends at most ONE POST to the fixed SHOP worker endpoint.
+No redirects, retries, configurable URLs, order argument or automatic polling.
+Worker limit5 is server-owned; its consumer is GLOBAL before/after processing.
+This runner does NOT implement single-order isolation or durable exactly-once
+dispatch. Attempt=1 blocks GitHub rerun, not a fresh dispatch/new process. A future
+workflow/operator must prevent a second invocation without a new bounded decision.
+
+Deadline135s covers fetch and body consumption (worker nominal deadline120s).
+Response body maximum8192 bytes, JSON status200 and safe nonnegative integer
+counter whitelist. Unknown extra fields are never emitted. Result observed means
+only a validated invocation summary, NOT successful payment/order delivery.
+Attention (pending/deferred/missing ID/failure/lost lease) exits1; read current state,
+do not automatically rerun. Verify order-specific terminal state/counts separately.
+No payment/provider create is performed by the runner; worker may make provider GETs
+and commit facts/fulfillment when separately invoked.
+
+Errors emit only stopped plus a fixed code. configuration_rejected: no dispatch.
+worker_http_rejected, worker_response_rejected or worker_outcome_unknown: once
+dispatch began, committed effects remain possible; never infer failure rollback.
+Abort/timeout/flag OFF cannot cancel server work already running. Take read-only
+postcheck first, preserve IDs/key/body; no retry, new payment/order, lease rewrite,
+refund or direct service-RPC fallback. Missing payment ID stays manual attention.
+After terminal execution restore RECONCILIATION_ENABLED=false and APPROVED=false
+under the approved containment plan, PAYMENT_ENABLED remains false. If execution
+is uncertain, record uncertainty and unfinished obligations; OFF pauses recovery.
+
+Offline validation uses synthetic env and injected fake fetch only, existing Node
+network-denial preload, isolated Vitest envDir:false and writable external cache.
+No source change to handler/worker/SQL; no reason to rerun the prior112 availability
+matrix. Relevant regression is the unchanged tariff runner plus SHOP worker tests.
+Remaining gates: reviewed publication/workflow definition, verified secure caller
+injection, fresh staging inventory and explicit invocation/payment approval.
+
+Protected workflow approval:
+The job references shop-staging-manual. Reviewer Adoms17, only staging branch and
+administrator bypass disabled were reported verified before publication. The two
+secret names were reported present; values and gateway usability were not inspected.
+YAML alone does not create or verify these environment protections.
+Set protected environment variables SHOP_APPROVED_SHA (the reviewed published SHA),
+SHOP_APPROVED_RUNNER_SHA256 (lowercase digest) and SHOP_APPROVED_RUN_ID (the exact
+waiting run ID) only under separate execution authorization. Empty/mismatched
+values stop before checkout or worker credentials are injected. Review fresh
+project-wide inventory before approving that specific waiting run. Never authorize
+an unnoticed queued duplicate by updating the run ID blindly.
+GitHub workflow-level concurrency serializes cooperating runs, not external writers.
+The approved-run-ID equality denies other dispatch IDs; it is not a durable ledger
+of one-use authorization. GITHUB_RUN_ATTEMPT=1 independently rejects reruns.
+The workflow pins checkout/setup-node commits and checkout github.sha; verifies
+approved SHA and runner bytes; installs no project dependencies. Credentials are
+injected only into the final step, with NODE_OPTIONS cleared and TLS verification on.
+GITHUB_TOKEN needs contents:read only. The gateway JWT should be the least-privileged
+existing staging JWT accepted by the gateway; no service_role privilege is needed
+by this CLI itself. Signature/project/expiry acceptance must be proven separately.
+No SUPABASE_ACCESS_TOKEN, DB password, merchant key or GitHub PAT is required here.
+Dispatch discovery may require the workflow on the repository default branch.
+This staging-only publication does not authorize a main merge or any worker run.

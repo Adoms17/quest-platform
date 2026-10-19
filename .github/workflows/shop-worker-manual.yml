@@ -1,0 +1,77 @@
+{
+  "name": "Manual staging SHOP worker",
+  "on": {
+    "workflow_dispatch": {}
+  },
+  "permissions": {
+    "contents": "read"
+  },
+  "concurrency": {
+    "group": "supabase-staging",
+    "cancel-in-progress": false
+  },
+  "jobs": {
+    "invoke": {
+      "if": "${{ github.repository == 'Adoms17/quest-platform' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/staging' && github.run_attempt == 1 }}",
+      "runs-on": "ubuntu-latest",
+      "timeout-minutes": 8,
+      "environment": "shop-staging-manual",
+      "steps": [
+        {
+          "name": "Check protected approval before checkout or credential injection",
+          "shell": "bash",
+          "env": {
+            "APPROVED_SHA": "${{ vars.SHOP_APPROVED_SHA }}",
+            "APPROVED_RUN_ID": "${{ vars.SHOP_APPROVED_RUN_ID }}",
+            "APPROVED_RUNNER_HASH": "${{ vars.SHOP_APPROVED_RUNNER_SHA256 }}"
+          },
+          "run": "set -euo pipefail\n[[ \"$GITHUB_REPOSITORY\" == Adoms17/quest-platform ]]\n[[ \"$GITHUB_EVENT_NAME\" == workflow_dispatch ]]\n[[ \"$GITHUB_REF\" == refs/heads/staging ]]\n[[ \"$GITHUB_RUN_ATTEMPT\" == 1 ]]\n[[ \"$APPROVED_SHA\" =~ ^[a-f0-9]{40}$ ]]\n[[ \"$GITHUB_SHA\" == \"$APPROVED_SHA\" ]]\n[[ \"$APPROVED_RUN_ID\" =~ ^[1-9][0-9]*$ ]]\n[[ \"$GITHUB_RUN_ID\" == \"$APPROVED_RUN_ID\" ]]\n[[ \"$APPROVED_RUNNER_HASH\" =~ ^[a-f0-9]{64}$ ]]"
+        },
+        {
+          "name": "Checkout approved immutable SHA",
+          "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "with": {
+            "ref": "${{ github.sha }}",
+            "persist-credentials": false,
+            "fetch-depth": 1,
+            "submodules": false,
+            "lfs": false
+          }
+        },
+        {
+          "name": "Set up Node without dependencies or lifecycle scripts",
+          "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+          "with": {
+            "node-version": "22.x",
+            "package-manager-cache": false
+          }
+        },
+        {
+          "name": "Verify reviewed runner bytes",
+          "shell": "bash",
+          "env": {
+            "APPROVED_RUNNER_HASH": "${{ vars.SHOP_APPROVED_RUNNER_SHA256 }}"
+          },
+          "run": "set -euo pipefail\n[[ \"$(git rev-parse HEAD)\" == \"$GITHUB_SHA\" ]]\n[[ -f scripts/run-stage-shop-worker.mjs && ! -L scripts/run-stage-shop-worker.mjs ]]\n[[ \"$APPROVED_RUNNER_HASH\" =~ ^[a-f0-9]{64}$ ]]\nprintf '%s  scripts/run-stage-shop-worker.mjs\\n' \"$APPROVED_RUNNER_HASH\" | sha256sum --check --status"
+        },
+        {
+          "name": "One SHOP worker POST; no automatic retry",
+          "shell": "bash",
+          "timeout-minutes": 3,
+          "env": {
+            "SHOP_RUN_ENVIRONMENT": "staging",
+            "SUPABASE_PROJECT_ID": "jeugfyaqzfgdvfhdxfht",
+            "SHOP_APPROVED_SHA": "${{ vars.SHOP_APPROVED_SHA }}",
+            "SHOP_PREFLIGHT_ACK": "exclusive-staging-global-consumer",
+            "SHOP_GATEWAY_JWT": "${{ secrets.SHOP_GATEWAY_JWT }}",
+            "SHOP_RECONCILIATION_WORKER_TOKEN": "${{ secrets.SHOP_RECONCILIATION_WORKER_TOKEN }}",
+            "NODE_OPTIONS": "",
+            "NODE_EXTRA_CA_CERTS": "",
+            "NODE_TLS_REJECT_UNAUTHORIZED": "1"
+          },
+          "run": "set -euo pipefail\nexec node scripts/run-stage-shop-worker.mjs"
+        }
+      ]
+    }
+  }
+}
