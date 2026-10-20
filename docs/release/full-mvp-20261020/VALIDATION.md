@@ -34,3 +34,18 @@ a future run has passed.
 Software-engineering skill was not present in the available skill catalog/local
 plugin directories; repository AGENTS instructions were read. The existing dirty
 PR182 documentation checkout was preserved. Work uses a separate clone/branch.
+
+## First Draft CI and Website dependency correction
+
+First published head: `3d7cd571a0c91dcee6ece6260dcb245714b882f3`.
+Market CI 39473312070 passed. Admin frontend job passed, but isolated Auth/browser
+job 118802728023 failed while loading the login form, before filling credentials.
+The root cause is not established; this is an open CI blocker, not a B17 result.
+Website CI 39473312123 failed audit for source-map-js 1.2.1. The separate Website
+lock now pins 1.2.2; no application source or security check was weakened.
+Local Website audit reports zero vulnerabilities; production/staging builds and
+build-link verification, four Sites tests and two tariff catalog tests pass.
+The initial sandboxed build could not read the Vite config path; the authorized
+local build outside that filesystem restriction passed. No deployment occurred.
+See SHOP-PROVENANCE.md for separately located source-review inputs; they are not
+part of the integrated runtime tree.
