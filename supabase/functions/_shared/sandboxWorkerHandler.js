@@ -1,6 +1,11 @@
 // Независимый от Supabase JWT секрет только для запуска sandbox-worker.
 // Генерируется из 32 случайных байт в hex; не передаётся во frontend.
-export function createSandboxWorkerHandler({ token, enabled = false, run }) {
+export function createSandboxWorkerHandler({ token, enabled = false, run, diagnostics = false }) {
+  // Opt-in only. Runtime attaches execution/deployment metadata; no request data.
+  const report = event => {
+    if (diagnostics !== true) return
+    try { console.info(event) } catch { /* Diagnostics must never affect responses. */ }
+  }
   return async request => {
     const headers = { 'Cache-Control': 'no-store' }
     const reply = status => new Response(null, { status, headers })
@@ -12,8 +17,14 @@ export function createSandboxWorkerHandler({ token, enabled = false, run }) {
     let difference = 0
     for (let i = 0; i < expected.length; i++) difference |= expected[i] ^ actual[i]
     if (difference !== 0) return reply(401)
-    if (!enabled) return reply(503)
+    if (!enabled) {
+      report('SHOP_WORKER_AUTHENTICATED_OFF_V1')
+      return reply(503)
+    }
     try { return Response.json(await run(), { headers }) }
-    catch { return reply(503) }
+    catch {
+      report('SHOP_WORKER_RUN_FAILED_V1')
+      return reply(503)
+    }
   }
 }

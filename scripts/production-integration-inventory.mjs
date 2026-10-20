@@ -61,7 +61,7 @@ export function inventory() {
     const entry = `supabase/functions/${name}/index.ts`
     const section = cfg.match(new RegExp(`\\[functions\\.${name}\\]([\\s\\S]*?)(?=\\n\\[|$)`))?.[1]
     return {
-      name, entry, source: sources.staging, ...closure(entry),
+      name, entry, entrySource: name.startsWith('shop-') ? 'reviewed-source-import-not-in-pinned-git-refs' : sources.staging, ...closure(entry),
       declaredVerifyJwt: section?.match(/verify_jwt\s*=\s*(true|false)/)?.[1] ?? 'not-explicit-in-config',
       productionDisposition: name === 'redeem-quest-code'
         ? 'existing-production-function-replacement-not-authorized'
@@ -89,9 +89,7 @@ export function inventory() {
       disposition: path.includes('/fixtures/') ? 'test-fixture-NOT-production-migration' : 'HOLD-production-specific-review',
     })),
     functions,
-    deployedStageFunctionsWithoutSourceInPinnedBundle: [
-      'shop-checkout', 'shop-reconcile', 'shop-reconciliation-worker',
-    ],
+    deployedStageFunctionsWithoutSourceInIntegrationBundle: [],
     frontendDependencies: Object.fromEntries([
       ['App', 'src/main.jsx'], ['Admin', 'admin/src/main.jsx'],
       ['Website', 'website/src/main.jsx'], ['Market', 'market/src/main.jsx'],
@@ -106,7 +104,7 @@ export function inventory() {
       'Read back versions and OFF state; commercial activation remains separately gated.',
     ],
     blockers: [
-      'SHOP Edge source bundle provenance is absent from the three pinned Git refs.',
+      'SHOP sources are included; production contract and deployment approval remain separate.',
       '228 historical migrations require production classification; do not run blanket db push.',
       'Production Edge contracts, RPC/ACL dependency graph and exact apply order are not approved.',
       'Production Admin/Market hosting and configuration are not provisioned or attested.',

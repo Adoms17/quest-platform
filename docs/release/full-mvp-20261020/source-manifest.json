@@ -2035,7 +2035,7 @@
     {
       "name": "admin-fiscal-acceptance-prepare",
       "entry": "supabase/functions/admin-fiscal-acceptance-prepare/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/fiscalAcceptanceEndpoint.js",
@@ -2061,7 +2061,7 @@
     {
       "name": "admin-sandbox-refund",
       "entry": "supabase/functions/admin-sandbox-refund/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/platformRefundEndpoint.js",
@@ -2123,7 +2123,7 @@
     {
       "name": "admin-subscription-fiscal-refund",
       "entry": "supabase/functions/admin-subscription-fiscal-refund/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/sandboxRefundIdentity.js",
@@ -2181,7 +2181,7 @@
     {
       "name": "admin-subscription-refund",
       "entry": "supabase/functions/admin-subscription-refund/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/refundReceiptTransport.js",
@@ -2239,7 +2239,7 @@
     {
       "name": "admin-subscription-refund-prepare",
       "entry": "supabase/functions/admin-subscription-refund-prepare/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/refundReceiptTransport.js",
@@ -2301,7 +2301,7 @@
     {
       "name": "participant-avatar",
       "entry": "supabase/functions/participant-avatar/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/participantAvatarEndpoint.js",
@@ -2327,7 +2327,7 @@
     {
       "name": "redeem-quest-code",
       "entry": "supabase/functions/redeem-quest-code/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/cors.ts",
@@ -2349,7 +2349,7 @@
     {
       "name": "sandbox-checkout",
       "entry": "supabase/functions/sandbox-checkout/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/receiptCheckout.js",
@@ -2407,7 +2407,7 @@
     {
       "name": "sandbox-reconcile",
       "entry": "supabase/functions/sandbox-reconcile/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/prepaymentSettlementFlow.js",
@@ -2443,7 +2443,7 @@
         },
         {
           "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
-          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+          "sha256": "c879a54e2d94d6b544f3a14fbd1e7deb76a9024a0899b3b148eed6523e8164b4"
         },
         {
           "path": "supabase/functions/_shared/settlementHttp.js",
@@ -2501,7 +2501,7 @@
     {
       "name": "sandbox-reconcile-order",
       "entry": "supabase/functions/sandbox-reconcile-order/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/receiptPaymentTransport.js",
@@ -2525,7 +2525,7 @@
         },
         {
           "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
-          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+          "sha256": "c879a54e2d94d6b544f3a14fbd1e7deb76a9024a0899b3b148eed6523e8164b4"
         },
         {
           "path": "supabase/functions/_shared/settlementHttp.js",
@@ -2563,7 +2563,7 @@
     {
       "name": "sandbox-recurring",
       "entry": "supabase/functions/sandbox-recurring/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/receiptPaymentTransport.js",
@@ -2587,7 +2587,7 @@
         },
         {
           "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
-          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+          "sha256": "c879a54e2d94d6b544f3a14fbd1e7deb76a9024a0899b3b148eed6523e8164b4"
         },
         {
           "path": "supabase/functions/_shared/settlementHttp.js",
@@ -2625,11 +2625,11 @@
     {
       "name": "sandbox-subscription-fiscal-order",
       "entry": "supabase/functions/sandbox-subscription-fiscal-order/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
-          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+          "sha256": "c879a54e2d94d6b544f3a14fbd1e7deb76a9024a0899b3b148eed6523e8164b4"
         },
         {
           "path": "supabase/functions/_shared/settlementHttp.js",
@@ -2679,7 +2679,7 @@
     {
       "name": "sandbox-subscription-settlement-order",
       "entry": "supabase/functions/sandbox-subscription-settlement-order/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/prepaymentSettlementFlow.js",
@@ -2691,7 +2691,7 @@
         },
         {
           "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
-          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+          "sha256": "c879a54e2d94d6b544f3a14fbd1e7deb76a9024a0899b3b148eed6523e8164b4"
         },
         {
           "path": "supabase/functions/_shared/settlementHttp.js",
@@ -2735,9 +2735,99 @@
       "productionDisposition": "HOLD-production-contract-and-binding"
     },
     {
+      "name": "shop-checkout",
+      "entry": "supabase/functions/shop-checkout/index.ts",
+      "entrySource": "reviewed-source-import-not-in-pinned-git-refs",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/shopPaymentAdapter.js",
+          "sha256": "e99dfe97b9ed5098b9c8af1b55578ebd7f88e5c4377a4f4e6dd7b18f89b81ab3"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaHttpRequest.js",
+          "sha256": "9bbcf178052729c81f430dfea10e2361ece6a72b40e29e16c55e2d7aee218572"
+        },
+        {
+          "path": "supabase/functions/shop-checkout/index.ts",
+          "sha256": "e18fc96e06f4c54715d83e2359df1e81536ddcd1cc392a7cd0929752c3ae29ba"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "not-explicit-in-config",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "shop-reconcile",
+      "entry": "supabase/functions/shop-reconcile/index.ts",
+      "entrySource": "reviewed-source-import-not-in-pinned-git-refs",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/shopPaymentAdapter.js",
+          "sha256": "e99dfe97b9ed5098b9c8af1b55578ebd7f88e5c4377a4f4e6dd7b18f89b81ab3"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaHttpRequest.js",
+          "sha256": "9bbcf178052729c81f430dfea10e2361ece6a72b40e29e16c55e2d7aee218572"
+        },
+        {
+          "path": "supabase/functions/shop-reconcile/index.ts",
+          "sha256": "198619d251f22413ee07b7d02e394baf93f6174dffb9fd597d25c3a517851490"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "not-explicit-in-config",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "shop-reconciliation-worker",
+      "entry": "supabase/functions/shop-reconciliation-worker/index.ts",
+      "entrySource": "reviewed-source-import-not-in-pinned-git-refs",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
+          "sha256": "c879a54e2d94d6b544f3a14fbd1e7deb76a9024a0899b3b148eed6523e8164b4"
+        },
+        {
+          "path": "supabase/functions/_shared/shopOrderConsumer.js",
+          "sha256": "71a46b20fdb01c0896a17fa4bfebcc065ce428f0333e00d56cde9dfcff8cf7fd"
+        },
+        {
+          "path": "supabase/functions/_shared/shopPaymentAdapter.js",
+          "sha256": "e99dfe97b9ed5098b9c8af1b55578ebd7f88e5c4377a4f4e6dd7b18f89b81ab3"
+        },
+        {
+          "path": "supabase/functions/_shared/shopReconciliationWorker.js",
+          "sha256": "07369b4c169b31cd1fe1ee45691afcdf5918c81c6ec39a77dd64239dfeb34e85"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaHttpRequest.js",
+          "sha256": "9bbcf178052729c81f430dfea10e2361ece6a72b40e29e16c55e2d7aee218572"
+        },
+        {
+          "path": "supabase/functions/shop-reconciliation-worker/index.ts",
+          "sha256": "ab2525908607f0ccd0902cc9546a4a9767815887b8ff22967e4b46245968f3d7"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "not-explicit-in-config",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
       "name": "yookassa-sandbox-webhook",
       "entry": "supabase/functions/yookassa-sandbox-webhook/index.ts",
-      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "entrySource": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
       "files": [
         {
           "path": "supabase/functions/_shared/sandboxReconciliation.js",
@@ -2785,11 +2875,7 @@
       "productionDisposition": "HOLD-production-contract-and-binding"
     }
   ],
-  "deployedStageFunctionsWithoutSourceInPinnedBundle": [
-    "shop-checkout",
-    "shop-reconcile",
-    "shop-reconciliation-worker"
-  ],
+  "deployedStageFunctionsWithoutSourceInIntegrationBundle": [],
   "frontendDependencies": {
     "App": {
       "files": [
@@ -4044,7 +4130,7 @@
     "Read back versions and OFF state; commercial activation remains separately gated."
   ],
   "blockers": [
-    "SHOP Edge source bundle provenance is absent from the three pinned Git refs.",
+    "SHOP sources are included; production contract and deployment approval remain separate.",
     "228 historical migrations require production classification; do not run blanket db push.",
     "Production Edge contracts, RPC/ACL dependency graph and exact apply order are not approved.",
     "Production Admin/Market hosting and configuration are not provisioned or attested.",
