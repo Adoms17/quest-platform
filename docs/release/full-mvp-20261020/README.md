@@ -4,6 +4,9 @@
 [полный реестр](MIGRATION-REGISTER.md), [проверенный source-состав SHOP](SHOP-SOURCE-REVIEW.md).
 Все миграции остаются HOLD; runtime и production-конфигурация не изменены.
 
+[Конкретная production mapping-матрица 29 файлов](PRODUCTION-DATA-MAPPING.md)
+уточняет уже утверждённые цены, transition, seed permissions и stage scheduler.
+
 Status: **DRAFT / NOT DEPLOYABLE / no production GO**. Prepared 2026-10-20.
 Scope includes all implemented App, Admin, Website and Market/SHOP capabilities.
 This package does not activate sales, provision resources, configure credentials,
