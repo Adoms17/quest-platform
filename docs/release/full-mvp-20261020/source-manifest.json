@@ -1,0 +1,4055 @@
+{
+  "schemaVersion": 1,
+  "status": "review-only-not-deployable",
+  "deployable": false,
+  "sources": {
+    "main": "1621969901c7269581ae6dd9cd88a85f41519faa",
+    "staging": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+    "market": "220ce8bd660ef860c29500775cbd4fc911010a28"
+  },
+  "releaseCommit": null,
+  "hashNormalization": "utf8-lf",
+  "scope": "all implemented MVP components; no feature exclusions",
+  "productionLedger": {
+    "project": "szjiwamevblkpjmmeonf",
+    "observedDate": "2026-10-20",
+    "source": "Supabase list_migrations read-only connector",
+    "count": 99,
+    "lastVersion": "20260914210000",
+    "versionSetEvidence": {
+      "path": "docs/tasks/PROD-PAY-05-production-history-20261001.json",
+      "sha256": "dc731ad983bca5a94db4dd282eeb09e0385fe774573f61a7ae6fbe338acaeeb0",
+      "exactSetReconfirmedOn": "2026-10-20"
+    },
+    "regenerationRefreshesRemoteEvidence": false,
+    "currentSqlContentsVerified": false,
+    "currentCatalogVerified": false
+  },
+  "migrations": [
+    {
+      "path": "supabase/migrations/20260819230000_baseline.sql",
+      "version": "20260819230000",
+      "sha256": "e5a3d2e5ca6ac26e9375bf25ff71f843e6fa3686370ab32d74a5b76354dcee29",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260823130000_add_task_attempt_idempotency.sql",
+      "version": "20260823130000",
+      "sha256": "48ad585abcb9180567d85091d4b4b05edc277b6e77aae4326b0f2eab2e38ec90",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260823150000_enforce_task_attempt_quest_match.sql",
+      "version": "20260823150000",
+      "sha256": "379ef88a39ca18b3fac751da9e00457865fc197033bab4543d859bf780bfd898",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260823160000_harden_profile_privacy.sql",
+      "version": "20260823160000",
+      "sha256": "deb1b7ca2ee3c59f948e063c1e313cd7cd61277c0e55fcfab65b75d863d8bf7d",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260823170000_add_server_verification_rpc.sql",
+      "version": "20260823170000",
+      "sha256": "e5f36a4e4e4095ac1c1af46d80dc21a4fde80a6a451df76cd4963c6484e78403",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260824010000_enforce_rpc_only_participant_writes.sql",
+      "version": "20260824010000",
+      "sha256": "12865b7b0c3fc3421ef3487aa96209086917a4e35d87cfc6909bf1b9dc68d9ac",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260824020000_add_hybrid_task_verifiers.sql",
+      "version": "20260824020000",
+      "sha256": "da2f7ae71955e1342ff0fc67213ca2090321612e48a1585e00266a4dc967190a",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260829010000_enforce_gps_verification_location.sql",
+      "version": "20260829010000",
+      "sha256": "8666bc55fc6c3d7493ae2c8e6ee89db93a4983f06fa62754b5eadf0b5886b7d3",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260831010000_add_timing_confidence.sql",
+      "version": "20260831010000",
+      "sha256": "7481e1cb526286460036ca1f6217da7a51fb21742f14eb13bb047def86019214",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260831020000_add_task_event_receipts_rpc.sql",
+      "version": "20260831020000",
+      "sha256": "c8e951c8f63d838bc097e7056fd5c3e5d292e42ec4669a4ed8409d91164fd282",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260831030000_add_attempt_state_to_event_receipts.sql",
+      "version": "20260831030000",
+      "sha256": "0349e9197027f170dc48a0fd118d823e86c532f769f50906b8c1b113dfa810b9",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260831040000_remove_legacy_attempts.sql",
+      "version": "20260831040000",
+      "sha256": "f6ae86afdbc91ed0affc840a0aa9bc09aac4af15500ec54cf7091eeaefff8415",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260906010000_add_verification_match_policy.sql",
+      "version": "20260906010000",
+      "sha256": "9ac046965d1560f10f1e708f187e3d7e6faff1016fd1b97ae269ea17bf8f519e",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907010000_add_organization_access_foundation.sql",
+      "version": "20260907010000",
+      "sha256": "c9fa1e87bc2d76f5eb8b89b718898ccd75ea7569a4ba3013b99aa12ecea7f213",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907011000_fix_personal_organization_provisioning.sql",
+      "version": "20260907011000",
+      "sha256": "f3ea0ba585855a13365d4157b6ca5106baed43a56efc441b7b66aab5b2d52706",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907020000_enforce_organization_permissions.sql",
+      "version": "20260907020000",
+      "sha256": "6ba66c589220c7088321db71dd912efe4ddd09409258178163175ebcb524faeb",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907030000_add_organization_team_management.sql",
+      "version": "20260907030000",
+      "sha256": "88477ee2375ac046892041ec343691969ea17496d9acd3a520aa1b5ae23c3dba",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907040000_add_organization_team_queries.sql",
+      "version": "20260907040000",
+      "sha256": "15f7ec6a936c28fa661d1647d7546580bc75e78fda0efc27ad0d5f1039f436e5",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907050000_restrict_team_management_to_organization_admins.sql",
+      "version": "20260907050000",
+      "sha256": "036eec60f37a109632475daf646409b942f1d8a053cdda43a135927736ba087b",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907060000_add_quest_access_grants.sql",
+      "version": "20260907060000",
+      "sha256": "e6e45002dab0fec2ac0a06fa8ab8f0fdd874174b9f3943ae345fde9dd49d0c38",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907070000_harden_quest_access_grants.sql",
+      "version": "20260907070000",
+      "sha256": "34df92fcb74d590aa98420aa133fc34df6ceff62e46c3e27fd4e386cc6f3e01e",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907080000_audit_quest_access_credential_revocation.sql",
+      "version": "20260907080000",
+      "sha256": "572387fcd6b0fdf2241a30f140b16c4dc1d7b5b3fb245bddeaab76be4457fe25",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907090000_add_quest_access_queries.sql",
+      "version": "20260907090000",
+      "sha256": "8dd8a6add938bce2114567a811842bdb8106bc5c9851142e0e011152964f99e6",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907100000_enforce_participant_grants.sql",
+      "version": "20260907100000",
+      "sha256": "cf20756f3db7a086ace254764d2c3694579a93344682e383b20f77368408c252",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907110000_add_quest_entry_status.sql",
+      "version": "20260907110000",
+      "sha256": "f97dbfb812135c1d52ef26992bd4517410767ce05d11cfefbefc4229977e0522",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907120000_add_quest_access_preview.sql",
+      "version": "20260907120000",
+      "sha256": "5f194492fccbfd4e16c052255dcc63530817d44e2b4df4143e04fca2e47649b7",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907130000_add_rate_limited_quest_access_codes.sql",
+      "version": "20260907130000",
+      "sha256": "58f36e357c9f522107190c1de2a8f1f5030278bd95f1689aa2fe9395f127bc22",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907140000_scope_email_to_quest_invitations.sql",
+      "version": "20260907140000",
+      "sha256": "688d4f35f1a742e05984a70823e56bc2ed0aa1dd4cdd0c6b0ebd826726e6d472",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907150000_add_quest_completion_limit.sql",
+      "version": "20260907150000",
+      "sha256": "72525a35b96e4dabaf5ad9e5923e6015419da85d01654956e38f168147573850",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907160000_add_organization_audit_feed.sql",
+      "version": "20260907160000",
+      "sha256": "262540705f5f265bd62f04070d27b937622e365dd418a3337484b49ae7dace70",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907170000_add_participant_profile_foundation.sql",
+      "version": "20260907170000",
+      "sha256": "f51a2edcaf119bfc06eb849597da74f3745a3e8578178f18a20d19ae8b4f8eca",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907180000_add_participant_group_management.sql",
+      "version": "20260907180000",
+      "sha256": "38a113fd671fd96b3117c7a65a46b90943f7a9a949c66c6efc56e867a28670a5",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907190000_add_participant_profile_invitations.sql",
+      "version": "20260907190000",
+      "sha256": "7c2be02b8dace5f8effd8f787fef153d4057fc43dad7da186b38cb0a5d76cf3a",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907191000_fix_participant_invitation_claim.sql",
+      "version": "20260907191000",
+      "sha256": "ff9460869596bd981385d597608d76959e7d1e094fe5f0059e778ed92d2a1625",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907200000_scope_quest_data_to_participant_profiles.sql",
+      "version": "20260907200000",
+      "sha256": "7feef340d5df859f6d4c998b0610175589b63d0663ac943b6726de72f1ab85a6",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907201000_fix_quest_participant_scope_defaults.sql",
+      "version": "20260907201000",
+      "sha256": "d5d19b51b7b8e9adc837d6a94bd7ce9fdbe3859441cc7d9bdcd5366e88ca3f61",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907210000_redeem_quest_access_for_participant.sql",
+      "version": "20260907210000",
+      "sha256": "0d029cc8074190814e500dadc8f98d5dda889ba4dd3004d4ccad076c4a4355c4",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907220000_add_profile_scoped_quest_entry.sql",
+      "version": "20260907220000",
+      "sha256": "b1cb7f69a17320fc2668ec34bd08b14f3b56777ae5e8c92f428ef05c17847b59",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907221000_transfer_participant_attempt_control.sql",
+      "version": "20260907221000",
+      "sha256": "0e8534e1500c85be995d36f29e04fffc41426f7b6257410443d2f29a94c0987b",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907230000_add_quest_participant_labels.sql",
+      "version": "20260907230000",
+      "sha256": "b97b39b6c2736b3d74abe2eb8e4000c4abc4bcff03ca8ad51d7a2ec6446a1fea",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907240000_add_participant_quest_history.sql",
+      "version": "20260907240000",
+      "sha256": "b0074db17603ce1f5b2977f8954c5fb8d81a9e6fd30c83254765108d61a88247",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907250000_scope_active_attempts_to_participants.sql",
+      "version": "20260907250000",
+      "sha256": "6c0e6d6f6f336598338093657502d81dfd650d919c10d511caa558b84f3d1ca8",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907260000_scope_audit_events_to_participants.sql",
+      "version": "20260907260000",
+      "sha256": "b6306885af925cda588f231360e6fd3ea6463c4bdc79e5b16f63c0ddb0b11b53",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907261000_fix_audit_participant_trigger.sql",
+      "version": "20260907261000",
+      "sha256": "9809695d156254acc8b4ab4b0af420c4e00a0a309ba00e9a0c97c1985492ae36",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907262000_enforce_participant_group_leadership.sql",
+      "version": "20260907262000",
+      "sha256": "bc9c2170d0297d365ca2221a679ffdf9e8ad2af63128c548a135aa004da93d60",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907263000_restore_supervisor_group_visibility.sql",
+      "version": "20260907263000",
+      "sha256": "53ed4d8a530575847e9e04aaab5169da79ec75557e49f18cef0dec9669d54fa5",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907264000_manage_participant_supervisors.sql",
+      "version": "20260907264000",
+      "sha256": "bebc011baab60ba91a580e8b16f8e953074c43fbf60b8a372794cbb6903fbae7",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907265000_add_supervision_revocation_timestamp.sql",
+      "version": "20260907265000",
+      "sha256": "95f7f1d4fddccd674871afaab6803a934eea35a71d205284c0b1e1baf1d31555",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907266000_recheck_participant_access_on_task_events.sql",
+      "version": "20260907266000",
+      "sha256": "3618e85e3edc09ece913e3586d84a47c3d07c3f110a0e056524e2a11df7248bc",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907267000_scope_task_event_guard_to_participant.sql",
+      "version": "20260907267000",
+      "sha256": "cf9334de9792029b78021a04fe7bf0ec507411274a88624afbc8d06afc17eaba",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907268000_add_participant_audit_feed.sql",
+      "version": "20260907268000",
+      "sha256": "8b74fb03da0d883b22f2646d9ae2bdfddb095c1e8eed7243ab3f01ceb92ce048",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907269000_show_managed_supervisor_emails.sql",
+      "version": "20260907269000",
+      "sha256": "8b7a6bc824285e1295ae19dd6c45966e844c67c720c6f77f252aee8085e495f9",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260907270000_add_quest_code_gateway_rate_limit.sql",
+      "version": "20260907270000",
+      "sha256": "6a6605b4fca598275866eb830c94a0fc444a6e0ab450d3867329ab42f08652d0",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260908200000_restrict_direct_quest_code_redemption.sql",
+      "version": "20260908200000",
+      "sha256": "2161b8807e89fce3ca8845d4562483a193238c4fe9be99bbf6ae2ab68ea4766f",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260908210000_add_quest_task_navigation_mode.sql",
+      "version": "20260908210000",
+      "sha256": "8a89e57c3229e5cfa1c8501ec0bcbd5d85091d8307205de076af1f45d85a55fb",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260908211000_add_participant_quest_summary.sql",
+      "version": "20260908211000",
+      "sha256": "eccf13bf45a1247e5a956bd7f17664be0742010e46f3949c0499cda6d9e862ee",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260908212000_enforce_sequential_task_navigation.sql",
+      "version": "20260908212000",
+      "sha256": "5ebf47e356e1bdaed3a6432592ff8acced1150c90ca0c55745b05fe75a85223a",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260908213000_stabilize_quest_task_order.sql",
+      "version": "20260908213000",
+      "sha256": "8bd144f6594faf1bb5c0dd8db12863eec397211012997ef870f6f55e4be3ff23",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260908214000_add_participant_task_map_visibility.sql",
+      "version": "20260908214000",
+      "sha256": "2442a3b962ec785b4fdf9e5e07e8760cb1013a6b29ef6522056d88527f170686",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260908215000_add_quest_cover_image.sql",
+      "version": "20260908215000",
+      "sha256": "d48d9709ee8598047be912d18c5b3ed9491e48438e93aa2de6bac4e581ed1c94",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909090000_harden_participant_quest_payload.sql",
+      "version": "20260909090000",
+      "sha256": "0d7417a6450b5ff66613b3d25a38a8aeb6f6b760af30e070eda67d475e8ec4d6",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909143000_restore_participant_supervision_and_audit_visibility.sql",
+      "version": "20260909143000",
+      "sha256": "79fced1d89fc384ffa3522a17ca35e4b04799d7805af109ce2d8e3b31edc5be1",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909144500_isolate_participant_groups_between_accounts.sql",
+      "version": "20260909144500",
+      "sha256": "86b9c3ea226607e08e017e26136b8f8206339fe4e1254f774ec4318a05492918",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909150000_separate_supervision_from_participant_groups.sql",
+      "version": "20260909150000",
+      "sha256": "7af4ad9a1bce6e9cbfc92e483eb95f13fe9ac159f63b288796ecc03312b13dd8",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909151500_require_account_for_participant_group_leaders.sql",
+      "version": "20260909151500",
+      "sha256": "bacc9c11e904ef309e1d0e4d6a7fd0a03f2680f97ce483bbf30abf2c2ed3a05e",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909153000_merge_self_profile_history_on_claim.sql",
+      "version": "20260909153000",
+      "sha256": "d02db8f3ec6a111222ada6b7de9c709a28901774b79095ff6b78f3059a875dbb",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909154500_add_participant_group_invitations.sql",
+      "version": "20260909154500",
+      "sha256": "03473d4c666e250529476e07a48424c38531c0427912d6dedd079317aa8b660c",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909155000_finalize_group_member_visibility.sql",
+      "version": "20260909155000",
+      "sha256": "fcd6e732efa520c15978514cec2526e81200957e0ba1fe83ef809ec651eb1229",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909160000_make_group_leaders_profile_supervisors.sql",
+      "version": "20260909160000",
+      "sha256": "c257fc5c6cee2842c4c22276fda000248d4a0e9c054e6cbdcd999ba250c5dbff",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909161500_add_participant_profile_identity_labels.sql",
+      "version": "20260909161500",
+      "sha256": "8b38a9f2110d93af18f5c2a72b91e46d357032989151560c51876549ac6e350e",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909163000_allow_owners_to_rename_participant_profiles.sql",
+      "version": "20260909163000",
+      "sha256": "6b3aea1057f3ff3745f5a16b318d2b6cb6c9ed02d8ad4550942fb952a5275d53",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909164500_preserve_registered_name_when_claiming_profile.sql",
+      "version": "20260909164500",
+      "sha256": "6e7e2ba95fbc430298052ddb1a51c9405a71d42bbbdda82e88972199abbbe007",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909170000_sync_account_name_from_self_profile.sql",
+      "version": "20260909170000",
+      "sha256": "313b5d036946024e73d9917a575756db6d9e23b9b68ac16c06d72fb59110d183",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260909171500_list_accessible_private_quests.sql",
+      "version": "20260909171500",
+      "sha256": "d393b26b13b5fbe5e8a8fe6ce9f27e4f0cff055b6ceabd1d9a830a790fbfa466",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260911210000_drop_legacy_task_media_url.sql",
+      "version": "20260911210000",
+      "sha256": "497f0cf6574394be05f097672fad87aff5f44a2b2babe0920faf5e5690b6f09d",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260913120000_finish_quest_early.sql",
+      "version": "20260913120000",
+      "sha256": "7903a672b1673b751e90ca6be1bde3535223039e0e18215a4e310f95909668e9",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260913130000_quest_time_limit.sql",
+      "version": "20260913130000",
+      "sha256": "9105e7ba9cd38bf1270e2406fafbbe54fd47b9d93eb45ec369bfe11ac8afacef",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260913140000_allow_late_offline_answers.sql",
+      "version": "20260913140000",
+      "sha256": "4f5cdfba3aabd3f30d80a86b31e03f358f6da22a32eee7aa94ec886cf7d942be",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914010000_add_organization_quest_search.sql",
+      "version": "20260914010000",
+      "sha256": "93cfb37c319504102a0a2d1f2f2c5e986ca394108ef9e96c0186f6250fc8249f",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914020000_add_participant_quest_catalog.sql",
+      "version": "20260914020000",
+      "sha256": "89f9354305dc0f9c97d43295d92c36de9519eaf2aaf39cf55cad470a65452b1c",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914030000_add_people_catalogs.sql",
+      "version": "20260914030000",
+      "sha256": "08e86b1394b20575431fe24b8c58c20a631d4d53b932502ef724d45fbb1f915f",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914040000_add_group_member_catalog.sql",
+      "version": "20260914040000",
+      "sha256": "4c2b7441fc0a9371a6032e5dea940f347fe0a1407628b5e4db9ac3d0b3d75e2f",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914050000_add_participant_profile_card.sql",
+      "version": "20260914050000",
+      "sha256": "157c9adbfa1ac8db645eab7a746183321b1cdf3cc55842b5cc6e63a8587bf8c7",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914060000_add_group_member_safely.sql",
+      "version": "20260914060000",
+      "sha256": "7af8b21cc14a5cfce4168c9d534a906aefbb9d9875e98c385dc53f607ef53388",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914070000_add_group_invitation_catalog.sql",
+      "version": "20260914070000",
+      "sha256": "196fcee9777316325a6cda8dc35798b0150682b38a27869bae226dfee9b08594",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914080000_change_group_member_role.sql",
+      "version": "20260914080000",
+      "sha256": "8dd0ea390962af790de6612a7f1c18d867fa82009a6b6b3aed82bf3f895f7742",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914090000_add_participant_history_catalog.sql",
+      "version": "20260914090000",
+      "sha256": "f941af1ab0da2842df0329197d5cf88e81f79d207475030d26a13c025b57ab89",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914100000_add_profile_invitation_catalog.sql",
+      "version": "20260914100000",
+      "sha256": "8a724493fb31ddae91906f5217cc54002f7a0bee27268e4f133fb3868dfa4b4a",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914110000_add_supervisor_catalog.sql",
+      "version": "20260914110000",
+      "sha256": "954f0969f19fabb644493daf2fa3277536fc725f257b218c18fe63815a320b26",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914120000_add_supervisor_action_hints.sql",
+      "version": "20260914120000",
+      "sha256": "286f42a4d6961e4222f418b8c9c5ce1b33ae7f23697652f812368477107bbbc6",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914130000_add_participant_audit_catalog.sql",
+      "version": "20260914130000",
+      "sha256": "d37a60eae3bd28283fa0555bcb71c72d7c5957a52a39f084895f451c6a645a16",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914140000_add_group_exit_actions.sql",
+      "version": "20260914140000",
+      "sha256": "8c46011e3b72cf3f10faf14cbdc0dcde4f90e28c9ab5fcdef6287f3a3f2f04f5",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914150000_add_supervision_profile_catalog.sql",
+      "version": "20260914150000",
+      "sha256": "0efc56f3afe0d75551a79527821971412f9b88ec13889b6ffef9368d8613212c",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914160000_add_participant_archive.sql",
+      "version": "20260914160000",
+      "sha256": "292cbeb706513ca3fe185a1f6dd8432a0b4ac75b7241768dbe391299de92de2a",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914170000_add_quest_access_catalog.sql",
+      "version": "20260914170000",
+      "sha256": "0a6b5822f16de22fce46f7617ec526ff2fcc0bc790d3fbfb3c6fda16e59db3c5",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914180000_add_quest_results_catalog.sql",
+      "version": "20260914180000",
+      "sha256": "c006e70f21057dba8f2eb16fdc220adaf207d5b217064f729d11622cfc0c6965",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914190000_add_organization_team_catalog.sql",
+      "version": "20260914190000",
+      "sha256": "4dd19b77adafe962d347b515dd149143968143055b40ba9bc04bfd5db21ec424",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914200000_add_organization_audit_catalog.sql",
+      "version": "20260914200000",
+      "sha256": "f270ca25edfdbbbc1c0b694cfe119326d500066f96368462b42f76030b3d3911",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260914210000_add_quest_results_sorting.sql",
+      "version": "20260914210000",
+      "sha256": "a619a3e2267553aa2ea810b185f509ccf54ca97332ae31a610f549dc3569265c",
+      "disposition": "production-ledger-version-present-content-not-freshly-attested"
+    },
+    {
+      "path": "supabase/migrations/20260915010000_add_billing_plan_versions.sql",
+      "version": "20260915010000",
+      "sha256": "e51eeec5e483f1aad7c253556bea313be8e68cc8874cc80492f3e79047ce167a",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915020000_add_organization_subscriptions.sql",
+      "version": "20260915020000",
+      "sha256": "288f4db91d5b0295820653186aa8c64f2009de09790905601988f13122471171",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915030000_add_organization_billing_state.sql",
+      "version": "20260915030000",
+      "sha256": "499a345a775b8d0496067c5dc10e42280b0ea39986693cfeecfd969573c5ac04",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915040000_add_billing_period_resolution.sql",
+      "version": "20260915040000",
+      "sha256": "709d973a29c91a8dd25fe1a38ef8483af77b7010fbee56203620a329aa2111c4",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915050000_require_finite_billing_periods.sql",
+      "version": "20260915050000",
+      "sha256": "4a8017e90f828743266066f859140a68f5176618e79df6238c1a067909ec1aa3",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915060000_enforce_active_quest_quota.sql",
+      "version": "20260915060000",
+      "sha256": "b4495a04228e9c873d80b608a7ef9fd819b5e3b9f157f31afb3b879f326e9a84",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915070000_expose_active_quota_state.sql",
+      "version": "20260915070000",
+      "sha256": "50025ebc5b09464112ae406493bc8f5285a4f1a112ddcba5abd3bf17892f01c0",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915080000_add_organization_billing_overview.sql",
+      "version": "20260915080000",
+      "sha256": "a4a0c284a1b47f2cdbcc0f652ec53172856307bc45ddc86b17479f88abac9194",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915090000_enforce_team_member_quota.sql",
+      "version": "20260915090000",
+      "sha256": "b3ca199aab8c6c2607a4511a260b207130da178b337ac45a1d6440cdac232d08",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915100000_expose_team_quota_state.sql",
+      "version": "20260915100000",
+      "sha256": "36f926944159326fb944cebe3ac8d8e7e515585e9022e189bccc572c30097fc3",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915110000_record_participant_usage.sql",
+      "version": "20260915110000",
+      "sha256": "bcb8240a90838076a6ec84901e468e372c85b366db637398e7abe0e2abfcfb18",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915120000_read_monthly_participant_usage.sql",
+      "version": "20260915120000",
+      "sha256": "82996c632f4cbcb759fa2ec6e5068aa8df960b4240022b0f13140184931cc1db",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915130000_register_offline_attempt_identity.sql",
+      "version": "20260915130000",
+      "sha256": "aaea795de67fab1eefda9110fb99530fb3b9a44ebe57984587e6bfbe4e8cd8c3",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915140000_adopt_registered_offline_attempt.sql",
+      "version": "20260915140000",
+      "sha256": "c036155ac733c9623b558ad6d7506a079ea283bd04bc361a2063cd1095440189",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915150000_merge_participant_usage_identity.sql",
+      "version": "20260915150000",
+      "sha256": "43bfb8e49edd5d00ec60a1a6983b6c72e3199d667a80ca7dc28a45388ba7fdff",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915160000_add_idempotent_quest_creation.sql",
+      "version": "20260915160000",
+      "sha256": "d364cc585462ec69f5fc1b5f63a6c8e258ee455d30e9f10d376a9c1d96d6d8a2",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915170000_add_billing_intents.sql",
+      "version": "20260915170000",
+      "sha256": "831a1571fa184304577c14a312a554ee0e2d931803cbd4aad940adb6eecf13fd",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915180000_bind_scheduled_billing_intent.sql",
+      "version": "20260915180000",
+      "sha256": "0cad4437c348552eb42d079032a63998ca74d4163cbb3bf2a3eab16e05928c56",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915190000_audit_due_billing_intents.sql",
+      "version": "20260915190000",
+      "sha256": "ca73e562c9449a88a8ad85fef893852e18f06309a6e1525bf76885d997554d4f",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915200000_bind_cancel_billing_intent.sql",
+      "version": "20260915200000",
+      "sha256": "13930f2b510b93fa0982d315d3b55897edc71bcfc485e1331cc959adb9b6604e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915210000_evaluate_cancel_billing_intent.sql",
+      "version": "20260915210000",
+      "sha256": "fee09dd91e8fc01cbf0e16b9cd0652170a5bb2a8699f52eec763582ba6e03e82",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915220000_read_billing_intent_controls.sql",
+      "version": "20260915220000",
+      "sha256": "4921d12d52ab8e4ed6ea46619cdca7c7b338dd3589074a3e168332ea7eb0537c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915230000_record_subscription_expiration.sql",
+      "version": "20260915230000",
+      "sha256": "42e6dd9dc85594c7a08d362a956a0f9e7049c053158057b322c997c35c225342",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915233000_batch_subscription_expiration.sql",
+      "version": "20260915233000",
+      "sha256": "2a98c384782de90f2b1bd7a9e0aaf4af844b73d87beaecb37d1f0ee42087e19e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915235000_confirm_subscription_period.sql",
+      "version": "20260915235000",
+      "sha256": "ca4e83f28ff791e66f7ec6bffb004d4f4c8f2f4c281b3f628fc02ed59735477a",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915235500_queue_billing_confirmations.sql",
+      "version": "20260915235500",
+      "sha256": "a4075536b97a2f5c928b1340c4d0e08660feeaf9eb73daae2382f56eb3d7decd",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260915235900_process_confirmation_queue.sql",
+      "version": "20260915235900",
+      "sha256": "11116f1c65d8b4ea71a44fe04f0e1dfe2b50ee5ad7747027d2e8e9a01b41d386",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916001000_reconcile_technical_expiration.sql",
+      "version": "20260916001000",
+      "sha256": "60b2510d57bf9a18d7acf67e24cf104373859e010673d01784c4593cd4ffb3b3",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916002000_recheck_expiration_review.sql",
+      "version": "20260916002000",
+      "sha256": "5e558c6408bb42fdd3333489e15328cb4ba0a19474fff27e89f9fe6b7b7ed82e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916003000_add_grace_policy_preview.sql",
+      "version": "20260916003000",
+      "sha256": "b32f1c10bce39d650d56d36d7c0c0c848eb875864f64cc4a583c302173a3e5dd",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916004000_bind_confirmed_grace_policy.sql",
+      "version": "20260916004000",
+      "sha256": "7eaf9dc9ce3974f71ab964fc604163e34ad659d32c88c16d5e9abbdeb3fad087",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916005000_apply_grace_to_resource_quotas.sql",
+      "version": "20260916005000",
+      "sha256": "79de10804a5bce2e0bf7db8f9708d5b7ef70b2e82f3136ad09c176f8478d6a69",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916006000_prepare_offline_start_permits.sql",
+      "version": "20260916006000",
+      "sha256": "7b4dcf2860cef8c5716a91419bf7ad71ea96ad40b7e6cf54ebd777b7707915e6",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916007000_redeem_offline_start_permits.sql",
+      "version": "20260916007000",
+      "sha256": "5b9cf442ade45b8d88e1d68be08a75522003d6c56ffca2b487b24f566fd406d8",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916008000_register_permitted_offline_attempt.sql",
+      "version": "20260916008000",
+      "sha256": "b2c1783bd961417c47827c71cb4ede8cb7db6eb82bbdab1e531c774a389f96d6",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916009000_guard_legacy_permit_registration.sql",
+      "version": "20260916009000",
+      "sha256": "ad218269a3e06783f142387e5d6c97bcaf8a39e32d2369d31a5857f3091a118e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916010000_schedule_billing_lifecycle.sql",
+      "version": "20260916010000",
+      "sha256": "818904bdbd96b596433c66c1b9c6353a53f1ca50d8fff52bfe2373584061a321",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916011000_apply_requested_free_downgrade.sql",
+      "version": "20260916011000",
+      "sha256": "0e4e6082c3be6b5cd16f6e7477f8bcc907266ee26d1c68dcd00d9228d7010939",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916012000_preserve_closed_offline_events.sql",
+      "version": "20260916012000",
+      "sha256": "e2581124a2e1102d3797ddfa04e60b12baef890d32f55e46296b9896017bc7f1",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916013000_guard_reviewed_offline_attempts.sql",
+      "version": "20260916013000",
+      "sha256": "43cff2ac36eff99930ca623850f5d7bdd76965239a52f81865ce41f1b723511a",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916014000_preserve_permits_on_profile_merge.sql",
+      "version": "20260916014000",
+      "sha256": "2c3842cdaae3d620540f8a2fe32b02cc1bae68f2ef3c5f64e6bcdf472fe57096",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916015000_connect_offline_start_policy.sql",
+      "version": "20260916015000",
+      "sha256": "1071750ba957944be27cd364b7c6c80a5811c44ea04bc8a2c4a83e869c1aef8c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916016000_preserve_legacy_events_after_grace.sql",
+      "version": "20260916016000",
+      "sha256": "7ce84a07aec69bb84bee0bd1cec1b6aeaf77dd63d3291e9a41c97ac7a8a85913",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916017000_expose_offline_start_requirement.sql",
+      "version": "20260916017000",
+      "sha256": "6eb22cf944ef3837b94c17b12c8ab6e9ea7ce38502e1cbdc5f0d7e339470cdfa",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916018000_add_trial_usage_foundation.sql",
+      "version": "20260916018000",
+      "sha256": "3cea205462244d9f10da29995d8c260dc1a590ed46561f796fd99d4df7ff1f9b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916019000_add_trial_lifecycle.sql",
+      "version": "20260916019000",
+      "sha256": "519c6e8ef239f2f48ffd9041b62223c8fbe409bc87b4a3e2a29309dc5340d681",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916020000_reconfirm_trial_schedule.sql",
+      "version": "20260916020000",
+      "sha256": "7bb665f420472477c51c943aef79970ae3a629ab1ca5a2fcd38b0fb039d45f59",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916021000_add_personal_promotions.sql",
+      "version": "20260916021000",
+      "sha256": "617119b05fad8271f4383af1cf325d8f64999f77f9cb2c987dd9b9320822d0c3",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916022000_expose_free_access_controls.sql",
+      "version": "20260916022000",
+      "sha256": "4dd417942ba85f5788556f0de31cc34e283e727e0e01eec13b6f1a9f7ba1ac49",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916023000_reconcile_free_access_before_reconfirmation.sql",
+      "version": "20260916023000",
+      "sha256": "77fa4b45606fcbcfc1f4d1e10ed1a890b1bc53fb96971b871f3e085689cec244",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916024000_reserve_sandbox_payment_orders.sql",
+      "version": "20260916024000",
+      "sha256": "2412767ffcb58deba99695d17e539f650cb1812141c0f521a22decf22e904f95",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916025000_record_sandbox_payment_results.sql",
+      "version": "20260916025000",
+      "sha256": "29209020ebf118d72fa22f0136266640e0ff816135dff50c34eadcb7d41a0bf1",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916026000_add_sandbox_checkout_gateway.sql",
+      "version": "20260916026000",
+      "sha256": "986c21ac2fecf998db71a2d55360550b48f3328d33b9cbf68badf7d13f9c7d6a",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916027000_expose_sandbox_order_offer.sql",
+      "version": "20260916027000",
+      "sha256": "73f16025e24c6ca30ecab865c39991395626839c3cb62f8dbf24a8fbd5ff1441",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916028000_find_pending_sandbox_order.sql",
+      "version": "20260916028000",
+      "sha256": "c1af898f2f8b1367ede2fcbef6ed3d6dd1838d8d7a6f6b3da1f6d07445c41a1b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916029000_add_sandbox_checkout_offers.sql",
+      "version": "20260916029000",
+      "sha256": "51aea299995a9c6a4c0b3703321f77546faad15db2ca9853d0504328a66d307e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916030000_recheck_sandbox_cancel_permission.sql",
+      "version": "20260916030000",
+      "sha256": "1cb10923c4fe49ce64ff715507f56d4625bdc087e9c7b064af57e5fdda7ed518",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916031000_add_sandbox_payment_inbox.sql",
+      "version": "20260916031000",
+      "sha256": "6a8ec21b51b929c40d42b7259f9974a5a867fe4908d2647ed2541254d3ace85c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916032000_expose_sandbox_fulfillment_and_fence_jobs.sql",
+      "version": "20260916032000",
+      "sha256": "4a3ad4f1f1da0420732d8f38400ab3c82191b8b2ec5f586d80c0f573e114efe0",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916033000_expose_sandbox_payment_status.sql",
+      "version": "20260916033000",
+      "sha256": "5f2dade4a90f1714def728388cfa5db1bb75304b1ea2999697fbd0bcccd7a322",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916034000_add_manual_sandbox_refunds.sql",
+      "version": "20260916034000",
+      "sha256": "1aaeb72dc9176d5181bcafee51bed732c5097e6052c4b8f189d59040a608179b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916035000_expose_sandbox_refund_summary.sql",
+      "version": "20260916035000",
+      "sha256": "91d4c8a89bd1d949fab3f03781d86a0680a01b63af2e54e1ae1c8301a144a23c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260916036000_reconcile_sandbox_refunds.sql",
+      "version": "20260916036000",
+      "sha256": "578847a29dad1d32321682910a6805ce203523ae93f67a4996a426808bbda313",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260917150000_archive_completion_limit_rejections.sql",
+      "version": "20260917150000",
+      "sha256": "3f288b587f9a4c9ae80b7b69b3762b689ec6d03f684743fdad8062808e4b6fd4",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260917160000_preserve_permit_conflicts.sql",
+      "version": "20260917160000",
+      "sha256": "b9ff113fec3c1c8e9606fa6c7065b371629075acb2a0223c36dea6ec64777a16",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260918010000_add_platform_access_foundation.sql",
+      "version": "20260918010000",
+      "sha256": "93704aa33dfb4c35c7dfccc9b90a3151eaac28c07e0df58c6fc1553109befc8a",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260918020000_manage_platform_assignments.sql",
+      "version": "20260918020000",
+      "sha256": "847888485d28ae91b7ca27d02aa00733b8641640f309fbd3f6d54cf0a0489feb",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260918030000_bootstrap_platform_owner.sql",
+      "version": "20260918030000",
+      "sha256": "07666185268287b402b7c9a7648490d52b0bfb630bab1be2616b3b0955259a0d",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260918040000_confirm_platform_commands.sql",
+      "version": "20260918040000",
+      "sha256": "3a7134c9748a10d52d79dbcc432f72a333061f08c3f7ce79db0867d471a6b56d",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260918050000_register_platform_support_cases.sql",
+      "version": "20260918050000",
+      "sha256": "dc1d759da7c9ea2a0abf9e54a8596b8e73ed6d4ef2177d8eef6c813cc1a9c979",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260918060000_search_platform_organizations.sql",
+      "version": "20260918060000",
+      "sha256": "cdfed66a40542791e391caad4621ff9361d7ee98c922d5264957c7846515395c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260918070000_log_platform_access_denials.sql",
+      "version": "20260918070000",
+      "sha256": "341f55ac69e8716331c488f50c96bf79177ba1f988fa55dab720831955910378",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260918080000_require_platform_command_reasons.sql",
+      "version": "20260918080000",
+      "sha256": "b26e30a70ae8080a334391a546c7b75c6a010b0858862dbec16702b8a0464917",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260919010000_read_platform_tariff_catalog.sql",
+      "version": "20260919010000",
+      "sha256": "bfe674720965a33d5fa28eae31036de8f1a215f179d8de0e89589b6b9de6d5b2",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260919020000_add_platform_tariff_drafts.sql",
+      "version": "20260919020000",
+      "sha256": "47223b79186487fce2352f1f2a354a582c49c1a6855e7966cd61495db388caaf",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260919030000_fix_platform_tariff_versions.sql",
+      "version": "20260919030000",
+      "sha256": "3fa281c66db6467ecbde57374174b458565d7df10e920a1020027b00420ea8a6",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260919040000_scope_tariff_draft_lists.sql",
+      "version": "20260919040000",
+      "sha256": "566ed1af31f85955ff0912ef23640dd52c543f0efdd271ca01936859e993370c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260919050000_describe_tariff_drafts.sql",
+      "version": "20260919050000",
+      "sha256": "7c2c0ad6aaff1bb7d4f518d8782da8fb162d9682355ac76fc5623371d8a482be",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260919060000_enable_fixed_tariff_versions.sql",
+      "version": "20260919060000",
+      "sha256": "3f4b91a4cef1429d3eb538534668a812b6917da8a306bf1c477d03ce260f804b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260919070000_link_fixed_tariff_versions.sql",
+      "version": "20260919070000",
+      "sha256": "a807d29ad6a4424aff2da7f93c18268b036d05305e8d24c878c3b76f81fde93d",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920010000_add_tariff_timeline_foundation.sql",
+      "version": "20260920010000",
+      "sha256": "abcf6bef74f42a87c41a9a2369a6fb16107b4a534263c33cd732c1c1dda24e4c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920020000_publish_and_revoke_tariff_versions.sql",
+      "version": "20260920020000",
+      "sha256": "b04ab2e4d2569c23385e6b98b4f6bdb65ef8552bbb07e13901c6be7ddb9d8638",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920030000_select_current_manual_checkout.sql",
+      "version": "20260920030000",
+      "sha256": "de8dcf9d6d1c6ac5e0907baa5c5f72dcf658a61ae9224228df5c1b555a7ce976",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920040000_select_trial_timeline.sql",
+      "version": "20260920040000",
+      "sha256": "2b451ea6c0c537066842f317f07cbfef80486e9ada8fe97e9a61840fa595d8e7",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920050000_preview_trial_purchase.sql",
+      "version": "20260920050000",
+      "sha256": "2dae9976697edf20a27c0ff93751db56ea0d4aec1b1d6fa7ce022c125f6ae7ec",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920060000_add_discount_code_foundation.sql",
+      "version": "20260920060000",
+      "sha256": "335a4d8eb31934f742383486a75b7d5da8b2540c363ee12abbe08cced3ffb379",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920070000_issue_and_preview_discount_codes.sql",
+      "version": "20260920070000",
+      "sha256": "3f353160ba9bbcea1973e4519e9d18148a2967f5f58ce7e1f994717d020e6fb1",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920080000_remove_legacy_promotions.sql",
+      "version": "20260920080000",
+      "sha256": "352401e6b9274eaa4b255893cf111a9b2f0520287af8746223bd95c09dc916ca",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920090000_reserve_discount_periods.sql",
+      "version": "20260920090000",
+      "sha256": "f156d6474ade3ffd4659b30b78db35be279af3818a3b94220fd8347e444e10d9",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920100000_preview_discount_checkout.sql",
+      "version": "20260920100000",
+      "sha256": "4d5a15affcab0f0147c699cbd40441fd194ff838c499c84c7755701cf490551d",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920110000_reserve_renewal_discount.sql",
+      "version": "20260920110000",
+      "sha256": "f38420f48bdd5be331546cdae9df8ef9599200c24e087a140bef834b0c8e132c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920120000_accept_discount_checkout.sql",
+      "version": "20260920120000",
+      "sha256": "c1c5d505132e529bfbc3047a3e99d8d8a40e20fd3b75931bb8adbc1a5f1ab1d4",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920130000_cancel_discount_checkout.sql",
+      "version": "20260920130000",
+      "sha256": "0fff60e3747fdb58445f211b19fed7a926fa4a502685f57b7ed6edc332a314fb",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920140000_fulfill_zero_discount_checkout.sql",
+      "version": "20260920140000",
+      "sha256": "42fec91220b5e024b9a1f5101249f7c4887721fa1ba49d78530887cfe134ce7c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920150000_capture_trial_checkout_terms.sql",
+      "version": "20260920150000",
+      "sha256": "f80870ee1da746199d599fb6ce6a02026ddcd25468de903f8c874f70dd56e27f",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920160000_replace_trial_zero_checkout.sql",
+      "version": "20260920160000",
+      "sha256": "26b4b291dcc8b78cb4d6a2af975107703dba3e1d94fd60f87e17540b4981547c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920170000_schedule_paid_period_after_trial.sql",
+      "version": "20260920170000",
+      "sha256": "56419f418adaff947a7892d3417b514aa2aed10c50f65efa524fc642776595f4",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920180000_prepare_discount_payment.sql",
+      "version": "20260920180000",
+      "sha256": "41b25e0440f10cc9b3996720ee0b85c50ef1f7b4162be1ff9187aa1c0abc84f9",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920190000_fulfill_discount_payment.sql",
+      "version": "20260920190000",
+      "sha256": "4f3df28c337b8b1856a856430664a3f95878d85dda383c67f6fcdb5f3e508919",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920200000_fulfill_paid_trial_checkout.sql",
+      "version": "20260920200000",
+      "sha256": "71880d729b97b5b5a5d8a149967fcc6555de2cf90a4acdea5f1946b30d2b4fcc",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920210000_cancel_discount_payment.sql",
+      "version": "20260920210000",
+      "sha256": "2260a69b8b623493fa2054ece6a9918e5c0eb83df36571aa1ad2f69f322e8668",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920220000_expose_discount_order_summary.sql",
+      "version": "20260920220000",
+      "sha256": "5eac25c8a55b6bc33aa6874cb16c339f56a83500077ff9941966db0e6b853bb4",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920230000_confirm_reviewed_discount_quote.sql",
+      "version": "20260920230000",
+      "sha256": "442d73e4b1890232b6bb845e47fe28b9c82acb41cdb2476014ef02cd0d2b96df",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920240000_preview_discount_trial_terms.sql",
+      "version": "20260920240000",
+      "sha256": "46317aa9ad1e40c45685bb266e67d3e56a00e4247473558567badaa37fe08942",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920250000_recover_and_cancel_discount_checkout.sql",
+      "version": "20260920250000",
+      "sha256": "4a7e23166acde14dc68a57c4107e2f6b756d7550f24dd0c28be162dc0e727e94",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920260000_expose_sandbox_discount_commands.sql",
+      "version": "20260920260000",
+      "sha256": "ec866240b971dd40441daa782e8d8a19b4f6f7e38147c61b02dfc6f2fa3ce50b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920270000_materialize_published_tariff_catalog.sql",
+      "version": "20260920270000",
+      "sha256": "ddcabd02af4da06f8557a92357c24ff9518158533c7af9ff292061c9c59b6c9e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920280000_read_admin_tariff_timeline.sql",
+      "version": "20260920280000",
+      "sha256": "cedab6ee9803d3cb3a8a9385a6c7d1dd1549bc535180d3bf0e8acc3507c72c77",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920290000_align_admin_tariff_reads.sql",
+      "version": "20260920290000",
+      "sha256": "627ac0b61f85c5e7dfcd2f538077805e8c45bcb7bafb1505d0548b9eef42f338",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920300000_group_admin_tariff_catalog.sql",
+      "version": "20260920300000",
+      "sha256": "1c48aa4896aa338435125de6b6baf6abe5e5d243c75c69a62a22b3e86c635ed6",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920310000_filter_tariff_versions_descending.sql",
+      "version": "20260920310000",
+      "sha256": "ad58fd1fc439b814687657d55341262a504b6979c82eaaad46dd8c2bd69804d3",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920320000_read_tariff_source_version.sql",
+      "version": "20260920320000",
+      "sha256": "3e0b2ef87b6a6190251fc97dff23e5dbbbb7c6c4e24da220f4aca8082163671d",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920330000_preview_tariff_support_end.sql",
+      "version": "20260920330000",
+      "sha256": "b5488688c9ba9130bf78c7906ea456800f07234dd003198b6f14e33eab7088d1",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260920340000_schedule_tariff_support_end.sql",
+      "version": "20260920340000",
+      "sha256": "8153af4cec17af4b33a4d260ae26ce11fc3dd4adae5c491d109675d9e8fa97f1",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260921010000_allow_full_price_checkout.sql",
+      "version": "20260921010000",
+      "sha256": "da60123f059703c8022ce8adfb07daa6b26768d0c24915e6bd51ae8ac6b488ad",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260921020000_read_platform_discounts.sql",
+      "version": "20260921020000",
+      "sha256": "167109e32fddf2b74812d5dc2053e3223fc99e021739f7b0e24ad13d35757f4b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260921030000_platform_discount_campaigns.sql",
+      "version": "20260921030000",
+      "sha256": "fe7866c2a716692ab774e479ab902d831542e0a73f58193f4cadfcc59d27440e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260921040000_read_discount_campaigns.sql",
+      "version": "20260921040000",
+      "sha256": "142446884228d343b59cd7fde1eb0a0d4d2728304cf13df0df0f24b4fbdd0e0f",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260921050000_issue_campaign_discount.sql",
+      "version": "20260921050000",
+      "sha256": "a388de22adc90082637615083d00406ed8a755baa363b393ccc594a80a675b73",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260921060000_global_campaign_catalog.sql",
+      "version": "20260921060000",
+      "sha256": "37b5b32692ced4f118fdca94d2238bd0b5df620362b5e962dde7e0ee427428cb",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260921070000_campaign_activation_windows.sql",
+      "version": "20260921070000",
+      "sha256": "8835432d0cc9437170d1895080d689ec2ff16ce9d92c076b651c271616c3aa68",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922010000_read_platform_payments.sql",
+      "version": "20260922010000",
+      "sha256": "6acd4caffaffcdac16ffbade8e48ec22d778e516f96fb2c40a2d7cc861c6914c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922020000_preview_platform_refund.sql",
+      "version": "20260922020000",
+      "sha256": "b187a8094d6b6c5697f94248c7a137b6e51ba50053f96594452a1fb80a5a566e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922030000_confirm_platform_refund.sql",
+      "version": "20260922030000",
+      "sha256": "e75a21eb81d9f8035f7391fe74fa2ed36108055b70b96ad2b9a68d2f1a4673f6",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922040000_authorize_platform_refund_execution.sql",
+      "version": "20260922040000",
+      "sha256": "6009cef16de64c75cbe96405487488088b3e84c6e800bba8d4b45b5524a52499",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922050000_platform_refund_gateway.sql",
+      "version": "20260922050000",
+      "sha256": "ce10fd21de3dd162dde34525322cd41f64d8fe724616b37b9122c586b6bbc5ac",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922060000_read_platform_refund_history.sql",
+      "version": "20260922060000",
+      "sha256": "19d73e23538e6bbf44c74e01fa18061016f106f39bf00f1cab65afaa69685b77",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922070000_validate_platform_refund_amount.sql",
+      "version": "20260922070000",
+      "sha256": "95075fff9e588a2446522106a490662e51232a551ddf49b3fb777536405bb6eb",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922080000_guard_paid_trial_checkout.sql",
+      "version": "20260922080000",
+      "sha256": "4a9dfa58e5a88b59b7a417a523ac9add33414fcd24d0cd93a50d305c592f201c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922090000_resolve_refunded_trial_duplicate.sql",
+      "version": "20260922090000",
+      "sha256": "91eeadfe86f98d1763eade6f5acbe7a8d4e6bc0b8b8c81a16e8860a0b0d24387",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922100000_recurring_consent_foundation.sql",
+      "version": "20260922100000",
+      "sha256": "01815dcf8698657c00365c488e0b860e22a110404611e5c69a264ae77afa0627",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922110000_bind_recurring_method.sql",
+      "version": "20260922110000",
+      "sha256": "833679686077e23fc7259fdae0309c5e7a00f127bbd96664b62c67b3f2ef37ce",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922120000_recurring_send_snapshot.sql",
+      "version": "20260922120000",
+      "sha256": "cde68e8496e9aac896d328e155c0e9ef7a59145cca1af110a5b539903fa3e13a",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922130000_prepare_recurring_order.sql",
+      "version": "20260922130000",
+      "sha256": "e826adf51b611365817646ea7d390cb47d91a3350eb0a71b3c263335cfd21601",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922140000_release_recurring_reservation.sql",
+      "version": "20260922140000",
+      "sha256": "a4be66a69f28a0b07080d6481a0d7790efee2fd372ebeac0461014dc47ae396c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922150000_review_recurring_order.sql",
+      "version": "20260922150000",
+      "sha256": "02ae15cb730f42f939c22124695cd2979273300053ba6aa17b65b7092f477c3b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922160000_begin_recurring_attempt.sql",
+      "version": "20260922160000",
+      "sha256": "53b54204eb49aecafd8ffafdefc0ceb4a60d6aacd43e9694b526737fff7eade2",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922170000_recurring_server_contract.sql",
+      "version": "20260922170000",
+      "sha256": "4c551347c79f8ac68487590c3d4afcee775a40f8eca19b658f2ba21a0ecef746",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922180000_claim_recurring_dispatch.sql",
+      "version": "20260922180000",
+      "sha256": "8551e038d6aaed81c7c718ee4f402724c5e792e47ad518f1bc48f60672d355f7",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922190000_recurring_worker_gateway.sql",
+      "version": "20260922190000",
+      "sha256": "e6c36a3bf82153c401a02cdd911742ce4716c0a5a27f51222a552c9b73159822",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922200000_recurring_worker_queue.sql",
+      "version": "20260922200000",
+      "sha256": "d3506f908d991ed97be1a6f3aae556cd2de9627a5cd8f6f81e8a9dfa69e48533",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922210000_recurring_check_backoff.sql",
+      "version": "20260922210000",
+      "sha256": "b2a96ccbd8c9e320049aeda641e38fc5f24320a0014c80e70651280afdcc3d4e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922220000_close_recurring_attempt.sql",
+      "version": "20260922220000",
+      "sha256": "dabe24e7b803e4346b6e523e7a8d3b046c051e7a7d2c599653b575447c6c1973",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922230000_apply_recurring_period.sql",
+      "version": "20260922230000",
+      "sha256": "cf91cb90c2db5ef856636c4e73968adea407ef52f3f2d6b1559e190f8e080983",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922233000_recurring_fulfillment_gateway.sql",
+      "version": "20260922233000",
+      "sha256": "3f8cee370b0ff68d4f5093acb2bf5828e88fa189ce5f774c815f3707631a7a87",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922234500_prepare_due_recurring.sql",
+      "version": "20260922234500",
+      "sha256": "ee5fa48c64a972176e23946d6fd71effcd933d2b567057d798aff0f70e7d6ec4",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260922235000_recurring_technical_expiration.sql",
+      "version": "20260922235000",
+      "sha256": "643d2b833ca851f41763bff4b2cab004c5e42a9887dca5530583283bb4ddae57",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260923010000_read_recurring_failure_notice.sql",
+      "version": "20260923010000",
+      "sha256": "e50a1186105a7331a90fbb5d74707c06dc4b0363810bbfd2e148fe79bd50abd0",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260923020000_scope_recurring_acceptance.sql",
+      "version": "20260923020000",
+      "sha256": "7d5e85f8a9c183e30acce5cc057ee43710cbee54b6e53d5b9300685a7d238610",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260923030000_defer_future_discount_payment.sql",
+      "version": "20260923030000",
+      "sha256": "b18e1db8292723731096ab1881fdc87b5d06bc147fec6ac006ea2c6e87701a5f",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260923040000_list_organization_recurring_consents.sql",
+      "version": "20260923040000",
+      "sha256": "386be54d8eefdd8b37bb7a04a6f1924a87d6b15114651d58f18feb407eb8c81b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260923050000_project_payment_processing.sql",
+      "version": "20260923050000",
+      "sha256": "11675258eb5ee2e5fa0015e8e8a3368665c4dc5790a482158197e578dba28dc2",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260923060000_project_payment_order_details.sql",
+      "version": "20260923060000",
+      "sha256": "154eed40f97710900dfe3d67edfc1c50353cb351d83e6e580bd5f0eb0e30e7d2",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260924010000_schedule_scoped_sandbox_reconciliation.sql",
+      "version": "20260924010000",
+      "sha256": "88d8adc425231a28e71f695c289205fd8dda6135ef95acf8ea85f436b4e5bce1",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260924020000_sign_scheduled_order_requests.sql",
+      "version": "20260924020000",
+      "sha256": "b907ac58f5dbb207a791f3df159b2379776e62a2646f417a7cd8fef9a49ac81c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925010000_read_platform_organization_quests.sql",
+      "version": "20260925010000",
+      "sha256": "10275a5f07bfd5b4cd9c3673489240905fd4695b128a983bf60dbd4d0c34a1a2",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925020000_read_platform_organization_participants.sql",
+      "version": "20260925020000",
+      "sha256": "d64f64a0642e8739350632fbdc91ae3601161a62aeac26ea831db1a16ae6b19f",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925025000_track_quest_attempt_activity.sql",
+      "version": "20260925025000",
+      "sha256": "3043c31da063b1fc9b4921692701b76000a7b3e437263e069ba472c452bcaeb8",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925030000_read_platform_quest_statistics.sql",
+      "version": "20260925030000",
+      "sha256": "580a01e32c283d3a323abf8471f0197b5e0123a178b3edf8e26f36b059b177d5",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925040000_subscription_refund_requests.sql",
+      "version": "20260925040000",
+      "sha256": "8057d00950f2e66ba0b27b8abf53171920e1345d1b501160c8fab28c3966206a",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925041000_subscription_refund_reservations.sql",
+      "version": "20260925041000",
+      "sha256": "28a859a62f5ed2de07d8612297f4e206ed7e7b3fb7ee0a4706956dcaea3ba69b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925042000_subscription_refund_period_binding.sql",
+      "version": "20260925042000",
+      "sha256": "812b07c699fa9d1e03c2eec865222df62de0101bfd76a2e7c1621933554c1340",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925043000_apply_current_subscription_refund.sql",
+      "version": "20260925043000",
+      "sha256": "159dfc1ff4eb059ccc1f1e1cf48e22b9e8fac7ddef541b4d8fa83313a850e5c5",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925044000_refund_future_trial_period.sql",
+      "version": "20260925044000",
+      "sha256": "8682ca43442fee109897510f0a50c00ccbb7b4c75305b18a9ae381607f2af9d1",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925045000_repurchase_after_trial_refund.sql",
+      "version": "20260925045000",
+      "sha256": "ce63fb5fb760d09bd257d78a3ae0b4ab4a93a95ac59886d462275e0aacc9dd49",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925046000_refund_activated_trial_period.sql",
+      "version": "20260925046000",
+      "sha256": "25b0d3d055b9148d30eb7590e0cfee630af2f5db99b81b5ef7bef54073519015",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925047000_apply_refund_across_trial_boundary.sql",
+      "version": "20260925047000",
+      "sha256": "97043e7635ccf2d41d302cc343b4dba384bf98d49b3865d002533e97ca662c25",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925048000_reconcile_subscription_refund.sql",
+      "version": "20260925048000",
+      "sha256": "728341332477331afa3572bb4f06a63306ee67bf70b57b28d4624b1ba72e7b88",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925049000_retry_subscription_refund_access.sql",
+      "version": "20260925049000",
+      "sha256": "a885680caae51ed3aa61883d5ee13dd75282d62b7621605a9029d649ef4198a2",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925050000_guard_refund_dispatched_renewal.sql",
+      "version": "20260925050000",
+      "sha256": "81d75d1d989b0a7184b09a23e72024e9d2a75b96bcb1e4cf574bf55517944d86",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925051000_refund_renewal_preflight.sql",
+      "version": "20260925051000",
+      "sha256": "9e26382a6e38987b9af0276f4b3962f3ad82df3f54da8f29e813ffa3e26c6e41",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925052000_guard_zero_renewal_during_refund.sql",
+      "version": "20260925052000",
+      "sha256": "e83460f5d0d86ba9c164c609f14fed00dfcba212ea819598008e4b9414ff2f63",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925053000_check_refund_period_before_reserve.sql",
+      "version": "20260925053000",
+      "sha256": "a12d1b7436d5627a39d51ed198dd6e7503492465203e401bd78711a99e66c1dd",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925054000_claim_subscription_refund_dispatch.sql",
+      "version": "20260925054000",
+      "sha256": "dc06de77652bae8f36e6dadbcdaca43976f087597434fbe9f5e4d669d988469b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925055000_record_subscription_refund_result.sql",
+      "version": "20260925055000",
+      "sha256": "670b7c368904b953429d22ae9ec29c00af30e4b8d05e1dbe436e440f9a3214c6",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925056000_prepare_refund_recovery.sql",
+      "version": "20260925056000",
+      "sha256": "84aa97be4f5e32b0610053b9e2a1e95356f4957373cdaae8e3732582464461e5",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925057000_subscription_refund_gateway.sql",
+      "version": "20260925057000",
+      "sha256": "6579934180cc1045ca9377fbbf5c2a684ec38961812de562a63492b937f32dc5",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925058000_reject_subscription_refund.sql",
+      "version": "20260925058000",
+      "sha256": "f2799c9e9aa5c1d8c4a161e3dc0613eb5267492c58807ef26aac10521e9966e0",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260925059000_prepare_subscription_refund_gateway.sql",
+      "version": "20260925059000",
+      "sha256": "77778fbdd39012ab36c07aac0cc74d254997173ef73b438c128dfefa654bc055",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926000000_subscription_refund_history.sql",
+      "version": "20260926000000",
+      "sha256": "0e50c5f6afe0cef2e94a1c4763d3b6040bf53ace2180b815c453edee33385b3c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926010000_purchase_document_versions.sql",
+      "version": "20260926010000",
+      "sha256": "ec3d8a02888b9cb3f4aa9f25096ee64ad6dff9439485899ff7bc80349fd834da",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926011000_manage_purchase_documents.sql",
+      "version": "20260926011000",
+      "sha256": "8935fa863167d4cc0e933da38c4e904e5c563bc44b92ac4516ea0175d27b4227",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926012000_purchase_document_audit.sql",
+      "version": "20260926012000",
+      "sha256": "1f7d2715cdd7c3c5b4022e5cf34a84db399bf4091f1510ec7c98c72ac67c363a",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926013000_read_purchase_documents.sql",
+      "version": "20260926013000",
+      "sha256": "c6aa4fcb389a28edf0cfd51d748994b4b8ac12b6aec55c432145b66548ee2b24",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926014000_record_checkout_documents.sql",
+      "version": "20260926014000",
+      "sha256": "c82928dffc3d52be10775b7e7fd8e2186dcd5f1e7c52f1b60a2b65cd9d2789d8",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926015000_accept_checkout_with_documents.sql",
+      "version": "20260926015000",
+      "sha256": "215250c0b8f31ec62e357b8bd2fff3973d9c97856bc27cc9a17af29ee7fca153",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926016000_checkout_document_flow.sql",
+      "version": "20260926016000",
+      "sha256": "82cd760fca9362de56dea373dfd221a6786e04c7f6ec43f4e80127009c02f1b4",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926017000_list_platform_purchase_documents.sql",
+      "version": "20260926017000",
+      "sha256": "f4e6d0a705d3f4087a26d588d032c746cdcd74d9fca30981a900ddcdc84bef82",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926018000_read_platform_order_documents.sql",
+      "version": "20260926018000",
+      "sha256": "8bac91cb6010c3abc614cd2dec35983f0e0c93fcfded6c78e7b0923e7d0e461d",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926019000_receipt_snapshot_storage.sql",
+      "version": "20260926019000",
+      "sha256": "7d76269c4c6db6ef386e8070019c853b800c57b9219a2b462f2dff9d837b6a89",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926020000_prepare_sandbox_receipt.sql",
+      "version": "20260926020000",
+      "sha256": "2407a45b8e079d14f8a5faff0c08ee71e85fee75be0c1289080648b5af49e9aa",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926021000_manage_sandbox_fiscal_policy.sql",
+      "version": "20260926021000",
+      "sha256": "79543b4e4c9e09ec500c11da84aa56704226ab35c55a7a15a4f36d7be9b4862f",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926022000_list_sandbox_fiscal_policies.sql",
+      "version": "20260926022000",
+      "sha256": "3f517027f626b5de3ba66122b9b7a68de5066d80ef07d124c4b1c9a4a25fa3a9",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926023000_receipt_payment_requests.sql",
+      "version": "20260926023000",
+      "sha256": "70a0c9364944d05955a877f3c52c0c9f373bb8395348bbb3ccd1f44b9bedf262",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926024000_receipt_pending_batch.sql",
+      "version": "20260926024000",
+      "sha256": "2d23bb968a53bf95b5aaeb4e00ad7b91addaffe67def79520167e08a1c08bcdb",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926025000_receipt_contact.sql",
+      "version": "20260926025000",
+      "sha256": "f4859933296935b3319fa3120afc2aaaf2421d7e57eabbc29d33770100c94331",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926026000_recurring_receipt_snapshot.sql",
+      "version": "20260926026000",
+      "sha256": "1d71a12913fd9b09310cde257723bb37c346d5787f97e461565c89d085680652",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926027000_recurring_receipt_requests.sql",
+      "version": "20260926027000",
+      "sha256": "65b457b735345b171828b97db7dc274af3062bf4e65ea93dcd1816c3da3e138b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926028000_recurring_receipt_poll.sql",
+      "version": "20260926028000",
+      "sha256": "f9b880b83975f36429b17a9ed222f210e2e0c0f4e59274972b45095731f38732",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926029000_full_refund_receipts.sql",
+      "version": "20260926029000",
+      "sha256": "15ba7912e63dffc8bce374b70d135c8729c048ac6b4ed1144146baadb1a29002",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926030000_refund_receipt_poll.sql",
+      "version": "20260926030000",
+      "sha256": "59f6990582cce1a5d9081026d6b4aeeb1c893f01ba9623bc73c29dfd3032cc98",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926031000_platform_receipt_status.sql",
+      "version": "20260926031000",
+      "sha256": "ce4154d2951a35540698b4cc38d111075933ce70203a9b455a8b8e45c20de40e",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926032000_receipt_poll_backoff.sql",
+      "version": "20260926032000",
+      "sha256": "8a63a921fff2703c594dff5750248125b957f51d438a2696d40329386b2c6646",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926033000_prepare_prepayment_settlement.sql",
+      "version": "20260926033000",
+      "sha256": "8b113f5925b408bd5e029e1566e4c4b6113261d3d0b3272bda096d6f76c3d547",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926034000_claim_prepayment_settlement.sql",
+      "version": "20260926034000",
+      "sha256": "03b92cb76dcdfc8ccea4a20d6278e8c4d75b1c81600d741ee60966a901f52789",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926035000_list_pending_settlements.sql",
+      "version": "20260926035000",
+      "sha256": "dba0c1552ebd6e4421a06cb7ced6817c805c8a5ca80d7e40157be266047327b0",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926036000_settlement_poll_backoff.sql",
+      "version": "20260926036000",
+      "sha256": "44c4244ba2aee62fa31e8f101c40a5bb9b9f24f612cde8d442b7fc43cd6ec74f",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926037000_platform_settlement_status.sql",
+      "version": "20260926037000",
+      "sha256": "df7c13f799df1c6304eb2dc31fc5803d6a0d8ed55a5ef185874b3c0d0a3d86c3",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260926038000_tariff_monthly_prices.sql",
+      "version": "20260926038000",
+      "sha256": "a5f2889dbdc09bd7e757462213dda72c64278de600e0f70cd2ccf9026194f8e2",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260927010000_subscription_fiscal_model_storage.sql",
+      "version": "20260927010000",
+      "sha256": "5acdae8c834f90ef8fd3857958e3e2ec980a89627cd5c872cdec334edc675eb2",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260927011000_subscription_fiscal_model_commands.sql",
+      "version": "20260927011000",
+      "sha256": "9da2f072cde92e1879c8056e2cc973a99802c108daa5969acb48e767fda72904",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260927012000_subscription_settlement_due.sql",
+      "version": "20260927012000",
+      "sha256": "3110cee94a61da4575d517d7d9fd8c26186432a471eb666ad84dd3c7009445cf",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260928010000_subscription_fiscal_reservations.sql",
+      "version": "20260928010000",
+      "sha256": "d1d13190a6793c6e07452c1c9e7aaad5c133570ecbd7986818d89b7b5359d14b",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260928011000_subscription_fiscal_results.sql",
+      "version": "20260928011000",
+      "sha256": "6003a9f2789326f0735065ff812add79cb689cdc102f0b023a4c89088c53b097",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260928012000_subscription_fiscal_refund_binding.sql",
+      "version": "20260928012000",
+      "sha256": "bc585f484d2e4046161dd3b370493a4b274a81cea629f004fe8f20640e074560",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260928013000_subscription_fiscal_refund_lifecycle.sql",
+      "version": "20260928013000",
+      "sha256": "b4a147655ecd810e55d8bf92dc8b8bbe729a75e84d5540abb612a83362f70cba",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260928014000_subscription_fiscal_refund_endpoint.sql",
+      "version": "20260928014000",
+      "sha256": "15246a80bc4183a5b59734313ad4e99a250a75cfd83ea98dd0fcafd64990770c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260928015000_subscription_fiscal_worker.sql",
+      "version": "20260928015000",
+      "sha256": "08fa2ca722f2b4334d31d4d861918c7a682e64bac7301bc6741962f3437dce76",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260928016000_subscription_fiscal_history.sql",
+      "version": "20260928016000",
+      "sha256": "960f121d7233105de0e28a4ff7821aef471cf9f4d52368338685bd958d672269",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260928017000_subscription_fiscal_order_worker.sql",
+      "version": "20260928017000",
+      "sha256": "5ae998733b82b4d0a2f6cf305465559c4fb2bad53177cf2d60289a6a63545434",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260928018000_subscription_fiscal_acceptance_fixture.sql",
+      "version": "20260928018000",
+      "sha256": "29d7f787204c5ec8eada29d0e3c6f0370806e0675230b1d7a306cb3d53ae3964",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260930010000_subscription_full_refund_body.sql",
+      "version": "20260930010000",
+      "sha256": "e4444beec258f29facf0d51bfa4b7a9544e237286464ad58c055f254a7e741ce",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260930020000_subscription_settlement_schedule.sql",
+      "version": "20260930020000",
+      "sha256": "6fcbc12bb4334ea06c0b8a5403ba3cf578ebdf06b72c77b29844c24aa6717fd4",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20260930030000_settlement_receipt_identifier.sql",
+      "version": "20260930030000",
+      "sha256": "eccc341c29693accfaca526f1adc0ee77f6bae29efcccf46010a6711aa5e9b8c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20261001000000_resolve_refunded_subscription_replay.sql",
+      "version": "20261001000000",
+      "sha256": "beaf152127eea74fd4185443025faa48b055d25009a028ef7490398895d13246",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20261006010000_participant_profile_identity.sql",
+      "version": "20261006010000",
+      "sha256": "e5e691d622bd62857f244f897f5d142f4ce8a7abd197c2a9a4714184300f2612",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20261006020000_record_account_activity.sql",
+      "version": "20261006020000",
+      "sha256": "dc9a0fab0445ff740c6b909a124cb52ab676bfb2d177942b7d28c19c33ac63d0",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    },
+    {
+      "path": "supabase/migrations/20261007030000_subscription_refund_received_at.sql",
+      "version": "20261007030000",
+      "sha256": "ba09850040582134add330eaba60b6d18fb4c4352f6d5d720a8842b92bcd425c",
+      "disposition": "HOLD-production-classification-and-dependency-review"
+    }
+  ],
+  "separateSqlInputs": [
+    {
+      "path": "supabase/release-migrations/20261003000000_adopt_billing_environment_guard.sql",
+      "sha256": "9f2459348e0d03bd4e6b4f66ce83d3ed5b37ac3d79e2d63b149b13286995b5b8",
+      "disposition": "HOLD-production-specific-review"
+    },
+    {
+      "path": "supabase/release-migrations/20261003010000_read_my_platform_sections.sql",
+      "sha256": "08c1fc5045c2172d99df4c2cea3e7bbbf3e51b7f0d831f4cd397df299cec7bff",
+      "disposition": "HOLD-production-specific-review"
+    },
+    {
+      "path": "scripts/fixtures/shop-stage-six/20261010010000_shop_acquisitions_and_lineage.sql",
+      "sha256": "b1b5f1102819600d4b5ce9759c16e6403a12aaf00a5d34634fecce9c14bb1ffa",
+      "disposition": "test-fixture-NOT-production-migration"
+    },
+    {
+      "path": "scripts/fixtures/shop-stage-six/20261010020000_shop_orders_and_fulfillment.sql",
+      "sha256": "72b6dc5531cc51b12633983c976a0a75af717779d277be9062bbcd54129db871",
+      "disposition": "test-fixture-NOT-production-migration"
+    },
+    {
+      "path": "scripts/fixtures/shop-stage-six/20261010030000_shop_order_screen_reads.sql",
+      "sha256": "88b8e10c4054b3f16c38d17496221d8d1c1e61ffe5ecee153051359392926fd6",
+      "disposition": "test-fixture-NOT-production-migration"
+    },
+    {
+      "path": "scripts/fixtures/shop-stage-six/20261010040000_shop_payment_attempts.sql",
+      "sha256": "9dd7b7be3c2f47526520e3f9e4ab8d867810cb50ce1cd12d758c7d6e6518467f",
+      "disposition": "test-fixture-NOT-production-migration"
+    },
+    {
+      "path": "scripts/fixtures/shop-stage-six/20261010050000_shop_payment_reconciliation.sql",
+      "sha256": "0b53aa8505f94a665bcfaf613ffe7d7ff7d420edf2b371b3887eba7891887c71",
+      "disposition": "test-fixture-NOT-production-migration"
+    },
+    {
+      "path": "scripts/fixtures/shop-stage-six/20261010060000_shop_public_catalog.sql",
+      "sha256": "760872f935d9ed4cd8a4280b971da3aebe62cf10a3084ea5790ebf1f3d4e35b0",
+      "disposition": "test-fixture-NOT-production-migration"
+    }
+  ],
+  "functions": [
+    {
+      "name": "admin-fiscal-acceptance-prepare",
+      "entry": "supabase/functions/admin-fiscal-acceptance-prepare/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/fiscalAcceptanceEndpoint.js",
+          "sha256": "644ac083d235511c8947e8ec209123e836ec2cba66a98783841f79a76516e0f2"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundIdentity.js",
+          "sha256": "3103829e0a9a45d0b44239c07dab76d8ad868e84d1316aedeeadec11d46cc927"
+        },
+        {
+          "path": "supabase/functions/admin-fiscal-acceptance-prepare/index.ts",
+          "sha256": "1509dd64e6a426213d4c6dfee6c1361d1e7fe4bf336d09a8bc97fbb1e63fa05e"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "true",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "admin-sandbox-refund",
+      "entry": "supabase/functions/admin-sandbox-refund/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/platformRefundEndpoint.js",
+          "sha256": "b86e89989f334fc67b7b45c18cb7475575d67ca2289b692d707553e3881e4641"
+        },
+        {
+          "path": "supabase/functions/_shared/refundReceiptTransport.js",
+          "sha256": "5bc5b486bc5db1217617d3c707856c7adb9b2255f5de05994762199ce0cf3f65"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefund.js",
+          "sha256": "3e01e96f9a942a34c737f130149352335306bd7b5f7fb67d94139438e79e207c"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundGateway.js",
+          "sha256": "5cb159020a8159b1ddf8f5a30493edac6516f3af1e26adcd42e2c927d3453cfe"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundHandler.js",
+          "sha256": "6104e19f06775cde5a6a6135057e9343ae8f2bf56586b9c114e0361dad74b95f"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundIdentity.js",
+          "sha256": "3103829e0a9a45d0b44239c07dab76d8ad868e84d1316aedeeadec11d46cc927"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/admin-sandbox-refund/index.ts",
+          "sha256": "fdff133c7526c47f5ba84b8ad7d07997deeee97f9083749aa7e9583827b20d2a"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "not-explicit-in-config",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "admin-subscription-fiscal-refund",
+      "entry": "supabase/functions/admin-subscription-fiscal-refund/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/sandboxRefundIdentity.js",
+          "sha256": "3103829e0a9a45d0b44239c07dab76d8ad868e84d1316aedeeadec11d46cc927"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalFlow.js",
+          "sha256": "ace1f6d8635c6cbdb7cdc9cb7fc3b674633a822c04f818bf323e25e87b8a8bc5"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalRefundEndpoint.js",
+          "sha256": "d29c7adb5994ac86023c001e6cfa6cce0715bacb6beb254e53ad2067fe44814c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalRefundRuntime.js",
+          "sha256": "900b06f33ceb68f2a926e3eebe338a8abebe4c27a36ebd98e07aaca6a81e1e7e"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalRefundStorage.js",
+          "sha256": "dbf7900677bdec2f62cd598ba9a139b0690e078b971220fd247b9c61c2080436"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/admin-subscription-fiscal-refund/index.ts",
+          "sha256": "529dcab84388a8bfbc9651c519109ec55d8c472c151d9d64e330bc03a91fa407"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "not-explicit-in-config",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "admin-subscription-refund",
+      "entry": "supabase/functions/admin-subscription-refund/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/refundReceiptTransport.js",
+          "sha256": "5bc5b486bc5db1217617d3c707856c7adb9b2255f5de05994762199ce0cf3f65"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundHandler.js",
+          "sha256": "6104e19f06775cde5a6a6135057e9343ae8f2bf56586b9c114e0361dad74b95f"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundIdentity.js",
+          "sha256": "3103829e0a9a45d0b44239c07dab76d8ad868e84d1316aedeeadec11d46cc927"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionRefundEndpoint.js",
+          "sha256": "a511818a0e54da700dda0f5008433d7fb7332ee482be65649f5076f878470524"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionRefundRuntime.js",
+          "sha256": "31b8fb4031e22f8527039fbd090d6f446be93ee9fa2a5248a0791b2134c71cb2"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/admin-subscription-refund/index.ts",
+          "sha256": "44879f2d5b22f703fee4e3004236ba9ad333de99cd706797c825dc63a754a28d"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "not-explicit-in-config",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "admin-subscription-refund-prepare",
+      "entry": "supabase/functions/admin-subscription-refund-prepare/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/refundReceiptTransport.js",
+          "sha256": "5bc5b486bc5db1217617d3c707856c7adb9b2255f5de05994762199ce0cf3f65"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundHandler.js",
+          "sha256": "6104e19f06775cde5a6a6135057e9343ae8f2bf56586b9c114e0361dad74b95f"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundIdentity.js",
+          "sha256": "3103829e0a9a45d0b44239c07dab76d8ad868e84d1316aedeeadec11d46cc927"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionRefundEndpoint.js",
+          "sha256": "a511818a0e54da700dda0f5008433d7fb7332ee482be65649f5076f878470524"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionRefundPreparationEndpoint.js",
+          "sha256": "fef05d4794cc23a31f1ecf8771ea87e7994892cccb7a3a8988edb79383b7eab7"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionRefundRuntime.js",
+          "sha256": "31b8fb4031e22f8527039fbd090d6f446be93ee9fa2a5248a0791b2134c71cb2"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/admin-subscription-refund-prepare/index.ts",
+          "sha256": "5e652690eb19a205e847029424fed8f1f5f3bf3bc85a202dd8b6c59ee18b91ac"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "not-explicit-in-config",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "participant-avatar",
+      "entry": "supabase/functions/participant-avatar/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/participantAvatarEndpoint.js",
+          "sha256": "087171c672109f368e27ca3d6c20ea994188f4dd41369704fc9e17cbf31ff3a0"
+        },
+        {
+          "path": "supabase/functions/_shared/participantAvatarPng.js",
+          "sha256": "62dbac9441d3791139722576ecd95cbca358aa90b4dd87df00f88d07e43b0790"
+        },
+        {
+          "path": "supabase/functions/participant-avatar/index.ts",
+          "sha256": "68c0ef694eab109a0a44f8e67811d8374cfb202fcf81e1b2d58c121b8df5eb32"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "true",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "redeem-quest-code",
+      "entry": "supabase/functions/redeem-quest-code/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/cors.ts",
+          "sha256": "fb29364b7991b510820d6365fd5bff6da7f46c55ac351099fd3275101b14b253"
+        },
+        {
+          "path": "supabase/functions/redeem-quest-code/index.ts",
+          "sha256": "979218215dcf2f162e573c520f3618be480e7cf74a01471224b34dec97130ce5"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "true",
+      "productionDisposition": "existing-production-function-replacement-not-authorized"
+    },
+    {
+      "name": "sandbox-checkout",
+      "entry": "supabase/functions/sandbox-checkout/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/receiptCheckout.js",
+          "sha256": "2f25bf5184399483af77d47a58d1b4d75cec34e9ec490d2ed49644a19272869f"
+        },
+        {
+          "path": "supabase/functions/_shared/receiptPaymentTransport.js",
+          "sha256": "29c37893534883bae52c19f1b0d17257f1382a0eb0cf6937d93d0e09ec713512"
+        },
+        {
+          "path": "supabase/functions/_shared/receiptSnapshot.js",
+          "sha256": "865289bfb14b3c381c84850e8b6d643c54c0d326ff9caf5f12486747358ba34d"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxCheckout.js",
+          "sha256": "c8914cf74edb66c4c76b6f63aa01f9f4faa3a45150f27e117bf434348e597aaf"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxCheckoutHandler.js",
+          "sha256": "bf7b2d05ab669184da24b8793946da6afb3345d58e09fc322f1143eb8b6627d3"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/sandbox-checkout/index.ts",
+          "sha256": "45ad797a1a106919838ce6d3426e78f1a1f0d8ba46a42718edbb5d44e975cda5"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "not-explicit-in-config",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "sandbox-reconcile",
+      "entry": "supabase/functions/sandbox-reconcile/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/prepaymentSettlementFlow.js",
+          "sha256": "e5a6a4f9d44f0082536e0366d79793a9d5c9bd61528b1926d9a0c2efe9ff6a5b"
+        },
+        {
+          "path": "supabase/functions/_shared/receiptPaymentTransport.js",
+          "sha256": "29c37893534883bae52c19f1b0d17257f1382a0eb0cf6937d93d0e09ec713512"
+        },
+        {
+          "path": "supabase/functions/_shared/receiptReconciliation.js",
+          "sha256": "13ae258b912487d3179e56f094ab528dda4c6d1fb1ee0d5bb4da80b78e3153f1"
+        },
+        {
+          "path": "supabase/functions/_shared/receiptSnapshot.js",
+          "sha256": "865289bfb14b3c381c84850e8b6d643c54c0d326ff9caf5f12486747358ba34d"
+        },
+        {
+          "path": "supabase/functions/_shared/refundReceiptTransport.js",
+          "sha256": "5bc5b486bc5db1217617d3c707856c7adb9b2255f5de05994762199ce0cf3f65"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxReconciliation.js",
+          "sha256": "e38ca38b92c934866f13151d53f4eccf076dced2e5dbfa75655276622f63a087"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundReconciliation.js",
+          "sha256": "2604db05b491e100d4c39c9300e198cae5ca00dff83c05bccaea1b35d7c9a083"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxSettlementPhase.js",
+          "sha256": "d987c52cd67eec9a45ae784254652318a3ecf7e73c3bd389e3bad67d232db6f5"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
+          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementReconciliation.js",
+          "sha256": "7db241e17c964d879bea48ae86b61f31e7124ff7a4c8ab53165107ee3fb4f7ce"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalFlow.js",
+          "sha256": "ace1f6d8635c6cbdb7cdc9cb7fc3b674633a822c04f818bf323e25e87b8a8bc5"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalWorker.js",
+          "sha256": "58b65666512e208832514b68f57ef0719cff30f05c900ccc6f324c1020dbe72f"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionRefundAccessRetry.js",
+          "sha256": "29fe8efe1cfa247eff02f3e2f82b0fa00a47621942ddf2d28ccec48141f667c9"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionSettlementQueue.js",
+          "sha256": "a96628ede6480ffdfc6c4159e1978c76bf02308922a86013d1292d1755339bf5"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/sandbox-reconcile/index.ts",
+          "sha256": "965b429b069e8c8bbc8582bde6dea50308b1f76dfac82e02504b433cb10129b3"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "false",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "sandbox-reconcile-order",
+      "entry": "supabase/functions/sandbox-reconcile-order/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/receiptPaymentTransport.js",
+          "sha256": "29c37893534883bae52c19f1b0d17257f1382a0eb0cf6937d93d0e09ec713512"
+        },
+        {
+          "path": "supabase/functions/_shared/receiptSnapshot.js",
+          "sha256": "865289bfb14b3c381c84850e8b6d643c54c0d326ff9caf5f12486747358ba34d"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxOrderReconciliation.js",
+          "sha256": "644891d03befff7bc12cd89ebb3c172ffabcd4d0a61c6c64a26cb36a29d5119f"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxOrderWorkerHandler.js",
+          "sha256": "37b5089c13a866c0587bb0cd2e6343b3cc172da127e176effa6597b5cbe3deb3"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxReconciliation.js",
+          "sha256": "e38ca38b92c934866f13151d53f4eccf076dced2e5dbfa75655276622f63a087"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
+          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/sandbox-reconcile-order/index.ts",
+          "sha256": "ac123f3a91a90eb3a2483a9921762cb089d045c5b9add280082ae0335faa1ed9"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "false",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "sandbox-recurring",
+      "entry": "supabase/functions/sandbox-recurring/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/receiptPaymentTransport.js",
+          "sha256": "29c37893534883bae52c19f1b0d17257f1382a0eb0cf6937d93d0e09ec713512"
+        },
+        {
+          "path": "supabase/functions/_shared/receiptSnapshot.js",
+          "sha256": "865289bfb14b3c381c84850e8b6d643c54c0d326ff9caf5f12486747358ba34d"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRecurring.js",
+          "sha256": "266050e605c1441bb3e161626392676f13d487124d68f20c3ac71f992527fcda"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRecurringBatch.js",
+          "sha256": "6fd8857dd076688c049b08ba60bf5b4da02e17312a381f0c1226f940f1496d3e"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRecurringWorker.js",
+          "sha256": "c2c351965b609ef812618abb8ba69618ec7b4b43ebf4699300fce6e69e20b5bc"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
+          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/sandbox-recurring/index.ts",
+          "sha256": "93e7d8cb6ed89493fec81f306fe97201bc2e11e74c60c27d1f0c1e8f27193926"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "false",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "sandbox-subscription-fiscal-order",
+      "entry": "supabase/functions/sandbox-subscription-fiscal-order/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
+          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalFlow.js",
+          "sha256": "ace1f6d8635c6cbdb7cdc9cb7fc3b674633a822c04f818bf323e25e87b8a8bc5"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalOrderWorker.js",
+          "sha256": "27843d8e3f50ebd7ecb2cf1c5d22ae46b82ca302aa3fdc2693052bfdde725f0c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalWorker.js",
+          "sha256": "58b65666512e208832514b68f57ef0719cff30f05c900ccc6f324c1020dbe72f"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/sandbox-subscription-fiscal-order/index.ts",
+          "sha256": "0d0aa4410006b7c04bad31fe083d2edf6cea6c35c13ea7926e8f577b3dc951ac"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "false",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "sandbox-subscription-settlement-order",
+      "entry": "supabase/functions/sandbox-subscription-settlement-order/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/prepaymentSettlementFlow.js",
+          "sha256": "e5a6a4f9d44f0082536e0366d79793a9d5c9bd61528b1926d9a0c2efe9ff6a5b"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxOrderWorkerHandler.js",
+          "sha256": "37b5089c13a866c0587bb0cd2e6343b3cc172da127e176effa6597b5cbe3deb3"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxWorkerHandler.js",
+          "sha256": "315d1af6eb2275b65efc254b09cfe82f82c36becc6724b80b38557743d5c4e79"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionSettlementOrder.js",
+          "sha256": "2078108547c0878f8e86c633a000c8933070556bca6bdb2a57e8a56c1472aced"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionSettlementOrderRuntime.js",
+          "sha256": "4f4680a7f1e2dc5cdea63628de5050fbcd8fec5b8b6c770da993b77a95cc3d30"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/sandbox-subscription-settlement-order/index.ts",
+          "sha256": "40d15a8188b3638243e3fdd5568b541f1dadb9c6f3589ef74af499d44410a1f7"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "false",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    },
+    {
+      "name": "yookassa-sandbox-webhook",
+      "entry": "supabase/functions/yookassa-sandbox-webhook/index.ts",
+      "source": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+      "files": [
+        {
+          "path": "supabase/functions/_shared/sandboxReconciliation.js",
+          "sha256": "e38ca38b92c934866f13151d53f4eccf076dced2e5dbfa75655276622f63a087"
+        },
+        {
+          "path": "supabase/functions/_shared/sandboxRefundReconciliation.js",
+          "sha256": "2604db05b491e100d4c39c9300e198cae5ca00dff83c05bccaea1b35d7c9a083"
+        },
+        {
+          "path": "supabase/functions/_shared/settlementHttp.js",
+          "sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionFiscalHttp.js",
+          "sha256": "643236f93019be83c4a70bd07197498aa273417f8a9c5bec89ac6ae9c73b113a"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionReceipt.js",
+          "sha256": "c53fbc40b9cd165b4dc2020b9ff3b2e606a836fd11d82f2d06463cfc4326bad9"
+        },
+        {
+          "path": "supabase/functions/_shared/subscriptionRefundAccessRetry.js",
+          "sha256": "29fe8efe1cfa247eff02f3e2f82b0fa00a47621942ddf2d28ccec48141f667c9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandbox.js",
+          "sha256": "ab7ae70a328a900f9111e25918ca295a011cad4606536898446b124f02e92ed9"
+        },
+        {
+          "path": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "sha256": "ae6499e7724e5c98518c98de5c04e3178c8577f6952e506f339c7f6c83e2a2bf"
+        },
+        {
+          "path": "supabase/functions/yookassa-sandbox-webhook/index.ts",
+          "sha256": "a37d74813a7226da46ed95b179146720ac1346c25ace9cb77b5c91200020d0d4"
+        }
+      ],
+      "externalImports": [
+        "npm:@supabase/supabase-js@2.112.3"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation.",
+      "declaredVerifyJwt": "false",
+      "productionDisposition": "HOLD-production-contract-and-binding"
+    }
+  ],
+  "deployedStageFunctionsWithoutSourceInPinnedBundle": [
+    "shop-checkout",
+    "shop-reconcile",
+    "shop-reconciliation-worker"
+  ],
+  "frontendDependencies": {
+    "App": {
+      "files": [
+        {
+          "path": "src/App.jsx",
+          "sha256": "3e1cb99e1cf42548c4689ab6b350aa212d3ccd1cedb114a2f4ea3a06f64a3b95"
+        },
+        {
+          "path": "src/components/AppBrand.jsx",
+          "sha256": "ca5ac276dc844cf999843806ddd1b4b5377e1224cc5f89182578760f551ab387"
+        },
+        {
+          "path": "src/components/AppIcon.jsx",
+          "sha256": "ef1e5fc1a1f0a004c29081d27e2868dc18deae86d2a346b689c0a5279cfcb92e"
+        },
+        {
+          "path": "src/components/BillingIntentControls.jsx",
+          "sha256": "e429a27d192b9dbd8f373e2d9637c397ff17d22a4774866b5eff3bc17915a34c"
+        },
+        {
+          "path": "src/components/DiscountCheckoutFlow.jsx",
+          "sha256": "5a4f3e7cbe831dbe99c34b701c0c1aed42f37c4f9a50498712bda8c9dd160810"
+        },
+        {
+          "path": "src/components/DiscountCheckoutPreview.jsx",
+          "sha256": "8a644af27f464b242e0b0d2c6c168a190917fb92c674d4834a780e228cf60562"
+        },
+        {
+          "path": "src/components/FreeAccessControls.jsx",
+          "sha256": "a472494f71943219c451fd3f8af894ad3d3799d9f324083f338349161c3f3c38"
+        },
+        {
+          "path": "src/components/InvitationQrCode.jsx",
+          "sha256": "471db85a080148b41be6ed6a73ecc04637479e48b76b414457ff6fbd283c2303"
+        },
+        {
+          "path": "src/components/LazyRouteErrorBoundary.jsx",
+          "sha256": "c07859fec7a74746684efff74c432aee966435af4f5990145da8bd9e4a322a56"
+        },
+        {
+          "path": "src/components/Loader.jsx",
+          "sha256": "9c81314f71d5872a9b3e49f4fd713980ba79bb7b91041af80bcaf63b54de0905"
+        },
+        {
+          "path": "src/components/LoginEntry.jsx",
+          "sha256": "9f7746c0d79cfd8ebc1aa30c6518a31947e1e9135582c2a63f3b287dca55e8b3"
+        },
+        {
+          "path": "src/components/MapPicker.jsx",
+          "sha256": "677bc95c22e632baa65eb15b09dcf8814f3e7e2724f58f57af7ecbe7456d57c0"
+        },
+        {
+          "path": "src/components/MonthlyParticipantUsage.jsx",
+          "sha256": "b5e9ebe2a4f21f0ddfeca654e60cd875b9244d78a45dede264e6bd7166f087d9"
+        },
+        {
+          "path": "src/components/Navbar.jsx",
+          "sha256": "252eb30d8d7f354120dede72bbc661bf035f7aba58237577b81a008fc9db8ca1"
+        },
+        {
+          "path": "src/components/OfflineEventReviews.jsx",
+          "sha256": "bc7b8cbbb126bd65f23717bfe0258b0de4fc04bdfddf296860a8c89a81ba2e71"
+        },
+        {
+          "path": "src/components/OfflineLocationGuide.jsx",
+          "sha256": "918cb900c5596deab68c0e5844dbada774b41cbe750794be7b2b494187d471c2"
+        },
+        {
+          "path": "src/components/OfflinePackageCheck.jsx",
+          "sha256": "721c8dfb09e425d436e22ee3c0df649282e762d57e043022a9638e93cd8f1b36"
+        },
+        {
+          "path": "src/components/OrganizationAudit.jsx",
+          "sha256": "393b06cebb4f6c08d6000eeade78e46c2a8b620eac8332e992f0127a5de48177"
+        },
+        {
+          "path": "src/components/OrganizationInvitationActions.jsx",
+          "sha256": "9b578844b8cb7c27ef2baab6394d19f8a62799d3458b848ca3ab56d7a91b4d35"
+        },
+        {
+          "path": "src/components/OrganizationInvite.jsx",
+          "sha256": "aa5c1a6382ef5099a78dd601346a373d8d3459b44509cb3cec76437fb5e93c68"
+        },
+        {
+          "path": "src/components/OrganizationMemberActions.jsx",
+          "sha256": "46215a4ddc468060f1a08e2e8fa3c938fd8db978cec1deb2fcc538698eaff508"
+        },
+        {
+          "path": "src/components/OrganizationRecurringConsent.jsx",
+          "sha256": "30b1bfa294aab0b4f75120037f0f4a8d8ccd0dbbae7748a5ba74150f2e034164"
+        },
+        {
+          "path": "src/components/ParticipantAvatar.jsx",
+          "sha256": "f06a2e7f306e7448101291993eeadb2df683f449dac175502a155793287adc01"
+        },
+        {
+          "path": "src/components/ParticipantDashboard.jsx",
+          "sha256": "cc68a89ccddabff38747c55a693e809361a401e840c17a7a6f74bb5b859fbd88"
+        },
+        {
+          "path": "src/components/ParticipantGroupAddMember.jsx",
+          "sha256": "3319bfad944f6bffdfd0a53186e5d8df337e8f03cabd3510a33c71d256da1d76"
+        },
+        {
+          "path": "src/components/ParticipantGroupExit.jsx",
+          "sha256": "7f813ed4863f0a11bbdcf36b0111162254cbb58178b6f4946164ee18d52911dd"
+        },
+        {
+          "path": "src/components/ParticipantGroupInvite.jsx",
+          "sha256": "726b822801d49b72caff30bde20773affe88d7328f2d6d685fbc7664830d01ed"
+        },
+        {
+          "path": "src/components/ParticipantGroupPicker.jsx",
+          "sha256": "dc0a5a334f494c04ba692a810abc67193df9faa29c9518e8ef0ec5e80b8e400d"
+        },
+        {
+          "path": "src/components/ParticipantGroupRole.jsx",
+          "sha256": "d9f3e4ab314d07040e69e19971badba30c1416ece0d6ee91841a49112bab23ca"
+        },
+        {
+          "path": "src/components/ParticipantIdentityEditor.jsx",
+          "sha256": "5c7d1847877bcb325b23b711005510c8c08dfa1b630d3e955c1df5951af7724f"
+        },
+        {
+          "path": "src/components/ParticipantModeBar.jsx",
+          "sha256": "46630ad93eab713acb7c1e3ae97634d8744bcf86f65112035fb01f64422c34e3"
+        },
+        {
+          "path": "src/components/ParticipantProfileInvite.jsx",
+          "sha256": "697d8bd5b6dcf3d0a194b584b12dfbed7ce028de1cffda6f502f6572605eaee3"
+        },
+        {
+          "path": "src/components/ParticipantProfileSearch.jsx",
+          "sha256": "b7263f70e24032e789805087d178acc25a03ef9fbf154edb09d4f34c4cca5d41"
+        },
+        {
+          "path": "src/components/ParticipantProfileSelect.jsx",
+          "sha256": "864a73fc7f627e2144463f476894f3aea56cb36da97a509ee8ebc43f60266a6e"
+        },
+        {
+          "path": "src/components/ParticipantQuestProfilePicker.jsx",
+          "sha256": "805e71c05dfd65fa6f6034362f3f825702006fb568fa788df9b37dcb1ba2beaf"
+        },
+        {
+          "path": "src/components/ParticipantResume.jsx",
+          "sha256": "a75743668dd96fc8c363938c6a9d436b9c299ce26e20fdcc639ebc3fa141a08a"
+        },
+        {
+          "path": "src/components/ParticipantSupervisionControl.jsx",
+          "sha256": "6f49598e59fc0efec13e809ad7fb1b85de6aebfee2e0aabf4a730c6c1d1d0e55"
+        },
+        {
+          "path": "src/components/ParticipantSupervisorAction.jsx",
+          "sha256": "61c8d449c82fd0cdb3f64598393756ef5b1f7f6f9faac6d89631a677ed3bbef6"
+        },
+        {
+          "path": "src/components/PendingActionStatus.jsx",
+          "sha256": "8d22e915635eed0a81b1323574fd30f534c9b8ec989b03ef16ce2d1d788a76e6"
+        },
+        {
+          "path": "src/components/PrepareOfflineStart.jsx",
+          "sha256": "6eae75d68125f4ad30044bcb03a81f0028c3b2de05b0a01af5248ad9886c92c7"
+        },
+        {
+          "path": "src/components/ProtectedRoute.jsx",
+          "sha256": "38b0c560c366494eb33a326004565609bc2e510886b32e880562c408608465e3"
+        },
+        {
+          "path": "src/components/PurchaseDocuments.jsx",
+          "sha256": "93e84644292f0ce75d48cd66d335d89e1316c967f6d1135e769b58071d2bbd6e"
+        },
+        {
+          "path": "src/components/QuestAccessCreate.jsx",
+          "sha256": "90d30bfcf6a648d63fe6587adfa80b425308c0511bafcbe6ef03a3abaaca8803"
+        },
+        {
+          "path": "src/components/QuestAccessLists.jsx",
+          "sha256": "91eaf8ff21c59ea850125c118501b21facefafede99f61074ab1cec474efd881"
+        },
+        {
+          "path": "src/components/QuestAccessRevoke.jsx",
+          "sha256": "55614522790399fbdcdaefd76192eb5e5f850504de71a65a6ee5015e41fdc920"
+        },
+        {
+          "path": "src/components/QuestConnectionStatus.jsx",
+          "sha256": "99a068934112bd6b56cd61a657cbdc2c76c0540fa307883927d4480881e06a09"
+        },
+        {
+          "path": "src/components/QuestCountdown.jsx",
+          "sha256": "022fde6eb5f29310a7a5394459fbc13857ce4127982a2da62994adf33f775e95"
+        },
+        {
+          "path": "src/components/QuestListRow.jsx",
+          "sha256": "48872c3f68a5f9f9663011f24693a44ab9e66d334d9916ee7970efd7f9c45256"
+        },
+        {
+          "path": "src/components/QuestOverviewMap.jsx",
+          "sha256": "9a2b7575a339924f4ac3e015a154f166339953b0382745a592ec077ea064baa7"
+        },
+        {
+          "path": "src/components/QuestResultTasks.jsx",
+          "sha256": "b363cd55dbda070f124be9ac8fddace8df6d8e215cf83fba95d6314572a3143b"
+        },
+        {
+          "path": "src/components/QuestResultsMaintenance.jsx",
+          "sha256": "1ca8d9bf25a784272574fab7c940d7e5c5eef0c3070bf2c2659e1179e3c62f0c"
+        },
+        {
+          "path": "src/components/QuestResultsMaintenanceAccess.jsx",
+          "sha256": "6c23e039a8b36941ee3fa9e04892c00ff6240c8e3a632f99a73946fa32740e7d"
+        },
+        {
+          "path": "src/components/QuestStartScreen.jsx",
+          "sha256": "b284559ab6b0b76a3937a95f96168c610913a056a0e460fe7f16a153892ab3fc"
+        },
+        {
+          "path": "src/components/QuestTaskSummary.jsx",
+          "sha256": "a1a8f1a6c4821bc375d20de03fe4ff66e9b99bf59808461c43debd2eb26a0744"
+        },
+        {
+          "path": "src/components/QuestWorkspaceNav.jsx",
+          "sha256": "5d6422e2c1b33bb1349647f60028001b969306295508e4016597e6d9ef7a141b"
+        },
+        {
+          "path": "src/components/ReceiptContact.jsx",
+          "sha256": "4f2905d315a7cf8801a28d65581cd56e1cac89c66ecf3ff71c896902552f723d"
+        },
+        {
+          "path": "src/components/RecoveryMfa.jsx",
+          "sha256": "1de52032b59f139d2bf37c5eb52abd3548bdd6aa42d12e5a254a14392d9a33a0"
+        },
+        {
+          "path": "src/components/RecoveryRequest.jsx",
+          "sha256": "a1af600d42efd5bbe09c7eb995c52aae620485b4bd2bef6d96b199ace710f165"
+        },
+        {
+          "path": "src/components/RecurringConsent.jsx",
+          "sha256": "f22bdd991e800a0a9814d5634a0372c5c0d61115189414dcc3c0134d36d87238"
+        },
+        {
+          "path": "src/components/RecurringFailureNotice.jsx",
+          "sha256": "0cd2199526691a0aa0efb67cbfaafa11ae76fa735c66cdea28e0477067e579d2"
+        },
+        {
+          "path": "src/components/SandboxCheckout.jsx",
+          "sha256": "54e3a2d97af420be4973c098c64655dec8ac93d7b28c1f14a11b54e7bcaaffae"
+        },
+        {
+          "path": "src/components/SandboxOfferPicker.jsx",
+          "sha256": "446c58a4a10e949bcf8b724982986873063fc15629929c8c327b3be56e6df5a2"
+        },
+        {
+          "path": "src/components/SandboxSessionCheck.jsx",
+          "sha256": "c7d05b776fd0b91218777658f5e74b00d52be03b47583503346fd1feb6fbac52"
+        },
+        {
+          "path": "src/components/ShopOrderDetails.jsx",
+          "sha256": "734be3734114463e709a545088c80441dee2faa9f4ec38ef84bba78b4b04f112"
+        },
+        {
+          "path": "src/components/ShopOrganizationGate.jsx",
+          "sha256": "07fb073c8e16554df888c42840db1da2bd68c6cc4fc8fa073b481120baec9ce1"
+        },
+        {
+          "path": "src/components/ShopPayment.jsx",
+          "sha256": "e801995b64feb6499843c789c7f626acd4530713b8a3caee76a61f3e7ce269ca"
+        },
+        {
+          "path": "src/components/ShopPendingOrders.jsx",
+          "sha256": "ef192ca09f63eff633efa8a71401af3e47bc0f49ecc0388b8d0bae3ccf1b8065"
+        },
+        {
+          "path": "src/components/StaticMapOverlay.jsx",
+          "sha256": "b4376d00b39ee3495bed7b437197f6bd09a4c6235f31692c12366a113ca8593d"
+        },
+        {
+          "path": "src/components/TaskLocationMap.jsx",
+          "sha256": "4da64b6e2c23d9aafef2413abe1c6c631d7f28a7336ccf2b4f04054112033fc9"
+        },
+        {
+          "path": "src/components/TaskMedia.jsx",
+          "sha256": "a4a0aa06c96b849939c0be30055599637e908869962725f0bcc465954c12470b"
+        },
+        {
+          "path": "src/components/Toaster.jsx",
+          "sha256": "bf00a1a1424540a1cc89002399eddf8e6329ac35ebf4ea66851d7aff94103273"
+        },
+        {
+          "path": "src/contexts/OrganizationContext.jsx",
+          "sha256": "949b0f1e9f6b0daf890b629c39d3f0d804fa19afd493fa21d39917d6821de967"
+        },
+        {
+          "path": "src/contexts/organizationContextState.js",
+          "sha256": "472b89ecec0c1e412222eb5aaf585ca03440c8dbd70940b6ce19f5888cdcc0c7"
+        },
+        {
+          "path": "src/contexts/useOrganization.js",
+          "sha256": "e55aaaa0795517eb2b44c9d6da923f94226cd0958d3898a51a885f2a0fe7179b"
+        },
+        {
+          "path": "src/diagnostics/ShopOffDiagnostic.jsx",
+          "sha256": "d4fb7734d800f40222d2ad5a8a64af1af08fffddbfdc304637b7e9f4e32344e3"
+        },
+        {
+          "path": "src/diagnostics/shopOffDiagnostic.js",
+          "sha256": "356fb73c43af561752c9d3f48242cb856aeaac097a41ce2001589fbd483d3109"
+        },
+        {
+          "path": "src/diagnostics/shopOffDiagnosticClient.js",
+          "sha256": "45762d50fb96872efc1edbcc9a65283d01d0d021b8ef615b0ed4ca5d4b1cf09c"
+        },
+        {
+          "path": "src/hooks/useAccountActivity.js",
+          "sha256": "023b0421edd7696d0eb5aa60fc0a560ab7f725f1a078f228db990f8fa426aaef"
+        },
+        {
+          "path": "src/hooks/useOrganizationAudit.js",
+          "sha256": "dcade0f44480f964e8d5356c69246dcd16cb2f94415e613140733d6a12aacaf0"
+        },
+        {
+          "path": "src/hooks/useOrganizationQuestList.js",
+          "sha256": "344af6c7fe49eb5011a7d0d1eef1a8fc3b61baca1cb31c30522e524f9e8ebfff"
+        },
+        {
+          "path": "src/hooks/useParticipantCatalog.js",
+          "sha256": "a9e12d56fdd457d91dc2a0f8c0036cdaa920dc4069137b713e595eea4b944b6d"
+        },
+        {
+          "path": "src/hooks/useParticipantDashboard.js",
+          "sha256": "8fe10c4a8c25142efd185b5129aadc6fe07308697336877b7b7c133c11f13b35"
+        },
+        {
+          "path": "src/hooks/useParticipantHistory.js",
+          "sha256": "ca6bf7807c14a29cea3e586defa27caa2eee967bb8a96282cb2973ef1d214fc1"
+        },
+        {
+          "path": "src/hooks/usePeopleCatalog.js",
+          "sha256": "8ffa46e6575c19ff19e293977c3de9ad28a0d62fb0f8c231800813c2624bc576"
+        },
+        {
+          "path": "src/hooks/useQuestAccessCatalog.js",
+          "sha256": "9ea2642f04f507b4a3723b96082e53339005d13b5c7c956422d400b345aa85c9"
+        },
+        {
+          "path": "src/hooks/useQuestResultsCatalog.js",
+          "sha256": "22e7338a2c738af713e1af055b1dd633eb82177f50a9bba1ebb8abc5c6c1a245"
+        },
+        {
+          "path": "src/hooks/useTeamCatalog.js",
+          "sha256": "88fc9e9332d31d4643924a698dd178f4121d10a5f30c35e35e220ea660201cbe"
+        },
+        {
+          "path": "src/index.css",
+          "sha256": "cb158317ed2aa5406801f02eb0111b3e160cfb25715736e0fa2f3ce1259dca4d"
+        },
+        {
+          "path": "src/main.jsx",
+          "sha256": "88d329b8bf672987571bd6d140f6696108b53cfac22a2ee2f62c65aaf74243ed"
+        },
+        {
+          "path": "src/pages/AcceptOrganizationInvitation.jsx",
+          "sha256": "01bd54cdeb9e4e31038eb4d4fb3995611fbb5337729e3b42a08b8ad2cffee564"
+        },
+        {
+          "path": "src/pages/AcceptParticipantGroupInvitation.jsx",
+          "sha256": "74f67aca75e7ab6b8c5b66351127a48365d0da308c56f7f1c236a794e65d4c21"
+        },
+        {
+          "path": "src/pages/AcceptParticipantInvitation.jsx",
+          "sha256": "f7b08f400cddad6a8f9013a8bf3c3e0552d62553763436686d890c42bbb06eca"
+        },
+        {
+          "path": "src/pages/Downloads.jsx",
+          "sha256": "2f033e4b6a6a325531731461de0aa740a20a9ea1290d3b02c5ec994f14592538"
+        },
+        {
+          "path": "src/pages/Login.jsx",
+          "sha256": "85e91a3a24b9a57cb550f5eb82185227d066d9090c910154d850566df74bed92"
+        },
+        {
+          "path": "src/pages/OrganizationBilling.jsx",
+          "sha256": "6313cce8030131c4efd13a820a72c37c25af2c5ff8221c98da3d6efbcd2e297d"
+        },
+        {
+          "path": "src/pages/OrganizationTeam.jsx",
+          "sha256": "0da5115a43dc24a770be5b2d6b33304f4bd500a4f91aa553a7a810985ada507a"
+        },
+        {
+          "path": "src/pages/ParticipantArchive.jsx",
+          "sha256": "8517e4e92b739339421c81ecc617eefdb8371f0700f5f8f105aef4ea1eb65079"
+        },
+        {
+          "path": "src/pages/ParticipantAudit.jsx",
+          "sha256": "1f85505f278b036b4375375e55e1ea660fa8f17000575c944a21efc320440a07"
+        },
+        {
+          "path": "src/pages/ParticipantGroup.jsx",
+          "sha256": "df8e49e4601e07e973052c4ee7e6c0a1b0c8a123ac734937cde00edf75c6513a"
+        },
+        {
+          "path": "src/pages/ParticipantGroupCreate.jsx",
+          "sha256": "39e4a139f5269e7323d4d89613cefceaf27058cf2be6c67bf81f3cd56cdee363"
+        },
+        {
+          "path": "src/pages/ParticipantGroupInvitations.jsx",
+          "sha256": "96c6cdfe79cc5bb6efc61d4bc75dfd89101c56b794eea64519851b5030d8c99f"
+        },
+        {
+          "path": "src/pages/ParticipantGroupMembers.jsx",
+          "sha256": "919f00fc3cc1067aba43e263def9cfdb59351dfe7098ca4337fab9c1f07c4a73"
+        },
+        {
+          "path": "src/pages/ParticipantHistory.jsx",
+          "sha256": "4389e87fb7605c15b86bbc556c4198637dc957256ec510925cf518993fd64248"
+        },
+        {
+          "path": "src/pages/ParticipantProfileCard.jsx",
+          "sha256": "7a5a1da1f4212c96d28a2f4701d20c4c94e9ea073797bbd1b3cc55598bd9e243"
+        },
+        {
+          "path": "src/pages/ParticipantProfileCreate.jsx",
+          "sha256": "b382a9699e077d6063244d9f1ad705746c4731a301f65ee1223f7ad46b733a0f"
+        },
+        {
+          "path": "src/pages/ParticipantProfileInvitations.jsx",
+          "sha256": "2df38c261bb5750593d02e23097244717e8d007f9589d8a46f27489603c35f31"
+        },
+        {
+          "path": "src/pages/ParticipantQuests.jsx",
+          "sha256": "5f17ea83234ae38b206ba362047e811d929de2061b835c02d05e2bdef0e0ce15"
+        },
+        {
+          "path": "src/pages/ParticipantSupervisionProfiles.jsx",
+          "sha256": "dcb50b5225d803e031f721a97b78b353abdbd930220ee9c67d94aa5cfeb7ce64"
+        },
+        {
+          "path": "src/pages/ParticipantSupervisors.jsx",
+          "sha256": "0f20727f434f7bb0f98a79a2e89be35460836147d8657286c29e7aa002d98997"
+        },
+        {
+          "path": "src/pages/PasswordRecovery.jsx",
+          "sha256": "d00dd51e39f0b7ba8e909c36ad6b598bee02feaaa8815a1ad10d076126111929"
+        },
+        {
+          "path": "src/pages/PeopleCatalog.jsx",
+          "sha256": "e290948a16644c5672cd556fbf9cdf5821f42a53b49a88606431f545eda57d56"
+        },
+        {
+          "path": "src/pages/QuestAccess.jsx",
+          "sha256": "3679b945faa87ccd2d81f5ec4690bd55eb6c76424ffbed9be1872da778b0f92f"
+        },
+        {
+          "path": "src/pages/QuestCreate.jsx",
+          "sha256": "9cfbfae4b172a2aca65f51fbc9c3d13b0907bffb8fe66686d371ced503f15d50"
+        },
+        {
+          "path": "src/pages/QuestEdit.jsx",
+          "sha256": "2e2bf6e7d8237c2748df96a8a32d637b6c67277e189727375f1c424ddcf194be"
+        },
+        {
+          "path": "src/pages/QuestList.jsx",
+          "sha256": "a9b854662e5346357fff178c0a9b5cd33dc2bb0c15a94568105f438bd46d7883"
+        },
+        {
+          "path": "src/pages/QuestPlay.jsx",
+          "sha256": "91cd6ed954c02fe8c19d94142c3e43963e15335d77f7b65e965128b7f84802d1"
+        },
+        {
+          "path": "src/pages/QuestStats.jsx",
+          "sha256": "09934367e84549b8ee41a117667b619d5c85ad1a306db879f3befa4a0e40922e"
+        },
+        {
+          "path": "src/pages/RedeemQuestAccess.jsx",
+          "sha256": "07ba9ceb9a33b8598428b969b5bd51bd9cc3b4c5b902aac7c68a04ea3717e6ae"
+        },
+        {
+          "path": "src/pages/RedeemQuestCode.jsx",
+          "sha256": "d119d3f51ec1db08deeb3d8b25af4be9761706b7f9d7ca2cd17edea9a6f1e1e6"
+        },
+        {
+          "path": "src/pages/ShopCheckout.jsx",
+          "sha256": "7d5ceb21b284c7f6a590ed04714075ab9a29b6ed075c4e43b2754e886824aa68"
+        },
+        {
+          "path": "src/pages/ShopOrder.jsx",
+          "sha256": "3c67c9d8530b49467a29443ac5eea01e74972f3bd2600dcc350bda020d4923dd"
+        },
+        {
+          "path": "src/pages/ShopPurchases.jsx",
+          "sha256": "3e1040d5b85958c24de0403bbb70c2a27da1f70a26fd9a638c53a050e8ef2eef"
+        },
+        {
+          "path": "src/pages/TaskForm.jsx",
+          "sha256": "56f33930a6125b84ec90040c348bb1d9611aa3a6499f9cc7f67d09a17cbf14dc"
+        },
+        {
+          "path": "src/pages/TaskManager.jsx",
+          "sha256": "0d503891e283c4d57f16841b2718677bd03482719d84c78976aadc18494f8cc5"
+        },
+        {
+          "path": "src/recoveryEntry.jsx",
+          "sha256": "dab2f731bf9457934cb2d1b4b06cad4eac5637d494c0914722d46a5d6df9c5f5"
+        },
+        {
+          "path": "src/services/accountActivity.js",
+          "sha256": "602ec3b753d6e6c6c87374c795a2c0dee982c52509540533cf77fcc5e64ce5fd"
+        },
+        {
+          "path": "src/services/accountProfile.js",
+          "sha256": "3b2617a5d41b33f8921610a0ab9112f5b6fdd93ce73c5828c70115d886e0a5b8"
+        },
+        {
+          "path": "src/services/appNavigation.js",
+          "sha256": "dfb8e411093c413ac7cc5fc85ab1ae404ee4bf65cde9e1fe264aaedc085f16f6"
+        },
+        {
+          "path": "src/services/authErrors.js",
+          "sha256": "3cefadd7c961dc513bdc1c10cb4470a06c5f9769e8ae28dcbc60be482f092764"
+        },
+        {
+          "path": "src/services/authRequest.js",
+          "sha256": "a58e7d06b2db86cd270d0393b247928beeaa748d6092b7b203d8bd62b3d14f05"
+        },
+        {
+          "path": "src/services/authSession.js",
+          "sha256": "6c59b35c209b2eebb0c000da5df03d42c708d59aacdbee1d8f2e17191f9e47e8"
+        },
+        {
+          "path": "src/services/billingControlsApi.js",
+          "sha256": "99424090e9853a9c050b55de9a17800e2eba5524b6667e7f765075c0ff1edd7d"
+        },
+        {
+          "path": "src/services/db.js",
+          "sha256": "2e1ae8587130e0ee93b41ae502e2e0b843c96ab82749bf6fb296d6a92ee612f6"
+        },
+        {
+          "path": "src/services/deviceIdentity.js",
+          "sha256": "bc01ad452ec85d318737724bb5179e980eb23421e583501c867b36a978e64284"
+        },
+        {
+          "path": "src/services/discountCheckoutApi.js",
+          "sha256": "54b305f169046beae527d82474007e5841dc8b6b6b2385f85cf506da5d5b8ba4"
+        },
+        {
+          "path": "src/services/discountCheckoutCommands.js",
+          "sha256": "1a25c67e0ac87f738484891fe5b771060e26db06638cceca5c6a615ea58af162"
+        },
+        {
+          "path": "src/services/freeAccessApi.js",
+          "sha256": "899f127bfa762d28398402ba17eb13b73e0fcd950e9ecd4ae1c35fd32b7f4509"
+        },
+        {
+          "path": "src/services/geoNavigation.js",
+          "sha256": "86003787657204e0c9dc04a93da2665ba9053a075499c325c2b9c7aa56a76251"
+        },
+        {
+          "path": "src/services/hybridVerification.js",
+          "sha256": "49d20da8f1e8cae8b1d75e3cc58078d9241a0c7c86170569090c2de494135ad1"
+        },
+        {
+          "path": "src/services/localSecretLinks.js",
+          "sha256": "3487dab8038a583cad75dcb46a559d3343b94a241795a2b4121203a10a8f4c1b"
+        },
+        {
+          "path": "src/services/monthlyParticipantUsageApi.js",
+          "sha256": "4c781bb7d7f2fc0bdca8fd365f2b74d691bdf7ab45d54add15044dd8f5c0d838"
+        },
+        {
+          "path": "src/services/network.js",
+          "sha256": "ee1318b10af94be5823891726334c4605001d26b5a0bb3111a833b52019e234e"
+        },
+        {
+          "path": "src/services/offlineAnswerAttempt.js",
+          "sha256": "a981ffdbb7ff2aebaf0b5528accabb05f7ad9a643e39555f43f0eb66abd077c6"
+        },
+        {
+          "path": "src/services/offlineMedia.js",
+          "sha256": "96c3edcab13b46248e827b2fd010937b6e295205d988282c61b8ac28416417b9"
+        },
+        {
+          "path": "src/services/offlinePackageCheck.js",
+          "sha256": "08ae49380c92946491b83c401999f0d341a0b64261c1b3c0bccc3b38f185d5bf"
+        },
+        {
+          "path": "src/services/offlineReview.js",
+          "sha256": "695667c10276f16be13cbcbdb4b924616185dbdcbdd259a540801b99653fa237"
+        },
+        {
+          "path": "src/services/offlineStartPreparation.js",
+          "sha256": "2d9c996cadb7274c9145b9d63592ac08ee743eb7d3e089868d0545c32bcd7114"
+        },
+        {
+          "path": "src/services/operationTiming.js",
+          "sha256": "cb3a72aadaf6ff84f05cddac547f52b05a2625ceaaebba84ea683fe056617743"
+        },
+        {
+          "path": "src/services/organizationApi.js",
+          "sha256": "1bdd11535e80bddf033da064a1bba340e5a0a37f233cb8dbf365b140beaf3dff"
+        },
+        {
+          "path": "src/services/organizationBillingApi.js",
+          "sha256": "e39daea05af806c3a0165625778eceaeca6a76f1900c5ae561416c415981fb1b"
+        },
+        {
+          "path": "src/services/organizationPermissions.js",
+          "sha256": "137f790d74a49a9d7dc019ce409fb7cbf48ba093979544be99b80010fb987dcd"
+        },
+        {
+          "path": "src/services/organizationQuestApi.js",
+          "sha256": "7a7bd6f63d2daf698fd4f29a30f1de21b03324b1443c57df3acc987a7a6b1ef1"
+        },
+        {
+          "path": "src/services/participantCatalogApi.js",
+          "sha256": "9c7293e01b5cea5c202ae24971508c2ce8e8b5a6c93c90c4839e2d627c87fd8e"
+        },
+        {
+          "path": "src/services/participantClaimPreflight.js",
+          "sha256": "2838ccc195ade53b6048938641d17f05ba2e850c817712132bf8180f63a8df0c"
+        },
+        {
+          "path": "src/services/participantDashboard.js",
+          "sha256": "0e1610da1b47e2be757de86a21f7d0e2935d7b01badbbc78bb2ee4a4d14a613f"
+        },
+        {
+          "path": "src/services/participantGroupApi.js",
+          "sha256": "5bc6772c59e61c7fdd3419e7dec9ebc7945095c5a2ad40f36c61166c6ef72df0"
+        },
+        {
+          "path": "src/services/participantGroupErrors.js",
+          "sha256": "6946fb01a8606c9259132f6bce702e55161e47b85afafa327b48692bc9cd54fe"
+        },
+        {
+          "path": "src/services/participantHistoryApi.js",
+          "sha256": "a7c129aa8bcb8436b686bc7886370839a091c23895a65d0ac72ab5af1ccb1df8"
+        },
+        {
+          "path": "src/services/participantIdentityApi.js",
+          "sha256": "9d891c170ece8e3961115b9c02e7cff8cb8df8a2ec4d51f853fa5934b372240f"
+        },
+        {
+          "path": "src/services/participantMode.js",
+          "sha256": "e6dd0c5c7462e9fb8deee984309ce585012989bdb58a27da8bd9e4d8b9513b3d"
+        },
+        {
+          "path": "src/services/participantProfileAccess.js",
+          "sha256": "1957b0b3d185bd26f48b76b3707f516fdc2a98c7f95136fcbfd293c671b32680"
+        },
+        {
+          "path": "src/services/participantProfileLabels.js",
+          "sha256": "cee7c576d5e290c08f40eac00fd8167ac185662b02da51d415a6d632b8c68d6c"
+        },
+        {
+          "path": "src/services/passwordRecovery.js",
+          "sha256": "4092d55eec0c215683f828382c52d4a9bc9afbda9c5cb403c08e2e42914924ae"
+        },
+        {
+          "path": "src/services/peopleCatalogApi.js",
+          "sha256": "9cc8ebef13138e7924e54da0efb2d076089512f58dc9460f50057bda8cef92b9"
+        },
+        {
+          "path": "src/services/prepareParticipantAvatar.js",
+          "sha256": "dc870c72f7bf6e46c419e8d1a757115346e497273befcf667949f85d6684e5ff"
+        },
+        {
+          "path": "src/services/purchaseDocumentsApi.js",
+          "sha256": "eef3dfe8c5ec74c080f9b1b0fa3c0fde1ca3aa4337ab66ad62a930ad36ef95fb"
+        },
+        {
+          "path": "src/services/questAccessApi.js",
+          "sha256": "84ba500a54e82591bce27dfc6cfec179fc7410a6d373edf22d05ac56a77fc0b1"
+        },
+        {
+          "path": "src/services/questAccessCode.js",
+          "sha256": "6da920290940b37e29cea0252e7eb9eeb63bde068538cdc7de4a2398a65047d8"
+        },
+        {
+          "path": "src/services/questAccessErrors.js",
+          "sha256": "f31c8ad22d24a66711e1e7a3000ecdbbea6c4893cdb68564c3e72eb80660be8d"
+        },
+        {
+          "path": "src/services/questAccessPresentation.js",
+          "sha256": "cc5405163c4ebddbf1d99f2325beadc0e64004a3479ee6f47777d6da5f23b149"
+        },
+        {
+          "path": "src/services/questApi.js",
+          "sha256": "cb2a97bb71566a1d2146e334cfe3f3a758907b27d1efc1744bffed9f2643ea86"
+        },
+        {
+          "path": "src/services/questAttemptLifecycle.js",
+          "sha256": "169213b48b6ab49fbf6b61f71a2d483a1da8d17a68853f6b8043c6dfb037ab1c"
+        },
+        {
+          "path": "src/services/questAvailability.js",
+          "sha256": "bd70f0ebe096233cac6a1061903616997bb9c1dc35eb040e28ffad47bc74c240"
+        },
+        {
+          "path": "src/services/questCreationApi.js",
+          "sha256": "c298d02a0757aa9435a00f8702771de8b04f859382b96e2321f23fb59a79ed1b"
+        },
+        {
+          "path": "src/services/questListViews.js",
+          "sha256": "725940afe6a007d907193c290b638a1c6ea5240101ebb34d937f5539d22d8ff1"
+        },
+        {
+          "path": "src/services/questManagementApi.js",
+          "sha256": "cd8dcfc3cdcd6fcbc00717c9a42b3bb30bc9f61076a1f3f78c40340a0de6963b"
+        },
+        {
+          "path": "src/services/questResultPresentation.js",
+          "sha256": "e8e12c12a3c65c94314fee1729472f593c9f9c159871071ca050d7d43ded991d"
+        },
+        {
+          "path": "src/services/questResultsApi.js",
+          "sha256": "31b95f639514d0f2c6ff629bd3e8ea3186b1a7b6651470b81fb55fa748da6cfb"
+        },
+        {
+          "path": "src/services/questTaskSummary.js",
+          "sha256": "f1f8833f646837ff963a67d51cc1393dfae99e64a4ef5d5480f69ce4dd708d1e"
+        },
+        {
+          "path": "src/services/questTimeLimit.js",
+          "sha256": "9ecbe2527573db1bf78a4156a8f6fdca882c6090ad23ce1459aed2c7b68a7629"
+        },
+        {
+          "path": "src/services/questVerificationMode.js",
+          "sha256": "b8c0425f0033480eb61320379f657a47d7bbcc2a5f66257d28c68984488c8fc2"
+        },
+        {
+          "path": "src/services/questWorkspaceApi.js",
+          "sha256": "311afa1eb24e8994e5795f504d7b347e90c300691bea72332ef1a36679ddc0d4"
+        },
+        {
+          "path": "src/services/receiptApi.js",
+          "sha256": "9019e9a1a75312122b6a7cd2e8b28983d0ce20ca9183f2ddd778d857a192b6da"
+        },
+        {
+          "path": "src/services/recurringConsentApi.js",
+          "sha256": "7e2adc880044dbaa6d792fdf8e219d0853531ab63b141a761a252b46d8743bd0"
+        },
+        {
+          "path": "src/services/recurringFailureNoticeApi.js",
+          "sha256": "f8bfd02a9572924842408db1d0cb6fa46a4fc00f29bbc1bab2c04d491e4ed11a"
+        },
+        {
+          "path": "src/services/requestCancellation.js",
+          "sha256": "0b8dde1fd8e39d0db8df2b1c0db353648b5de836eca71dbb9711237b8a2f92d8"
+        },
+        {
+          "path": "src/services/sandboxCheckoutApi.js",
+          "sha256": "3e26d07dad2f5e63cdfd598562efb4d1bc53f39e7ea046da19da2eb6c7e1e44b"
+        },
+        {
+          "path": "src/services/sandboxCheckoutVisibility.js",
+          "sha256": "9f56c95c28968120b9dc3e911c1e64ab5298fe1b6078e7189476cee3800528c7"
+        },
+        {
+          "path": "src/services/sandboxSession.js",
+          "sha256": "853764dc7069bdc34e8658ddf6d101d5bacd5cb99abf5bd72da489b9b52b7bca"
+        },
+        {
+          "path": "src/services/shopMoney.js",
+          "sha256": "92625929c6b8b9d00a23d142415b2d9a7525570d4377f10fc625a407e7f02bf2"
+        },
+        {
+          "path": "src/services/shopOrdersApi.js",
+          "sha256": "8ba167f06d5cfbd8085c4ede6e432f58fa90fc4c446065ca7310519e488e44bf"
+        },
+        {
+          "path": "src/services/shopPaymentApi.js",
+          "sha256": "71942f7cfd5eb8778442ced0f9424ab726a82205e377fe5f9040f5865fd3f0ce"
+        },
+        {
+          "path": "src/services/shopPurchasesApi.js",
+          "sha256": "69342c414ddc8c789f81e998a6a2de7027022875a58e3707d5fc027b09c716ec"
+        },
+        {
+          "path": "src/services/staticOfflineMap.js",
+          "sha256": "05a4492e421eb947364f764bce9edc2af9b14ef7b1c8eb0833e51c0becf4e8da"
+        },
+        {
+          "path": "src/services/sync.js",
+          "sha256": "7dc20ae151ff8738ada2c93b965d16687965291964913eb9ac58224b112e8ad9"
+        },
+        {
+          "path": "src/services/syncCoordinator.js",
+          "sha256": "5f5cf9e5d02a12a7449c5a184e3372f2047925f04cad2581eaa80577a988079a"
+        },
+        {
+          "path": "src/services/syncReceipts.js",
+          "sha256": "e831d823b17e8a718a09fbba0d6dead8b6da679862d2c0fd34f74e35619f80f9"
+        },
+        {
+          "path": "src/services/syncSignals.js",
+          "sha256": "d8f512eec0c13ffcc27a2cf56d7b851178322317a98266f33651d770505743bc"
+        },
+        {
+          "path": "src/services/taskMedia.js",
+          "sha256": "43137ecb844efcbfcf49bf51e5e0bb79cb7d2e99c4e8bfe412693adb299b8bc6"
+        },
+        {
+          "path": "src/services/teamApi.js",
+          "sha256": "1fa5801eca3b6cf96518cc782b0db300e27debc756404633d530cbf0aef5366b"
+        },
+        {
+          "path": "src/services/teamCatalogApi.js",
+          "sha256": "9b5510a787aed353ffd864d5242aa22c5dd6e53a119769e45dcd1d34ed799eb9"
+        },
+        {
+          "path": "src/services/userErrorMessage.js",
+          "sha256": "69307f28c1cecc9e6f0c738b41e8383390c06414c1f3a63e2c8b9ce73fab2c44"
+        },
+        {
+          "path": "src/services/verificationPolicy.js",
+          "sha256": "9f3cf876b6f295a4b0d76fad211012d7b860a0a75318b2f521a3f9120aa01c58"
+        },
+        {
+          "path": "src/supabaseClient.js",
+          "sha256": "ab31d3138b65db74e6b651003c33a24b37026dfc67ccab4c679cf3a3200f6db3"
+        }
+      ],
+      "externalImports": [
+        "@supabase/supabase-js",
+        "idb",
+        "idb-keyval",
+        "leaflet",
+        "leaflet/dist/leaflet.css",
+        "qrcode",
+        "react",
+        "react-dom/client",
+        "react-hot-toast",
+        "react-leaflet",
+        "react-router-dom",
+        "react-spinners"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation."
+    },
+    "Admin": {
+      "files": [
+        {
+          "path": "admin/src/AdminSections.jsx",
+          "sha256": "20c632f1ab99cfdf96360acd1e9b25e24dacf0767435088c6d37774e82d417d0"
+        },
+        {
+          "path": "admin/src/App.jsx",
+          "sha256": "8dce6a9d1cb5599f47df45af7777f78dbfaca42b3f0888bc9a28f04ce7194607"
+        },
+        {
+          "path": "admin/src/ApproveCampaign.jsx",
+          "sha256": "b3506360c3834fd283902c4cb385ff33368f9e02dafa8a1037b8657501c0d469"
+        },
+        {
+          "path": "admin/src/CampaignEditor.jsx",
+          "sha256": "d80dab2a449046bd57786a582c573d27da7246ad94ce49b15bba5085bb366337"
+        },
+        {
+          "path": "admin/src/ConfirmRefund.jsx",
+          "sha256": "9c14dcc5ed5a16d55e59ca99fb1216a929d6617559ca5520aca03f937e87e7f2"
+        },
+        {
+          "path": "admin/src/DeviceDateTime.jsx",
+          "sha256": "7e5676776c8c2bc09dc1f146467c0d1ba3f711646e6fd5dec07b7f2e856dcd2c"
+        },
+        {
+          "path": "admin/src/FiscalAcceptance.jsx",
+          "sha256": "0995c446d2b13ad1a1d04973bcc300212dd474c69c7ca5a11f405873952ef060"
+        },
+        {
+          "path": "admin/src/FiscalPolicy.jsx",
+          "sha256": "6a231e119ec797bc2739e4fef0200c6d78374682c3a7bb36aa9f4821f30d20d6"
+        },
+        {
+          "path": "admin/src/IssueCampaignCode.jsx",
+          "sha256": "9b6b80f6c6b4af4880652285adc7739961387e030dd92fe3af4245555c37dc86"
+        },
+        {
+          "path": "admin/src/Login.jsx",
+          "sha256": "c3498399ff28155111e202b3821b5cfa614fb2a15aefcb0a86e476bdfc0620a6"
+        },
+        {
+          "path": "admin/src/Mfa.jsx",
+          "sha256": "281cc5a5a3797002218aa3510f59328234d1c457be997780456255e3bfb7e6e6"
+        },
+        {
+          "path": "admin/src/OrderFiscalReceipts.jsx",
+          "sha256": "393f7e5ae62225b120d7bca2e88712060f3e98df9336e3159a840740f868709c"
+        },
+        {
+          "path": "admin/src/OrderPurchaseDocuments.jsx",
+          "sha256": "6f862751b8a5c0d0051e01b63a767c5a6f1418f3b53bd63eee742911af7eea56"
+        },
+        {
+          "path": "admin/src/OrganizationCampaigns.jsx",
+          "sha256": "2bee2953cf0c625a2e5ae88581f354603802e8a32aa178674e4e4ff670cb2c9f"
+        },
+        {
+          "path": "admin/src/OrganizationCard.jsx",
+          "sha256": "baf38fd702fe2c267607be838789e091caeb9865bff5936e0809ef653cc391b6"
+        },
+        {
+          "path": "admin/src/OrganizationDiscounts.jsx",
+          "sha256": "3b7efd3a85367ed7f609abd83258d9e766654cc8247e551ca98fc3c704acda69"
+        },
+        {
+          "path": "admin/src/OrganizationParticipants.jsx",
+          "sha256": "a8663a60311a0fbb2380fb2d86b09ac5f7a68d1c1bdae8c343840c95a947e63a"
+        },
+        {
+          "path": "admin/src/OrganizationPayments.jsx",
+          "sha256": "ab96fa14a88e0b51d2a71ef21f4178648a78a48ffb979886b0d2a64c461fbf9f"
+        },
+        {
+          "path": "admin/src/OrganizationQuests.jsx",
+          "sha256": "13d56971b02888e9ffd8e466672b9a236374d8c8262ef32e6fedcd495fa99206"
+        },
+        {
+          "path": "admin/src/Organizations.jsx",
+          "sha256": "13772f1205d039611cf4be70ff05dfa478af1538edc10bf0b8ef4158a25b6cac"
+        },
+        {
+          "path": "admin/src/PaymentOrderDetails.jsx",
+          "sha256": "4f28576cdaa306dd9110f7db21628e7a85608996d2b2bb54fd3b73a334ed4bf6"
+        },
+        {
+          "path": "admin/src/PaymentReviewStatus.jsx",
+          "sha256": "bd19a1812c72a8f2d6d88270778ca51f9bdb7e9d3a75603b45d8715447472c0c"
+        },
+        {
+          "path": "admin/src/PublishPurchaseDocument.jsx",
+          "sha256": "1714f07ccf886db921b486cfe532fbdcf68e118e5d551121e731e6fa17b170fc"
+        },
+        {
+          "path": "admin/src/PublishTariffDraft.jsx",
+          "sha256": "0625ba08245093a0fcf731f8d1b0667f245a60046dd8ddfae3bc5abe57486866"
+        },
+        {
+          "path": "admin/src/PurchaseDocumentAudit.jsx",
+          "sha256": "f0d2c3805840f043c961783e6064f0d36f9351b744a95da29cb96895ca9e19ea"
+        },
+        {
+          "path": "admin/src/PurchaseDocumentEditor.jsx",
+          "sha256": "ae212fb62aa989fa48c154e4bbf5d00a5b354994ee7057f854d2266b304788a2"
+        },
+        {
+          "path": "admin/src/PurchaseDocuments.jsx",
+          "sha256": "bb403474658d59fb02aa70d00ecb3d95c6539da49d60493fad97ee99b18983d0"
+        },
+        {
+          "path": "admin/src/QuestStatistics.jsx",
+          "sha256": "c61c8ee1c4825bbbb82823d5b37f987bea6cdb648235949b6fa6934851012a96"
+        },
+        {
+          "path": "admin/src/RefundHistory.jsx",
+          "sha256": "f6fb7844ff5275f1b043e206d62db1077611abc54b0c92fc5cc992a10ae136c0"
+        },
+        {
+          "path": "admin/src/RefundPreview.jsx",
+          "sha256": "7ba8076217468c39edeac4ad63d31a7b17898215ecf560d4ec63484fc1f6ea40"
+        },
+        {
+          "path": "admin/src/ScheduleSupportEnd.jsx",
+          "sha256": "2510003670c43a1cdf9a1adf257e18f1d5f816dff02db2267d8ce2c0a4787ad6"
+        },
+        {
+          "path": "admin/src/SubscriptionRefund.jsx",
+          "sha256": "55b7529c3f005750eb4cb1eee015712d78f72ee8491109abd9abb108dc92bc7a"
+        },
+        {
+          "path": "admin/src/TariffDrafts.jsx",
+          "sha256": "022435d7aa4c2579e524b1da72531ac97045978b1476ae7994e1e9a8328985c1"
+        },
+        {
+          "path": "admin/src/TariffSupportEnd.jsx",
+          "sha256": "88e041ccb3748cf69c9dbb1fc4fe95b2c8a6b46c43507a1e3a4497f455644dd2"
+        },
+        {
+          "path": "admin/src/Tariffs.jsx",
+          "sha256": "7701dbf043ac78465bce24780cf42fa3e777ac18fa7459b5296f80830889422c"
+        },
+        {
+          "path": "admin/src/api.js",
+          "sha256": "61edf9a530098d9cfcb8276d1cf726e1d847c7be402f3c3c750c0c0ee821f229"
+        },
+        {
+          "path": "admin/src/fiscalAcceptanceApi.js",
+          "sha256": "cbaef7b3b75f7a65c7f7ebfa9622b2d2195bbea458586963bc6555f3c0ee29cd"
+        },
+        {
+          "path": "admin/src/fiscalPolicyApi.js",
+          "sha256": "cd16fefac3d8b57739fc25ad35c4d2aaea6f126db5ed1cdb630e25a92e6668c1"
+        },
+        {
+          "path": "admin/src/main.jsx",
+          "sha256": "890497bf174c737de4c53e956b8bfe91d467bafe9945acc56c669eb92c368801"
+        },
+        {
+          "path": "admin/src/platformSectionsApi.js",
+          "sha256": "9647c2845042f13f3e930b871a5c8acb1d0bd261e2497d2d26b061f88e543191"
+        },
+        {
+          "path": "admin/src/purchaseDocumentsApi.js",
+          "sha256": "595c959783d2b2fba27fd13a51742776414761c631c3aa039f5fd750c50d76b8"
+        },
+        {
+          "path": "admin/src/receiptsApi.js",
+          "sha256": "9d1066775133705bb85477a2090900848ecf604b328e9c3199e782ddf1eada27"
+        },
+        {
+          "path": "admin/src/style.css",
+          "sha256": "11f613063d5c86ecef45cd1d599b594b86008ea04606e7c420fc8664eee5e3d9"
+        },
+        {
+          "path": "admin/src/subscriptionRefundApi.js",
+          "sha256": "8d42a3c45dce0255e60059f07a386594fb499284b02896e62f2c45615d010bcc"
+        },
+        {
+          "path": "admin/src/subscriptionRefundOutcome.js",
+          "sha256": "28ab7f4d422d9e1c5382ea6e9be1133fc4fda1c6f8166dc66ab12444dfd8a55a"
+        },
+        {
+          "path": "admin/src/subscriptionRefundReceipt.js",
+          "sha256": "f022deff3af09be883c8388b7571df89e63cc8648d8418ec76eba08a07e097f7"
+        },
+        {
+          "path": "admin/src/tariffLabels.js",
+          "sha256": "45f05ead13f8267c27587a41108db676f08e1474dee8faa231e19a4567293b71"
+        },
+        {
+          "path": "admin/src/useReadSnapshot.js",
+          "sha256": "b2fc6b15d8739e1647da479369c8c03054974db39979d5b05eb892b9ed9e56ee"
+        }
+      ],
+      "externalImports": [
+        ", e.target.value)} /></label>\n   <label>По дату включительно<input type=",
+        "@supabase/supabase-js",
+        "qrcode",
+        "react",
+        "react-dom/client"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation."
+    },
+    "Website": {
+      "files": [
+        {
+          "path": "website/src/Agreement.jsx",
+          "sha256": "cdabb7cc6c5db6f23eb56d1e89ae7176b618ec14764f0f5da1dce8bb5a15d3d8"
+        },
+        {
+          "path": "website/src/App.jsx",
+          "sha256": "32aa859db24594c483ecbccb24672c7dfcee80e0a371218a0d1b54bea2bf99bf"
+        },
+        {
+          "path": "website/src/PaymentTerms.jsx",
+          "sha256": "822f8c21190a1e746959ec254b41d4497d12f5a0a85ab340e99009a1508d4ee5"
+        },
+        {
+          "path": "website/src/PublicTariffs.jsx",
+          "sha256": "177067ff1c0c148cac52c8ed6b40f83af4bae41224105e1edf8fe549fedc2de8"
+        },
+        {
+          "path": "website/src/QuestDemo.jsx",
+          "sha256": "24a3046fd4b4de465468727c461199ea8163df5f113b51bacb2b02aa8d659f71"
+        },
+        {
+          "path": "website/src/ServiceTerms.css",
+          "sha256": "f1715f23affb5080b938db2016287508977e597b6137725f539ffd53703faf3c"
+        },
+        {
+          "path": "website/src/ServiceTerms.jsx",
+          "sha256": "b071dbae68fc4ea169b1209c66f07e42e7edeb5820a7491e895a275cf993aa9e"
+        },
+        {
+          "path": "website/src/landing.css",
+          "sha256": "0be777a7a30ae6d6014e4ea0245bf6cdcda856d2f6b8a6a38fa03bab66a078c6"
+        },
+        {
+          "path": "website/src/main.jsx",
+          "sha256": "1e645068b50c26b68bf56916cf9ec8d440a93063cc431a6d4d0b6aa8bb881fde"
+        },
+        {
+          "path": "website/src/refinements.css",
+          "sha256": "ef2d539d123748a251c557dc0599157e6a089a8ad29f76d8aad8301b3dfc0a72"
+        },
+        {
+          "path": "website/src/styles.css",
+          "sha256": "a40fc885072f72841eb425fd476e9b90d459d515f6ff9f3dde2d7c375baf9dfc"
+        },
+        {
+          "path": "website/src/tariffCatalog.mjs",
+          "sha256": "68508544891cc93bd36ecf25d9f0ec45a24854e4e0871153dc078bb149c5b80e"
+        }
+      ],
+      "externalImports": [
+        "react",
+        "react-dom/client"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation."
+    },
+    "Market": {
+      "files": [
+        {
+          "path": "market/src/App.jsx",
+          "sha256": "73aaba824f4dea1a5792bfe1fec76765cb522baca9cf70d1193785d730425c5b"
+        },
+        {
+          "path": "market/src/Catalog.jsx",
+          "sha256": "7ae6358d4409348c508a2cc13ad81a7943542f0969b0b86efaaca331e3dfc0a0"
+        },
+        {
+          "path": "market/src/Demo.jsx",
+          "sha256": "6a9078f71f857dd13dea11c615840246163443a52854f99700c72da3a0f7c94f"
+        },
+        {
+          "path": "market/src/Details.jsx",
+          "sha256": "d207eca2439967ec8c166c6f378038c171140377259585abb3b270a95ac2ba0e"
+        },
+        {
+          "path": "market/src/Filters.jsx",
+          "sha256": "11b0903f07c6ed71a98baa2e196f5caf5e13133eb16725d5fd28a8aef2a5f105"
+        },
+        {
+          "path": "market/src/Icon.jsx",
+          "sha256": "c6e254d83f312c37974fb5dc0e4b75fbdea8072a393c989ebccf3615a22bb21b"
+        },
+        {
+          "path": "market/src/PublicCatalogPage.jsx",
+          "sha256": "4b991916acc2a968ddab919114046daa8f07bec8ce908ed9f7a018d17ee06535"
+        },
+        {
+          "path": "market/src/PublicDetails.jsx",
+          "sha256": "fb40128ebdc1b9c6282e215e74700de219c95718f28b17e90a0d50a46e692f40"
+        },
+        {
+          "path": "market/src/PublicMarket.jsx",
+          "sha256": "c94a59fd5e59c28e391a38af8522d9eeb9ec454af6fda0a0c2cf94b98e5e6c89"
+        },
+        {
+          "path": "market/src/PublicMarketUi.jsx",
+          "sha256": "b667623dae21afd9c11d327af353f15739dec44eed4454ff354f045375dc2eee"
+        },
+        {
+          "path": "market/src/SnapshotPreview.jsx",
+          "sha256": "e8e41dc3ede85417c92bc88ed2a209ce21f653748f75203923a314d363fad544"
+        },
+        {
+          "path": "market/src/StandalonePublicExample.jsx",
+          "sha256": "f880469619f94c1aacd3f890b4ed2c9ae0c0a4a1bae7e70e4997bc6fff10dd24"
+        },
+        {
+          "path": "market/src/appDestination.js",
+          "sha256": "067ab9419a16ac407e53dde0ab2a07e154040c39a5790a5ec6e2f4a64c8499b9"
+        },
+        {
+          "path": "market/src/catalogData.js",
+          "sha256": "97425fa5af21cbd44949d721139bc5a0a2d0942868b964d548e8e196f11c76d9"
+        },
+        {
+          "path": "market/src/catalogFilters.js",
+          "sha256": "1fb6a04561f5efe9d4d9ffbc63870793bd961ba78ae5117c819e265ab5d58dc3"
+        },
+        {
+          "path": "market/src/fixtures.js",
+          "sha256": "1dc892588480f4db0dd6bc2c7483338be124eab1996eb8746ed5ab22c5057f30"
+        },
+        {
+          "path": "market/src/main.jsx",
+          "sha256": "d0e943b69cb5132a2c6eeb2814d990bf7f8e10d5e6243e9815492aae74e35431"
+        },
+        {
+          "path": "market/src/navigation.jsx",
+          "sha256": "e8dff36e8f9bce6eda5450d3663d3878a3ff724cc33423ffe95115b0f4110d0a"
+        },
+        {
+          "path": "market/src/navigationContext.js",
+          "sha256": "6f5b96cae4c72542570ff792b373ad7b531a4196f279c468f12298b5660d2eff"
+        },
+        {
+          "path": "market/src/publicCatalog.js",
+          "sha256": "1e155f5e1360f71dea2dedb8fc29a8265c6c0e95c1018061cfdf309b7fea1962"
+        },
+        {
+          "path": "market/src/publicCatalogContract.js",
+          "sha256": "2bb7602bf3f60ccccd3762825600c93a64174616f7c64a3c88913ecad751b696"
+        },
+        {
+          "path": "market/src/publicCatalogSort.js",
+          "sha256": "416afa4507606b7c0b62ee6f77aa0a9b1954f9df3c804d377e8c486d3e96cd81"
+        },
+        {
+          "path": "market/src/publicCatalogView.js",
+          "sha256": "62cf8d5d95aa98cc59172ba9959979c3c185dcfcd379e326604c135bc15e1a64"
+        },
+        {
+          "path": "market/src/questCount.js",
+          "sha256": "a81d75bf89214833df38445d8e60347b25e9eedcad9686e12f0b9510aa7ed211"
+        },
+        {
+          "path": "market/src/salesPolicy.js",
+          "sha256": "a00d76510b650f3b39deb279648151056372958c1db70914c089d05198d1bfeb"
+        },
+        {
+          "path": "market/src/snapshotPreviewAdapter.js",
+          "sha256": "ca1fa53295742ffcfa1b34cf484e1fd43f551243208854da26141ca4f33595bb"
+        },
+        {
+          "path": "market/src/snapshotPreviewPin.js",
+          "sha256": "c6e2d3dd22b6e3424ca70e7431b704670adfb1884f381d95066c546f05c6e826"
+        },
+        {
+          "path": "market/src/styles.css",
+          "sha256": "1403816035c4860669a4298f1b2faef7bf811e2b175084d5a45df0046a463710"
+        },
+        {
+          "path": "market/src/ui.jsx",
+          "sha256": "be618f06e8328511d242db17e1aed614125d5da9f586bbf4d689e411bf0595b6"
+        },
+        {
+          "path": "market/src/useCatalog.js",
+          "sha256": "1e2a4c5c18b63b98ef070a8ff8981a6ea78dc8437898ea62ef530555961f1308"
+        },
+        {
+          "path": "market/src/usePagePosition.js",
+          "sha256": "2b992b0ca41257ec0e0a2b28b5fd5b63fd440fd4da74a140dabcae2abb40e6f9"
+        },
+        {
+          "path": "market/src/useQuest.js",
+          "sha256": "4374c2de8fdde2425f97ea94fd8c08d105748eb4b135e3cda59a5b573ad2f6d6"
+        },
+        {
+          "path": "src/services/shopMoney.js",
+          "sha256": "92625929c6b8b9d00a23d142415b2d9a7525570d4377f10fc625a407e7f02bf2"
+        }
+      ],
+      "externalImports": [
+        "react",
+        "react-dom/client",
+        "react-router-dom"
+      ],
+      "unresolvedImports": [],
+      "limitation": "Literal relative import graph, including DEV inputs; not a compiled bundle, RPC graph, or production attestation."
+    }
+  },
+  "applyOrder": [],
+  "applyOrderStatus": "BLOCKED: a source list is not an approved migration/function apply sequence",
+  "dependencyOrder": [
+    "Resolve production source and contract blockers; pin final release commit and artifact hashes.",
+    "Approve hosting, configuration, restore point and schema/function compatibility manifest.",
+    "Apply only separately approved backend manifest, with workers quiescent and new sales/sends OFF.",
+    "Publish each frontend only after its backend dependencies are ready.",
+    "Read back versions and OFF state; commercial activation remains separately gated."
+  ],
+  "blockers": [
+    "SHOP Edge source bundle provenance is absent from the three pinned Git refs.",
+    "228 historical migrations require production classification; do not run blanket db push.",
+    "Production Edge contracts, RPC/ACL dependency graph and exact apply order are not approved.",
+    "Production Admin/Market hosting and configuration are not provisioned or attested.",
+    "Fresh SQL/catalog, extension, Auth/Storage and effective permission equivalence is UNKNOWN.",
+    "B17 remains NOT PROVEN; denied execution is not retried by this package.",
+    "UNAPPLIED auth/legal candidates are not imported; existing candidate files are not authorized SQL."
+  ]
+}

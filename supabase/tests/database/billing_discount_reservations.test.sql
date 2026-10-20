@@ -1,0 +1,24 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('reservation-owner')::uuid,'reservation-owner@example.test');
+select set_config('request.jwt.claim.sub',md5('reservation-owner')::uuid::text,true);
+select set_config('test.org',(select id::text from public.organizations where personal_owner_id=auth.uid()),true);
+insert into public.billing_discount_codes(id,organization_id,plan_key,code_hash,discount_bps,eligible_periods,period_months,activate_before,issuer_id,issue_command_id)
+values(md5('reservation-code')::uuid,current_setting('test.org')::uuid,'pro',repeat('d',64),10000,2,1,now()+interval '1 day',auth.uid(),gen_random_uuid());
+create function pg_temp.reserve(n integer) returns jsonb language sql as $$select platform_private.reserve_discount_period(md5('reserved-order-'||n)::uuid,current_setting('test.org')::uuid,md5('reservation-code')::uuid,'pro',1,10000)$$;
+select is(pg_temp.reserve(1)->>'amount_minor','0','резерв 100 процентов даёт нулевую сумму');
+select is(pg_temp.reserve(1),pg_temp.reserve(1),'retry возвращает ту же цену');
+select is((select count(*) from public.billing_discount_reservations where discount_id=md5('reservation-code')::uuid),1::bigint,'retry не расходует второй период');
+select lives_ok($t$select pg_temp.reserve(2)$t$,'второй период резервируется');
+select throws_ok($t$select pg_temp.reserve(3)$t$,'55000','discount periods exhausted','третий период недоступен');
+select is(platform_private.settle_discount_period(md5('reserved-order-1')::uuid,false),'released','неуспешная покупка освобождает резерв');
+select lives_ok($t$select pg_temp.reserve(3)$t$,'освобождённый период доступен новому заказу');
+select throws_ok($t$select pg_temp.reserve(1)$t$,'55000','discount reservation released','старый заказ не оживает после освобождения');
+select is(platform_private.settle_discount_period(md5('reserved-order-2')::uuid,true),'consumed','успех расходует период');
+select is(platform_private.settle_discount_period(md5('reserved-order-2')::uuid,true),'consumed','повтор успеха безопасен');
+select throws_ok($t$select platform_private.settle_discount_period(md5('reserved-order-2')::uuid,false)$t$,'55000','discount settlement conflict','поздняя отмена не возвращает израсходованную льготу');
+select throws_ok($t$select platform_private.settle_discount_period(md5('reserved-order-1')::uuid,true)$t$,'55000','discount settlement conflict','поздний успех требует сверки');
+select ok(not has_function_privilege('authenticated','platform_private.settle_discount_period(uuid,boolean)','execute'),'клиент не подтверждает себе оплату');
+select ok(not has_table_privilege('authenticated','public.billing_discount_reservations','update'),'журнал закрыт');
+select * from finish();
+rollback;

@@ -67,7 +67,7 @@ export default function Navbar({ session }) {
     else { closeMenu(); navigate('/login') }
   }
   const links = organizationContext
-    ? [{ to: '/quests', label: 'Квесты', icon: 'map' }, ...(canManageTeam ? [{ to: '/organization/team', label: 'Команда', icon: 'users' }] : [])]
+    ? [{ to: '/quests', label: 'Квесты', icon: 'map' }, { to: '/organization/purchases', label: 'Мои покупки', icon: 'map' }, ...(canManageTeam ? [{ to: '/organization/team', label: 'Команда', icon: 'users' }] : [])]
     : [{ to: '/home', label: 'Главная', icon: 'home' }, { to: '/my-quests', label: 'Квесты', icon: 'map' }, { to: '/participants/group', label: 'Люди', icon: 'users' }]
   const navigation = links.map(link => <NavLink key={link.to} to={link.to} className={({ isActive }) => `app-nav-link${isActive ? ' is-active' : ''}`}><AppIcon name={link.icon} /><span>{link.label}</span></NavLink>)
   const filteredOrganizations = organizations.filter(item => item.name.toLocaleLowerCase().includes(organizationSearch.trim().toLocaleLowerCase()))
@@ -91,6 +91,7 @@ export default function Navbar({ session }) {
             {organizationSearch && filteredOrganizations.length === 0 && <p className="app-menu-heading">Ничего не найдено</p>}
           </div>
           <div className="app-menu-secondary">
+            {organizationContext && hasOrganizationPermission(currentOrganization, 'billing.read') && <Link className="app-menu-item" to="/organization/billing" onClick={closeMenu}>Тариф и лимиты</Link>}
             <Link className="app-menu-item" to="/participants/history" onClick={closeMenu}>История прохождений</Link>
             <Link className="app-menu-item" to="/downloads" onClick={closeMenu}>Хранилище</Link>
             <Link className="app-menu-item" to="/access/code" onClick={closeMenu}>Ввести код</Link>

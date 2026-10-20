@@ -19,7 +19,7 @@ async function prepareShell(page) {
     if (url.pathname.endsWith('/get_participant_quest_for_profile') || url.pathname.endsWith('/get_quest_entry_status')) {
       data = { id: route.request().postDataJSON().p_quest_id, title: 'Зелёные дворы', is_open: true, is_public: true }
     }
-    if (url.pathname.endsWith('/get_my_participant_profiles')) data = [{ id: 'profile-self', relationship: 'self', display_name: 'Саша' }]
+    if (url.pathname.endsWith('/get_my_participant_profiles')) data = [{ participant_profile_id: 'profile-self', relationship: 'self', display_name: 'Саша' }]
     if (url.pathname.endsWith('/search_participant_quests')) data = { items: [], has_more: false, next_cursor: null }
     if (url.pathname.endsWith('/organization_memberships')) data = Array.from({ length: 8 }, (_, index) => ({
       organizations: organization(index + 1), membership_roles: [{ roles: { key: 'owner', name: 'Владелец', role_permissions: ['members.manage', 'quests.read', 'quests.create', 'quests.update', 'quests.delete', 'quest_stats.read', 'access_grants.manage'].map(key => ({ permissions: { key } })) } }],

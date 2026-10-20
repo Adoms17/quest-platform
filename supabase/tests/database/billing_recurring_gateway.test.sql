@@ -1,0 +1,14 @@
+begin;
+select no_plan();
+select ok(has_function_privilege('service_role','public.sandbox_recurring_worker_command(uuid,text,uuid,jsonb)','execute'),'server gateway granted');
+set local role anon;
+select throws_ok($$select public.sandbox_recurring_worker_command(gen_random_uuid(),'read')$$,'42501',null,'anonymous blocked');
+reset role;
+set local role authenticated;
+select throws_ok($$select public.sandbox_recurring_worker_command(gen_random_uuid(),'claim')$$,'42501',null,'browser blocked');
+reset role;
+set local role service_role;
+select is(public.sandbox_recurring_worker_command(gen_random_uuid(),'claim')->>'authorized','false','missing attempt cannot authorize');
+select throws_ok($$select public.sandbox_recurring_worker_command(gen_random_uuid(),'arbitrary')$$,'22023','invalid recurring command','fixed action allowlist');
+reset role;
+select * from finish();rollback;

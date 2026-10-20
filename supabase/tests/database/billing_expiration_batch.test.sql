@@ -1,0 +1,26 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) select md5('batch-owner-'||n)::uuid,'batch-'||n||'@example.test' from generate_series(1,3) n;
+update public.organization_subscriptions s set status='active',plan_version_id=(select id from public.billing_plan_versions where plan_key='pro' and version=1),period_start='0001-01-01 UTC',period_end='0001-02-01 UTC'
+where organization_id in (select id from public.organizations where personal_owner_id in (select md5('batch-owner-'||n)::uuid from generate_series(1,3) n));
+select throws_ok($$select public.process_subscription_expirations(0)$$,'22023','invalid billing batch size','zero rejected');
+select throws_ok($$select public.process_subscription_expirations(501)$$,'22023','invalid billing batch size','oversized rejected');
+select throws_ok($$select public.process_subscription_expirations(null)$$,'22023','invalid billing batch size','null rejected');
+set local role service_role;
+select is(public.process_subscription_expirations(2)->>'processed','2','batch respects bound');
+reset role;
+select is((select count(*)::int from public.billing_expiration_events where organization_id in(select id from public.organizations where personal_owner_id in(select md5('batch-owner-'||n)::uuid from generate_series(1,3) n))),2,'two audit records');
+savepoint batch_rollback;
+select is(public.process_subscription_expirations(1)->>'processed','1','remaining item');
+rollback to batch_rollback;
+select is((select count(*)::int from public.billing_expiration_events where organization_id in(select id from public.organizations where personal_owner_id in(select md5('batch-owner-'||n)::uuid from generate_series(1,3) n))),2,'rollback removes audit and transition');
+select is(public.process_subscription_expirations(1)->>'processed','1','retry after rollback processes item');
+select is((select count(*)::int from public.organization_subscriptions where status='expired' and organization_id in(select id from public.organizations where personal_owner_id in(select md5('batch-owner-'||n)::uuid from generate_series(1,3) n))),3,'all fixtures expired');
+select set_config('request.jwt.claim.sub',md5('batch-owner-1')::uuid::text,true);
+set local role authenticated;
+select throws_ok($$select public.process_subscription_expirations(1)$$,'42501',null,'owner denied');
+set local role anon;
+select throws_ok($$select public.process_subscription_expirations(1)$$,'42501',null,'anon denied');
+reset role;
+select * from finish();
+rollback;

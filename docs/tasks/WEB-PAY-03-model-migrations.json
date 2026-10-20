@@ -1,0 +1,17 @@
+[
+  {
+    "version": "20260927010000",
+    "file": "20260927010000_subscription_fiscal_model_storage.sql",
+    "sha256": "5acdae8c834f90ef8fd3857958e3e2ec980a89627cd5c872cdec334edc675eb2"
+  },
+  {
+    "version": "20260927011000",
+    "file": "20260927011000_subscription_fiscal_model_commands.sql",
+    "sha256": "9da2f072cde92e1879c8056e2cc973a99802c108daa5969acb48e767fda72904"
+  },
+  {
+    "version": "20260927012000",
+    "file": "20260927012000_subscription_settlement_due.sql",
+    "sha256": "3110cee94a61da4575d517d7d9fd8c26186432a471eb666ad84dd3c7009445cf"
+  }
+]

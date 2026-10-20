@@ -1,0 +1,39 @@
+{
+  "code": "8c9ae161d6a9d2a9c51be2940a14d945128752eb",
+  "target": "jeugfyaqzfgdvfhdxfht",
+  "baselineCount": 324,
+  "baselineVersionsSha256": "03983a6bea9fd6b53dbabea840c6528ac2955e7ccb55a5cfaaab71838f4ad5d8",
+  "knownReleases": [
+    {
+      "id": "20261003000000",
+      "file": "supabase/release-migrations/20261003000000_adopt_billing_environment_guard.sql",
+      "sha256": "9f2459348e0d03bd4e6b4f66ce83d3ed5b37ac3d79e2d63b149b13286995b5b8"
+    },
+    {
+      "id": "20261003010000",
+      "file": "supabase/release-migrations/20261003010000_read_my_platform_sections.sql",
+      "sha256": "08c1fc5045c2172d99df4c2cea3e7bbbf3e51b7f0d831f4cd397df299cec7bff"
+    }
+  ],
+  "currentCount": 326,
+  "currentVersionsSha256": "43e62d2b3279dfe6b443c5ec1dd4d29e9d2ed720bad80b019661caea173eeceb",
+  "expectedAfterCount": 328,
+  "expectedAfterVersionsSha256": "d94454b1909ae59b24fe77e34b6afd6918d90ede5ad1a2ced8db1e8f287a037b",
+  "migrations": [
+    {
+      "id": "20261006010000",
+      "name": "participant_profile_identity",
+      "sha256": "e5e691d622bd62857f244f897f5d142f4ce8a7abd197c2a9a4714184300f2612"
+    },
+    {
+      "id": "20261006020000",
+      "name": "record_account_activity",
+      "sha256": "dc9a0fab0445ff740c6b909a124cb52ab676bfb2d177942b7d28c19c33ac63d0"
+    }
+  ],
+  "edge": {
+    "function": "participant-avatar",
+    "verify_jwt": true
+  },
+  "remoteApplied": false
+}

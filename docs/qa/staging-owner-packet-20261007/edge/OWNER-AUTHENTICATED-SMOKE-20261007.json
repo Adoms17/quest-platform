@@ -1,0 +1,19 @@
+{
+  "evidenceType": "owner-reported UI observations, not direct API assertions",
+  "windowUtc": "2026-10-07 10:44–11:08",
+  "sources": ["Sentinel_992eaa6befc0819186dc3700ff8d16fa", "Sentinel_bba4a138b1e88191ade0f5b355c4ee2a", "Sentinel_caa7ffe9c8388191bb07791b54c76e9a", "Sentinel_eb4c5d7780bc81919ec2b1f4260f9ceb"],
+  "frontend": "http://127.0.0.1:4173",
+  "candidateSource": "8c9ae161d6a9d2a9c51be2940a14d945128752eb",
+  "backendProject": "jeugfyaqzfgdvfhdxfht",
+  "accounts": {"A": "existing QA test1", "B": "existing QA test2"},
+  "relationship": "Owner confirms no shared group and no curator relationship; not independently queried",
+  "checks": [
+    {"case": "A saved nickname Vasya and test avatar, then refreshed", "result": "OWNER_UI_PASS", "observed": "Saved identity persisted"},
+    {"case": "A replaced avatar, then refreshed", "result": "OWNER_UI_PASS", "observed": "Replacement persisted"},
+    {"case": "A removed avatar", "result": "OWNER_UI_PASS", "observed": "Avatar removed; nickname remained"},
+    {"case": "B opened A profile link", "result": "OWNER_UI_PASS", "observed": "Профиль недоступен. Возможно, ваши права изменились", "visibleAvatarDetailsOrEditing": false}
+  ],
+  "limitations": ["No captured direct API/Storage denial assertions", "No revoked relationship scenario", "No full adversarial acceptance", "No account_activity API acceptance", "No uploaded object inventory or cleanup assertion"],
+  "cleanup": "Avatar removal observed in UI only; nickname remains. No account/profile deletion or Storage sweep performed.",
+  "credentials": "No password, JWT, cookie or session captured"
+}

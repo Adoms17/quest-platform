@@ -1,0 +1,269 @@
+{
+  "observedAtUtc": "2026-10-07T11:23:45.802Z",
+  "sourceCandidate": "8c9ae161d6a9d2a9c51be2940a14d945128752eb",
+  "mode": "staging",
+  "envFilesLoaded": false,
+  "flags": {
+    "VITE_SANDBOX_RECEIPTS": "true",
+    "VITE_CHECKOUT_DOCUMENTS": "true"
+  },
+  "publicSupabaseProjectRefs": [
+    "jeugfyaqzfgdvfhdxfht"
+  ],
+  "artifactChainSha256": "afcbd0331b7916dcd8b2b33744d48d593627a2dd6a6eba71246bb60ecaf8a464",
+  "artifacts": [
+    {
+      "path": "assets/AcceptOrganizationInvitation-BvpVlVi4.js",
+      "sha256": "11cf3af8211c5b6f8e2d52f271863a11bd47b5a3cdaf57668953bac80e0cb320"
+    },
+    {
+      "path": "assets/AcceptParticipantGroupInvitation-D9mvnzA8.js",
+      "sha256": "540abdb95dfbbda343ac8a9b7c4f8a38abe25cb6841683909a78a72b7a8498a8"
+    },
+    {
+      "path": "assets/AcceptParticipantInvitation-DTAR-V4h.js",
+      "sha256": "f691b4c5840a1e5a2ad2f67a83c2643df9479e8f6506d0ea3561804086bc2e7e"
+    },
+    {
+      "path": "assets/Downloads-CpJETGlL.js",
+      "sha256": "70a2d021900e72ef2f9ed8199855ed17a1acaaa85b7839e030324581745c476e"
+    },
+    {
+      "path": "assets/InvitationQrCode-DtlG8VU1.js",
+      "sha256": "706fc6b2f3d5edf2e0d133f5daa2b3f0c01d50d81a7f9c626d4c30e7d33437cf"
+    },
+    {
+      "path": "assets/Loader-D4_6wRCd.js",
+      "sha256": "f2d9ae139b3fd25427cd828d749506fa4887d363d813ce3251a1adc1001e139c"
+    },
+    {
+      "path": "assets/Login-D9LJERye.js",
+      "sha256": "8bf39028a683e76b6d390048fc623abab1a3c04f544294555599383f1b4605a6"
+    },
+    {
+      "path": "assets/OrganizationAudit-CnbhQauO.js",
+      "sha256": "1b4f5b681e5457a827e8b29c79660a05e24f56352b81ddb2699ef6770a331fdc"
+    },
+    {
+      "path": "assets/OrganizationBilling-CeKKgHzK.js",
+      "sha256": "e6219a16f4ff14d6b8534e79557bb291ad9eed85ae615069b521391feb7c8b6c"
+    },
+    {
+      "path": "assets/OrganizationInvite-CXcyLM_k.js",
+      "sha256": "2f2117c138e4f218a99929a0640082080dcffd8368f3b193790b4b861d4d58d2"
+    },
+    {
+      "path": "assets/OrganizationTeam-DCYH2lli.js",
+      "sha256": "3acfb8a7e5bd89de25a31a191d7812af8a4349367cfaf07ee540ec56ccb8a496"
+    },
+    {
+      "path": "assets/ParticipantArchive-GSElOxPh.js",
+      "sha256": "4f637bcbf774945a91ba68559069f5ed31d0bddd120eef4d77f99a059200aec8"
+    },
+    {
+      "path": "assets/ParticipantAudit-B2C9yejF.js",
+      "sha256": "119f42fe3e13128b9d24b94ce5c5ec862fb4ca152575ee93f63817bb4e82e9fe"
+    },
+    {
+      "path": "assets/ParticipantAvatar-CIMlGM0O.js",
+      "sha256": "9656b280aecf173b34896f934093e00f91c9cde2f9ac6724f496221e16c250cc"
+    },
+    {
+      "path": "assets/ParticipantGroup-DZBjRLwM.js",
+      "sha256": "c79da540943a5d51cdea8aaa2d56281ae9b1153e9d65dead3ebce2c52a4a7953"
+    },
+    {
+      "path": "assets/ParticipantGroupCreate-Bh1WGVwE.js",
+      "sha256": "a202c4bb83d1f8041597974fe36c4465b9701b1cde4f992ba1d9482a8238362a"
+    },
+    {
+      "path": "assets/ParticipantGroupInvitations-C2f5SStv.js",
+      "sha256": "8f42a124b200ca2547c74e13dce82eecc51d9a1615b814105164abee59783c8b"
+    },
+    {
+      "path": "assets/ParticipantGroupMembers-CmPJsXuu.js",
+      "sha256": "24b56f599734363c7b754ce75455bcb6beafa6fedec11a9fbf9e9daa68a4bdaf"
+    },
+    {
+      "path": "assets/ParticipantHistory-DglbVuAL.js",
+      "sha256": "f519b3b63f2e931e5ed3d5e70cf5677e8cc7e1739b546f70be7dd3ba1aa67e37"
+    },
+    {
+      "path": "assets/ParticipantProfileCard-Bj9Sz4fX.js",
+      "sha256": "fb0db7795036c5f2ca03bfd4ea44ac23ba07aeb63e00fd1c443ba80f71fd7df7"
+    },
+    {
+      "path": "assets/ParticipantProfileCreate-Bcoza_I4.js",
+      "sha256": "c13f4972dde89fa42302ddbc7a7df4d4831e922f9069dbd3d419c4ad109c67c5"
+    },
+    {
+      "path": "assets/ParticipantProfileInvitations-C7_Z9bKI.js",
+      "sha256": "7c4d68834f0fae25e4a8616cfe75438f39411bb6f60f70592faf27fa3f73b61a"
+    },
+    {
+      "path": "assets/ParticipantProfileSelect-CrRUuj4I.js",
+      "sha256": "2fdff5ad474070f73a014f9284867600e0bdf22a61b39f0de79bdf0f9164c5d8"
+    },
+    {
+      "path": "assets/ParticipantQuests-BP0WRrpQ.js",
+      "sha256": "ab4a372e4040197315896fd8188d7c7868050feca6bb8b7d59f5735b4ef75c12"
+    },
+    {
+      "path": "assets/ParticipantSupervisionProfiles-dVBMjzc-.js",
+      "sha256": "2afaf84dcc02704becc5742713bb8af674d379add7bd63565fcbbda5aa8e5e25"
+    },
+    {
+      "path": "assets/ParticipantSupervisors-BIzo1JSa.js",
+      "sha256": "fee778d4125bb751758bd71c519ffb46a44989b7543245ee94c88e1aac021dee"
+    },
+    {
+      "path": "assets/PeopleCatalog-Dp-f7k5M.js",
+      "sha256": "4c94d94c1cb1b5f3d9cabfccca3238be28c29c64fc673641a9554fbbb56c0a91"
+    },
+    {
+      "path": "assets/QuestAccess-CTclMXZJ.js",
+      "sha256": "aed6266331cf5d8f5f2f43e5bd6ec6a769c9bbfe7ea90f9437957961cb49808f"
+    },
+    {
+      "path": "assets/QuestCreate-Cef52iax.js",
+      "sha256": "7eecefbca90a9f6f0ebff3a21a2c59accd02f1b73066ad9153d31bc426a3e38f"
+    },
+    {
+      "path": "assets/QuestEdit-BB3IzQY-.js",
+      "sha256": "cd145766664517628ab2669ad985367b28d044a9b60a9bdd0dcca0610546b7f9"
+    },
+    {
+      "path": "assets/QuestList-C7wvEubr.js",
+      "sha256": "b93364435bb6763c1ab75029a3b997f9a4e2e89b6f064ce40b04923f80711658"
+    },
+    {
+      "path": "assets/QuestPlay-BMBKV_kH.js",
+      "sha256": "fa26828334f08492df72e268496a464d0ca1e49c25368fd0f62510d9d688ac8b"
+    },
+    {
+      "path": "assets/QuestStats-Cilv6edM.js",
+      "sha256": "1e192e9b7448f7414c9edff2d176b07824f948197ab2a402f0a88bde2f513323"
+    },
+    {
+      "path": "assets/RedeemQuestAccess-1Tpi83vI.js",
+      "sha256": "68f335b604482a6d4b07e72ba3c75f759d1b53f7b9cfdeeb7ebf45657319f865"
+    },
+    {
+      "path": "assets/RedeemQuestCode-CFrnQ48C.js",
+      "sha256": "ab58cd7401aa586bff3bfd2c04d67edf2516af4e21c9ec8359b924675f16c8f4"
+    },
+    {
+      "path": "assets/TaskForm-_dCkX6r-.js",
+      "sha256": "548e1572739350b09257429c89cb1d1317912638fee9fe54c5fafc1a798426af"
+    },
+    {
+      "path": "assets/TaskManager-D6perBPH.js",
+      "sha256": "d9ef96b901730a0143939eae45eb6d11b879fc350358cbd57880c82667103ca7"
+    },
+    {
+      "path": "assets/authRequest-DuIlNeFa.js",
+      "sha256": "1653f83fef49a00a0256deaf28657e4ec50c1831b8c4e260e07263bcdb2b55ef"
+    },
+    {
+      "path": "assets/db-BZRIBh1p.js",
+      "sha256": "a32d6a9eae06e3344b81225ede7000f21085fa6c428b16ef40608dd666d09b90"
+    },
+    {
+      "path": "assets/hybridVerification-DiDAPeor.js",
+      "sha256": "bb9e321d023de795a60db726faa9f03ecd213992e50d3cace4dca69f278232d5"
+    },
+    {
+      "path": "assets/index-BGXWOcEt.css",
+      "sha256": "7d83fca7d315a6f2019c6179348573dca50ea7ec52b9fe4748b9a2753a443d69"
+    },
+    {
+      "path": "assets/index-D-oX4IjN.js",
+      "sha256": "9ac417a358d6fe7f5a412f4b1fe9708a7b19ae447b66d8c523fa963ae4ee1201"
+    },
+    {
+      "path": "assets/leaflet-UotK3cRu.js",
+      "sha256": "13b933e6137c52792511ec6102a85ba50294d3a585b9f34fcd596674956ac933"
+    },
+    {
+      "path": "assets/leaflet-vh-t_kPv.css",
+      "sha256": "86d3d093fad979e1d185c8a93258f5f124d863fd13ca894c0b9f50bb68b66997"
+    },
+    {
+      "path": "assets/localSecretLinks-DDcbi1RZ.js",
+      "sha256": "7dff15ac860fefa40c85d96fdf56c19394b6565d883797a5b70e2c8a8bcfb8a4"
+    },
+    {
+      "path": "assets/offlineMedia-DKRvGyeR.js",
+      "sha256": "c0ec09462d770aa3ecda3d29f89b08b6305d13f83e93659052e291033cb7249b"
+    },
+    {
+      "path": "assets/offlineReview-c7E4wbif.js",
+      "sha256": "76e07c5142c6a7dcc61a546522d3b06a74832c85dda1be0617104eea7f660a3a"
+    },
+    {
+      "path": "assets/participantDashboard-V7xUb1fO.js",
+      "sha256": "3ee41fe944144423a669addc77737d2f0e90c2d3ae268685f7b0f89158ac43b2"
+    },
+    {
+      "path": "assets/participantGroupApi-Clc1j5vq.js",
+      "sha256": "93e1d48d38637bd8feaa6d01de360a04df115a4c35038361ba501bc7803cd9a0"
+    },
+    {
+      "path": "assets/participantGroupErrors-CO-rM2EZ.js",
+      "sha256": "f16bdda9c32e49372a1bae5dec39a5b2262709efc73a7f1580e7710e3af6efdc"
+    },
+    {
+      "path": "assets/peopleCatalogApi-DKaQw-LS.js",
+      "sha256": "5b897df561ce925d58b642860c74b603aa8679830d6b46471b7c83b1755dedcf"
+    },
+    {
+      "path": "assets/questAccessApi-BlVsoe6Y.js",
+      "sha256": "70e7f2e6f06158a9f0822bedddc8ba3e7905ae0af4114928d953049b89bef111"
+    },
+    {
+      "path": "assets/questAccessErrors-DOfVvBSz.js",
+      "sha256": "fe24b7f8368b4d000bf865e351831f1fc325195ea9e1d64e33f00d205a366990"
+    },
+    {
+      "path": "assets/questCreationApi-CWUq4qtk.js",
+      "sha256": "c0656ac9855e2cb8afab2732836efa751bc1a680601b42b187c535e19aa14a9b"
+    },
+    {
+      "path": "assets/questVerificationMode-_XkZgyfv.js",
+      "sha256": "b2cdd3291619b0afa1ea627a595bf2850feb297936dad86ae7541bdb116557b2"
+    },
+    {
+      "path": "assets/sync-Bu8RERfD.js",
+      "sha256": "69b06e642bd7a72f3e1772b98502962ede34f414f7096615536d80a33cfbc9ef"
+    },
+    {
+      "path": "assets/teamApi-ndQ3J5ST.js",
+      "sha256": "89a6a17e72dc4eea6842fd691f9c3880ed12db5b6a71db60238f05dc8f37c210"
+    },
+    {
+      "path": "assets/usePeopleCatalog-Dp6ekWs_.js",
+      "sha256": "d51827f88c7235a6d28f8f2bb1c3946ba1f733f111f053a7262af71e20399cd3"
+    },
+    {
+      "path": "index.html",
+      "sha256": "a64dce08a0edd639c4627d845f2c13a0ec657e12b1cf1c951e2631147302eb0d"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "sha256": "73956df5db49567558540c4295720540cc879769f8be0a8499087f936171fa47"
+    },
+    {
+      "path": "registerSW.js",
+      "sha256": "9742073ef7fc795e7673d98f272992843298426a0ffd8cb3507784df5143608b"
+    },
+    {
+      "path": "sw.js",
+      "sha256": "d8cfe57cd3798f661ebcf75007647613659b5e12c159b1dc522ab69d9103fe7d"
+    },
+    {
+      "path": "workbox-9c191d2f.js",
+      "sha256": "04b086f1b2f4215ee4b659a7bc9c76162894abdb43fa876247bc7c0bd6fd1c37"
+    }
+  ],
+  "scope": "Local build only; remote artifact/deployment and hosted app-shell/PWA checks pending. No user data or credentials."
+}

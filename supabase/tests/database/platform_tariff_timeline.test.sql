@@ -1,0 +1,40 @@
+begin;
+select no_plan();
+insert into public.billing_plan_versions(id,plan_key,version,display_name,active_quests_limit,team_members_limit)
+select md5('timeline-'||n)::uuid,'timeline_test',n,'Timeline',n,1 from generate_series(1,4)n;
+insert into public.billing_tariff_timeline(version_id,catalog_version_id,plan_key,effective_at)
+select md5('timeline-'||n)::uuid,md5('timeline-'||n)::uuid,'timeline_test','2030-01-01 UTC'::timestamptz+(n-1)*interval '1 month' from generate_series(1,3)n;
+select is(platform_private.current_tariff_version('timeline_test','2029-12-31 UTC'),null::uuid,'no version before first date');
+select is(platform_private.current_tariff_version('timeline_test','2030-01-01 UTC'),md5('timeline-1')::uuid,'starts exactly at boundary');
+select is(platform_private.current_tariff_version('timeline_test','2030-02-01 UTC'),md5('timeline-2')::uuid,'next version replaces previous');
+select is(platform_private.tariff_version_state(md5('timeline-1')::uuid,'2030-02-01 UTC'),'superseded','previous is superseded');
+select is(platform_private.tariff_version_state(md5('timeline-3')::uuid,'2030-02-01 UTC'),'scheduled','future is scheduled');
+select ok(platform_private.tariff_allows_renewal(md5('timeline-1')::uuid,'2030-02-01 UTC',true),'automatic may renew previous version');
+select ok(not platform_private.tariff_allows_renewal(md5('timeline-1')::uuid,'2030-02-01 UTC',false),'manual cannot buy superseded version');
+select throws_ok($t$insert into public.billing_tariff_timeline(version_id,catalog_version_id,plan_key,effective_at) values(md5('timeline-4')::uuid,md5('timeline-4')::uuid,'timeline_test','2030-02-01 UTC')$t$,'23505',null,'same effective time rejected');
+update public.billing_tariff_timeline set revoked_at='2030-02-15 UTC' where version_id=md5('timeline-3')::uuid;
+select is(platform_private.current_tariff_version('timeline_test','2030-04-01 UTC'),md5('timeline-2')::uuid,'revoked version never becomes current');
+select is(platform_private.tariff_version_state(md5('timeline-3')::uuid,'2030-04-01 UTC'),'revoked','revoked status retained');
+update public.billing_tariff_timeline set support_notice_at='2030-01-01 UTC',support_ends_at='2030-03-01 UTC' where version_id=md5('timeline-2')::uuid;
+select is(platform_private.current_tariff_version('timeline_test','2030-03-01 UTC'),null::uuid,'no fallback to older version when latest support ends');
+select ok(not platform_private.tariff_allows_renewal(md5('timeline-2')::uuid,'2030-03-01 UTC',true),'automatic renewal stops at support boundary');
+select throws_ok($t$update public.billing_tariff_timeline set support_notice_at='2030-02-15 UTC' where version_id=md5('timeline-2')::uuid$t$,'23514',null,'minimum notice is 30 days');
+select throws_ok($t$update public.billing_tariff_timeline set effective_at='2030-04-01 UTC' where version_id=md5('timeline-1')::uuid$t$,'55000','tariff timeline identity immutable','cannot move effective date');
+select ok(not exists(select 1 from public.billing_tariff_timeline t join public.billing_plan_versions p on p.id=t.version_id where p.plan_key<>'timeline_test' and (t.effective_at<>p.created_at or t.support_ends_at is not null)),'legacy dates copied without support deadline');
+set local role authenticated;
+select throws_ok('select * from public.billing_tariff_timeline','42501',null,'timeline private');
+select throws_ok($t$select platform_private.current_tariff_version('timeline_test',now())$t$,'42501',null,'client cannot choose clock');
+reset role;
+select is(platform_private.tariff_timeline_number(md5('timeline-1')::uuid),1::bigint,'first ordinal preserved');
+select is(platform_private.tariff_timeline_number(md5('timeline-2')::uuid),2::bigint,'second ordinal preserved');
+select is(platform_private.tariff_timeline_number(md5('timeline-3')::uuid),null::bigint,'revoked version has no ordinal');
+insert into public.billing_tariff_timeline(version_id,catalog_version_id,plan_key,effective_at)
+values(md5('timeline-4')::uuid,md5('timeline-4')::uuid,'timeline_test','2030-01-15 UTC');
+select is(platform_private.tariff_timeline_number(md5('timeline-4')::uuid),2::bigint,'inserted future publication gets chronological number');
+select is(platform_private.tariff_timeline_number(md5('timeline-2')::uuid),3::bigint,'later publication shifted forward');
+select is(platform_private.tariff_timeline_number(md5('timeline-1')::uuid),1::bigint,'earlier publication unchanged');
+update public.billing_tariff_timeline set revoked_at='2030-01-10 UTC' where version_id=md5('timeline-4')::uuid;
+select is(platform_private.tariff_timeline_number(md5('timeline-2')::uuid),2::bigint,'revocation shifts later publication back');
+select is((select count(*)::int from public.billing_tariff_timeline where plan_key='timeline_test'),4,'revoked snapshots retained for audit');
+select * from finish();
+rollback;

@@ -128,6 +128,8 @@ describe('participant-scoped offline data', () => {
 
     expect(hasFreshParticipantPackageAccess(quest, 'profile-a', now)).toBe(true)
     expect(hasFreshParticipantPackageAccess(quest, 'profile-b', now)).toBe(false)
+    expect(hasFreshParticipantPackageAccess(quest, null, now)).toBe(false)
+    expect(hasFreshParticipantPackageAccess(quest, 'profile-a', now - 1)).toBe(false)
   })
 
   it('builds an offline quest only for fresh profiles available to this user', () => {

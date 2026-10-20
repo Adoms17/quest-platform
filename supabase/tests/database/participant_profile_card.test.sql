@@ -14,7 +14,7 @@ select is(pg_temp.card()->>'display_name','Саша','имя выбранног�
 select is(pg_temp.card()->>'can_rename','true','создатель может переименовать неприсвоенный профиль');
 select is(pg_temp.card()->>'can_participate','true','активный контроль разрешает прохождение');
 select is(pg_temp.card()->>'is_self','false','зависимый профиль не объявляется собственным');
-select ok(not exists(select 1 from jsonb_object_keys(pg_temp.card()) k where k not in ('id','display_name','profile_kind','age_group','is_self','supervision_status','can_participate','can_rename')),'нет контактов, групп, истории и ответов');
+select ok(not exists(select 1 from jsonb_object_keys(pg_temp.card()) k where k not in ('id','display_name','profile_kind','age_group','is_self','supervision_status','can_participate','can_rename','nickname','avatar_path','identity_revision')),'нет контактов, групп, истории и ответов');
 select is(public.get_participant_profile_card((select participant_profile_id from public.participant_profile_accounts where user_id=auth.uid() and relationship='self'))->>'is_self','true','собственный профиль');
 select lives_ok($$select public.update_my_participant_profile_name('96000000-0000-4000-8000-000000000011','Новое имя')$$,'сохранение существующим защищённым RPC');
 select is(pg_temp.card()->>'display_name','Новое имя','после сохранения возвращается серверное имя');

@@ -1,0 +1,8 @@
+{
+  "version": "20261003000000",
+  "name": "adopt_billing_environment_guard",
+  "path": "supabase/release-migrations/20261003000000_adopt_billing_environment_guard.sql",
+  "sha256": "9f2459348e0d03bd4e6b4f66ce83d3ed5b37ac3d79e2d63b149b13286995b5b8",
+  "status": "reviewed-locally-not-applied",
+  "automaticDiscovery": false
+}

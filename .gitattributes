@@ -1,2 +1,3 @@
 * text=auto eol=lf
 
+scripts/fixtures/shop-stage-six/*.sql -text

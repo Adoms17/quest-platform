@@ -1,0 +1,97 @@
+[
+  {
+    "version": "20260926019000",
+    "file": "20260926019000_receipt_snapshot_storage.sql",
+    "sha256": "7d76269c4c6db6ef386e8070019c853b800c57b9219a2b462f2dff9d837b6a89"
+  },
+  {
+    "version": "20260926020000",
+    "file": "20260926020000_prepare_sandbox_receipt.sql",
+    "sha256": "2407a45b8e079d14f8a5faff0c08ee71e85fee75be0c1289080648b5af49e9aa"
+  },
+  {
+    "version": "20260926021000",
+    "file": "20260926021000_manage_sandbox_fiscal_policy.sql",
+    "sha256": "79543b4e4c9e09ec500c11da84aa56704226ab35c55a7a15a4f36d7be9b4862f"
+  },
+  {
+    "version": "20260926022000",
+    "file": "20260926022000_list_sandbox_fiscal_policies.sql",
+    "sha256": "3f517027f626b5de3ba66122b9b7a68de5066d80ef07d124c4b1c9a4a25fa3a9"
+  },
+  {
+    "version": "20260926023000",
+    "file": "20260926023000_receipt_payment_requests.sql",
+    "sha256": "70a0c9364944d05955a877f3c52c0c9f373bb8395348bbb3ccd1f44b9bedf262"
+  },
+  {
+    "version": "20260926024000",
+    "file": "20260926024000_receipt_pending_batch.sql",
+    "sha256": "2d23bb968a53bf95b5aaeb4e00ad7b91addaffe67def79520167e08a1c08bcdb"
+  },
+  {
+    "version": "20260926025000",
+    "file": "20260926025000_receipt_contact.sql",
+    "sha256": "f4859933296935b3319fa3120afc2aaaf2421d7e57eabbc29d33770100c94331"
+  },
+  {
+    "version": "20260926026000",
+    "file": "20260926026000_recurring_receipt_snapshot.sql",
+    "sha256": "1d71a12913fd9b09310cde257723bb37c346d5787f97e461565c89d085680652"
+  },
+  {
+    "version": "20260926027000",
+    "file": "20260926027000_recurring_receipt_requests.sql",
+    "sha256": "65b457b735345b171828b97db7dc274af3062bf4e65ea93dcd1816c3da3e138b"
+  },
+  {
+    "version": "20260926028000",
+    "file": "20260926028000_recurring_receipt_poll.sql",
+    "sha256": "f9b880b83975f36429b17a9ed222f210e2e0c0f4e59274972b45095731f38732"
+  },
+  {
+    "version": "20260926029000",
+    "file": "20260926029000_full_refund_receipts.sql",
+    "sha256": "15ba7912e63dffc8bce374b70d135c8729c048ac6b4ed1144146baadb1a29002"
+  },
+  {
+    "version": "20260926030000",
+    "file": "20260926030000_refund_receipt_poll.sql",
+    "sha256": "59f6990582cce1a5d9081026d6b4aeeb1c893f01ba9623bc73c29dfd3032cc98"
+  },
+  {
+    "version": "20260926031000",
+    "file": "20260926031000_platform_receipt_status.sql",
+    "sha256": "ce4154d2951a35540698b4cc38d111075933ce70203a9b455a8b8e45c20de40e"
+  },
+  {
+    "version": "20260926032000",
+    "file": "20260926032000_receipt_poll_backoff.sql",
+    "sha256": "8a63a921fff2703c594dff5750248125b957f51d438a2696d40329386b2c6646"
+  },
+  {
+    "version": "20260926033000",
+    "file": "20260926033000_prepare_prepayment_settlement.sql",
+    "sha256": "8b113f5925b408bd5e029e1566e4c4b6113261d3d0b3272bda096d6f76c3d547"
+  },
+  {
+    "version": "20260926034000",
+    "file": "20260926034000_claim_prepayment_settlement.sql",
+    "sha256": "03b92cb76dcdfc8ccea4a20d6278e8c4d75b1c81600d741ee60966a901f52789"
+  },
+  {
+    "version": "20260926035000",
+    "file": "20260926035000_list_pending_settlements.sql",
+    "sha256": "dba0c1552ebd6e4421a06cb7ced6817c805c8a5ca80d7e40157be266047327b0"
+  },
+  {
+    "version": "20260926036000",
+    "file": "20260926036000_settlement_poll_backoff.sql",
+    "sha256": "44c4244ba2aee62fa31e8f101c40a5bb9b9f24f612cde8d442b7fc43cd6ec74f"
+  },
+  {
+    "version": "20260926037000",
+    "file": "20260926037000_platform_settlement_status.sql",
+    "sha256": "df7c13f799df1c6304eb2dc31fc5803d6a0d8ed55a5ef185874b3c0d0a3d86c3"
+  }
+]

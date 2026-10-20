@@ -1,0 +1,15 @@
+{
+  "name": "qvesta-admin-stage",
+  "compatibility_date": "2026-09-18",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "stage-admin.qvesta.ru", "custom_domain": true }],
+  "build": {
+    "cwd": ".",
+    "command": "npm run build -- --config admin/vite.config.mjs --mode staging"
+  },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

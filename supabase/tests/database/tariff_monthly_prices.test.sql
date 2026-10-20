@@ -1,0 +1,37 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('publish-owner')::uuid,'publish-owner@example.test');
+insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('publish-owner')::uuid,'owner','platform');
+select set_config('request.jwt.claim.sub',md5('publish-owner')::uuid::text,true);
+select set_config('request.jwt.claims',jsonb_build_object('aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from clock_timestamp())))))::text,true);
+select set_config('test.source',(select id::text from public.billing_plan_versions where plan_key='pro' and version=1),true);
+select set_config('test.future',(now()+interval '2 days')::text,true);
+set local role authenticated;
+select public.save_platform_tariff_draft(md5('publish-save')::uuid,md5('publish-draft')::uuid,current_setting('test.source')::uuid,0,'Draft',5,3,14,'Price test',123456);
+select throws_ok($t$select public.publish_tariff_draft(md5('bad-date')::uuid,md5('publish-draft')::uuid,1,now())$t$,'22023','publication must be in future','past rejected');
+select throws_ok($t$select public.publish_tariff_draft(md5('bad-revision')::uuid,md5('publish-draft')::uuid,2,now()+interval '2 days')$t$,'40001','draft revision conflict','stale revision rejected');
+select set_config('test.published',public.publish_tariff_draft(md5('publish')::uuid,md5('publish-draft')::uuid,1,current_setting('test.future')::timestamptz)::text,true);
+
+select is(public.read_platform_tariff_catalog(null,(current_setting('test.published')::jsonb->>'version_id')::uuid)#>>'{items,0,source_version,id}',current_setting('test.source'),'базовая версия связана с опубликованной');
+select is(public.read_platform_tariff_catalog(null,current_setting('test.source')::uuid)#>>'{items,0,source_version,id}',null::text,'исходная версия без выдуманной основы');
+
+select is(public.read_platform_tariff_catalog(null,(current_setting('test.published')::jsonb->>'version_id')::uuid)#>>'{items,0,monthly_price_minor}','123456','published card has exact monthly price');
+select is(public.preview_platform_tariff_draft(md5('publish-draft')::uuid,1)#>>'{changes,monthly_price_minor}','true','preview detects price change');
+select throws_ok($t$select public.save_platform_tariff_draft(md5('price-after-publish')::uuid,md5('publish-draft')::uuid,current_setting('test.source')::uuid,1,'Draft',5,3,14,'Price test',999)$t$,'55000',null,'published price cannot be edited');
+set local role anon;
+select is(jsonb_array_length(public.read_public_tariff_catalog()->'items'),3,'anonymous sees three current tariffs');
+select is(public.read_public_tariff_catalog()#>>'{items,1,monthly_price_minor}','99000','scheduled price not yet public');
+select is(public.read_public_tariff_catalog()#>>'{items,0,plan_key}','free','public order begins with Free');
+select throws_ok('select * from public.platform_tariff_drafts','42501',null,'anonymous cannot read drafts');
+select throws_ok('select * from public.billing_plan_versions','42501',null,'anonymous cannot read history');
+reset role;
+select is((select monthly_price_minor from public.platform_fixed_tariff_versions where id=(current_setting('test.published')::jsonb->>'version_id')::uuid),123456,'fixed snapshot preserves price');
+select throws_ok($t$update public.billing_plan_versions set monthly_price_minor=1 where id=current_setting('test.source')::uuid$t$,'55000',null,'version price immutable');
+select is(platform_private.current_tariff_version('pro',current_setting('test.future')::timestamptz),(current_setting('test.published')::jsonb->>'version_id')::uuid,'new version effective at exact start');
+set local role authenticated;
+select public.revoke_tariff_publication(md5('price-revoke')::uuid,(current_setting('test.published')::jsonb->>'version_id')::uuid);
+select public.save_platform_tariff_draft(md5('price-after-revoke')::uuid,md5('publish-draft')::uuid,current_setting('test.source')::uuid,1,'Draft',5,3,14,'Price test',222222);
+reset role;
+select is(platform_private.current_tariff_version('pro',current_setting('test.future')::timestamptz),current_setting('test.source')::uuid,'revoked version excluded');
+select is((select monthly_price_minor from public.billing_plan_versions where id=(current_setting('test.published')::jsonb->>'version_id')::uuid),123456,'editing revoked draft does not change old snapshot');
+select * from finish(); rollback;

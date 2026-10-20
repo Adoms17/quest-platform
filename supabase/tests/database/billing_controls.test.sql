@@ -1,0 +1,34 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('controls-owner')::uuid,'controls@example.test');
+select set_config('test.controls_org',(select id::text from public.organizations where personal_owner_id=md5('controls-owner')::uuid),true);
+select set_config('request.jwt.claim.sub',md5('controls-owner')::uuid::text,true);
+set local role authenticated;
+select is(public.get_organization_billing_controls(current_setting('test.controls_org')::uuid)->>'can_request','false','unconfigured cannot request');
+reset role;
+update public.organization_subscriptions set status='active',plan_version_id=(select id from public.billing_plan_versions where plan_key='pro' and version=1),period_start=now()-interval '1 day',period_end=now()+interval '1 day' where organization_id=current_setting('test.controls_org')::uuid;
+set local role authenticated;
+select is(public.get_organization_billing_controls(current_setting('test.controls_org')::uuid)->>'can_request','true','owner active can request');
+select is(jsonb_array_length(public.get_organization_billing_controls(current_setting('test.controls_org')::uuid)->'downgrade_targets'),1,'Pro offers only Free');
+select is(public.get_organization_billing_controls(current_setting('test.controls_org')::uuid)->'downgrade_targets'->0->>'name','Free','server names target');
+select throws_ok($$select public.get_organization_billing_controls(md5('foreign-controls')::uuid)$$,'42501','billing access denied','foreign denied');
+reset role;
+insert into auth.users(id,email) values(md5('controls-reader')::uuid,'controls-reader@example.test');
+insert into public.organization_memberships(id,organization_id,user_id,status)
+values(md5('controls-reader-member')::uuid,current_setting('test.controls_org')::uuid,md5('controls-reader')::uuid,'active');
+insert into public.membership_roles(membership_id,role_id)
+select md5('controls-reader-member')::uuid,id from public.roles where key='sales_manager';
+select set_config('request.jwt.claim.sub',md5('controls-reader')::uuid::text,true);
+set local role authenticated;
+select is(public.get_organization_billing_controls(current_setting('test.controls_org')::uuid)->>'can_manage','false','reader cannot manage');
+select is(public.get_organization_billing_controls(current_setting('test.controls_org')::uuid)->>'can_request','false','reader cannot request');
+reset role;
+select set_config('request.jwt.claim.sub',md5('controls-owner')::uuid::text,true);
+update public.organization_subscriptions set period_end=now()-interval '1 hour' where organization_id=current_setting('test.controls_org')::uuid;
+set local role authenticated;
+select is(public.get_organization_billing_controls(current_setting('test.controls_org')::uuid)->>'can_request','false','elapsed period denies new requests');
+set local role anon;
+select throws_ok($$select public.get_organization_billing_controls(current_setting('test.controls_org')::uuid)$$,'42501',null,'anon denied');
+reset role;
+select * from finish();
+rollback;

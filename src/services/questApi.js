@@ -77,6 +77,20 @@ export async function startServerQuestAttempt(questId, participantProfileId = nu
   return attempt
 }
 
+export async function registerOfflineQuestAttempt(questId, participantProfileId, localId, existingAttemptId = null, permitId = null) {
+  const { data, error } = await supabase.rpc(permitId ? 'register_permitted_offline_attempt' : 'register_offline_quest_attempt', {
+    p_quest_id: questId,
+    p_participant_profile_id: participantProfileId,
+    p_local_attempt_id: localId,
+    ...(permitId ? { p_permit_id: permitId } : { p_existing_attempt_id: existingAttemptId }),
+  })
+  throwIfError(error)
+  if (!data?.id || data.quest_id !== questId || data.participant_profile_id !== participantProfileId) {
+    throw new Error('Некорректная регистрация офлайн-попытки.')
+  }
+  return data
+}
+
 export async function loadTaskEventReceipts(clientEventIds) {
   if (clientEventIds.length === 0) return []
 

@@ -1,0 +1,45 @@
+{
+  "target": "jeugfyaqzfgdvfhdxfht",
+  "candidate": "8c9ae161d6a9d2a9c51be2940a14d945128752eb",
+  "cliVersion": "2.116.0",
+  "command": "functions deploy participant-avatar --project-ref jeugfyaqzfgdvfhdxfht --use-api",
+  "startedAtUtc": "2026-10-07T10:08:00.2399676Z",
+  "cliCompletedAtUtc": "2026-10-07T10:08:04.8193954Z",
+  "serverUpdatedAtUtc": "2026-10-07T10:08:04.1200000Z",
+  "verifiedAtUtc": "2026-10-07T10:10:36.5130923+00:00",
+  "function": {
+    "id": "5a4c93b2-46cd-4648-9969-6418d02bc16d",
+    "name": "participant-avatar",
+    "slug": "participant-avatar",
+    "status": "ACTIVE",
+    "version": 1,
+    "verify_jwt": true,
+    "entrypoint_path": "file:///tmp/user_fn_jeugfyaqzfgdvfhdxfht_5a4c93b2-46cd-4648-9969-6418d02bc16d_1/source/supabase/functions/participant-avatar/index.ts",
+    "import_map": false,
+    "created_at": 1791367684120,
+    "updated_at": 1791367684120
+  },
+  "source": [
+    {
+      "path": "participant-avatar/index.ts",
+      "sha256": "68C0EF694EAB109A0A44F8E67811D8374CFB202FCF81E1B2D58C121B8DF5EB32",
+      "matchesCandidate": true
+    },
+    {
+      "path": "_shared/participantAvatarEndpoint.js",
+      "sha256": "087171C672109F368E27CA3D6C20EA994188F4DD41369704FC9E17CBF31FF3A0",
+      "matchesCandidate": true
+    },
+    {
+      "path": "_shared/participantAvatarPng.js",
+      "sha256": "62DBAC9441D3791139722576ECD95CBCA358AA90B4DD87DF00F88D07E43B0790",
+      "matchesCandidate": true
+    }
+  ],
+  "sourceFileCount": 3,
+  "hostedSecuritySmoke": "NOT RUN",
+  "frontendDeployment": "NOT RUN / HOLD",
+  "auth": "existing managed CLI authentication; no login or credential extraction",
+  "localVerificationFolder": ".review.local/participant-avatar-remote-20261007T1008",
+  "cleanup": "No containers/processes created; downloaded source retained for review"
+}

@@ -22,6 +22,7 @@ test('UX05: серверный выбор участника истории', as
       history.push(args.p_participant_profile_id)
       const start=args.p_after?.offset||0, end=start+args.p_limit
       const rows=Array.from({length:61},(_,n)=>({quest_attempt_id:`a${n}`,quest_id:'q1',quest_title:`Прохождение ${n+1}`,started_at:'2026-09-01T10:00:00Z',finished_at:'2026-09-01T11:00:00Z',total_tasks:3,completed_tasks:2,failed_tasks:1}))
+      rows[0].outcome = 'invalid_limit'
       data={items:rows.slice(start,end),has_more:end<rows.length,next_cursor:end<rows.length?{offset:end}:null}
     }
     await route.fulfill({json:data})
@@ -30,6 +31,9 @@ test('UX05: серверный выбор участника истории', as
   await expect(page.getByText('Участник: Участник 1',{exact:true})).toBeVisible()
   await expect.poll(()=>history[0]).toBe('p1')
   await expect(page.locator('article')).toHaveCount(25)
+  await expect(page.locator('article').first()).toContainText('Недействительное прохождение — лимит исчерпан')
+  await expect(page.locator('article').first()).not.toContainText('Результат')
+  await expect(page.locator('article').first().getByRole('link')).toHaveCount(0)
   await page.getByRole('button',{name:'Показать ещё прохождения'}).click()
   await expect(page.locator('article')).toHaveCount(50)
   await page.getByRole('button',{name:'Показать ещё прохождения'}).click()
