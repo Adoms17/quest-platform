@@ -1,5 +1,9 @@
 # Full implemented MVP: integration preparation
 
+Обновление 20 октября: [классификация 228 миграций](MIGRATION-ASSESSMENT.md),
+[полный реестр](MIGRATION-REGISTER.md), [проверенный source-состав SHOP](SHOP-SOURCE-REVIEW.md).
+Все миграции остаются HOLD; runtime и production-конфигурация не изменены.
+
 Status: **DRAFT / NOT DEPLOYABLE / no production GO**. Prepared 2026-10-20.
 Scope includes all implemented App, Admin, Website and Market/SHOP capabilities.
 This package does not activate sales, provision resources, configure credentials,
