@@ -1,10 +1,10 @@
 # Migration source inventory after PR181
 
-Date: 2026-10-20. Status: source inventory prepared for review; publication held by the existing PR CI SQL job.
+Date: 2026-10-20. Status: Draft PR182; source inventory verified and two successful isolated schema replay results recorded, with one intervening writer failure preserved.
 
 ## Purpose and evidence boundary
 
-This package describes the complete **335-version source inventory** corresponding to the staging migration ledger observed on 2026-10-20 at approximately 08:33 UTC. It does not execute SQL, provision an environment, repair the ledger, or establish that replay into a new database succeeds.
+This package describes the complete **335-version source inventory** corresponding to the staging migration ledger observed on 2026-10-20 at approximately 08:33 UTC. This documentation does not execute SQL, provision an environment, or repair the ledger. Separately authorized local replay evidence is summarized in [REPLAY-REPORT.md](REPLAY-REPORT.md) and indexed in [replay-evidence-index.json](replay-evidence-index.json).
 
 The immutable source baseline is [6075dc9755357fedd2e26c21f0655f16ceeb6a51](https://github.com/Adoms17/quest-platform/commit/6075dc9755357fedd2e26c21f0655f16ceeb6a51), the squash merge of PR181. [manifest.json](manifest.json) records every version, name, repository path, source commit, Git blob OID, SHA256, byte length, line-ending counts, and ascending inventory position. Hashes refer to raw Git blob bytes, not normalized working-copy text.
 
@@ -36,7 +36,7 @@ Both release payloads and all six SHOP payloads are byte-identical to the corres
 
 ## Order and environment boundaries
 
-`order` is the ascending version order of the complete inventory. The two release entries occur after `20261001000000` and before `20261006010000`; the six SHOP entries follow `20261007030000`. This is not a validated replay schedule or a command sequence.
+`order` is the ascending version order of the complete inventory. The two release entries occur after `20261001000000` and before `20261006010000`; the six SHOP entries follow `20261007030000`. The inventory is not a command sequence. The separately tested prerequisite profile and its evidence boundaries are described in the replay report.
 
 Guard adoption and environment provisioning are separate concerns:
 
@@ -45,7 +45,7 @@ Guard adoption and environment provisioning are separate concerns:
 - Existing release wrappers have their own expected-history and target checks. They must not be blindly reused against this 335-version inventory or a live database.
 - Six existing SHOP ledger entries are already installed on staging. Their presence here is not a reason to reapply them or relabel/delete history.
 
-Before any future isolated replay, separately review dependency order, extension/storage prerequisites, guard behavior, the provisioning boundary, and the expected initial ledger. Then obtain authorization for the disposable database run. No execution reproducibility claim is made until that separate run is actually verified.
+Two successful isolated runs now establish matching catalog definitions for the pinned local profile, with one failed attempt preserved between them. This does not validate other prerequisite profiles. Future executions remain separately scoped and authorized; this publication contains no runner or execution instructions.
 
 Production is outside this evidence boundary. Its ledger and schema were not inspected, and neither parity nor deployment readiness is asserted. B17 remains on hold.
 
@@ -56,7 +56,7 @@ Production is outside this evidence boundary. Its ledger and schema were not ins
 - [PR181 acceptance report](../shop-play-staging-fixture/REPORT.txt): 2026-10-19, isolated staging-source-plus-six-fixtures acceptance. It excluded the two release migrations and did not establish full stage parity.
 - The fresh 2026-10-20 dashboard observation compared version/name sets only. Dashboard dates resembling version timestamps are not treated here as proven execution times.
 
-## Validation and publication hold
+## Source validation and publication status
 
 The permitted validation is offline source inspection: parse the manifest, compare its exact path/version/name sets against immutable Git trees, require uniqueness and ascending contiguous order, recompute raw blob hashes/lengths/line-ending counts, compare eight provenance blobs, and confirm index/commit round trips do not alter bytes. It does not run database tests or contact an application.
 
@@ -67,8 +67,8 @@ Performed on 2026-10-20 in the dedicated `migration-baseline-package` checkout o
 - PASS: all eight nonstandard payloads match the published package bytes and blob OIDs.
 - PASS: five in-memory negative cases rejected (missing entry, extra duplicate, reordered entries, changed hash, changed line-ending count). Only Python standard-library data checks and read-only Git plumbing were used.
 - PASS: staged package files retain their exact working-copy bytes; `git diff --cached --check` reports no errors.
-- NOT RUN: npm lint/build (documentation and JSON only; no dependency installation or application build in this scoped checkout), SQL/DB tests, live calls, provisioning, deploy, and replay. Historical results above remain reported evidence.
+- Preparation-time NOT RUN: npm lint/build and replay. The later separately authorized local replay results supersede only the replay status; see the replay report. No local tests, SQL, live calls, provisioning or deploy were run to prepare this documentation update.
 
 Existing [CI workflow](../../../.github/workflows/ci.yml) runs `production-billing-sql` for every pull request targeting `staging`, without a path or draft filter. It enables `QVESTA_TEST_PRODUCTION_BASELINE`, executes the historical SQL harness and isolated recovery-context database validation. A documentation-only draft PR would still trigger those jobs.
 
-Publication is therefore held under the current explicit prohibition on SQL execution and database tests. No workflow changes, CI bypass, skip markers, manual dispatch, push, or draft PR are part of resolving that hold. The next decision must explicitly reconcile ordinary automatic isolated SQL CI with the task restriction before publication. Live SQL, deployment, merge, removal of draft status, and B17 remain excluded.
+The preparation-time publication hold was resolved by explicit owner authorization of ordinary automatic isolated CI on 2026-10-20 before Draft PR182 was created. The owner also authorized this documentation update and push to the same draft branch, including its ordinary automatic isolated CI. No workflow changes, bypass or manual dispatch are included. Hosted SQL, deployment, merge, removal of draft status, payments and B17 remain excluded. CI results belong to their exact commit and do not replace the separately recorded local replay evidence.

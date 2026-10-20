@@ -1,0 +1,89 @@
+{
+  "formatVersion": 1,
+  "kind": "retained-local-evidence-index-not-execution-plan",
+  "date": "2026-10-20",
+  "sourceBaseline": "6075dc9755357fedd2e26c21f0655f16ceeb6a51",
+  "inventoryCommit": "ba006996d805d763e3a16a37b5bbacc49e7cffc4",
+  "manifestSha256": "fef5b68e29e848f9e34e5c46d93391e8f335a51761be65e0954f8d3cb6e0627b",
+  "successfulReplays": 2,
+  "failedReplayAttempts": 1,
+  "sameWriterVersion": false,
+  "catalogComparison": "PASS_EQUAL_DEFINITIONS",
+  "catalogSha256": "b17b0b577583c37190736cca27873bb7e7837da6fe728f491b14fdcca3a3c962",
+  "artifactAvailability": "Retained locally; raw artifacts are not uploaded. Paths below are relative evidence labels, not repository files.",
+  "artifacts": [
+    {
+      "artifact": "baseline-replay-execution-20261020-1225/final-result.json",
+      "sha256": "65e72ad9a79debdff92bc5110b2ad7f9c9d8ee9a8f5d1c12dcbc4d0748e2f297",
+      "bytes": 2609
+    },
+    {
+      "artifact": "baseline-replay-execution-20261020-1225/evidence-sha256.json",
+      "sha256": "5244e282b341bb6a1f3d98d18951f625108da5dd917e4b6f7f3439f24103b155",
+      "bytes": 2399
+    },
+    {
+      "artifact": "baseline-replay-execution-20261020-1225/image-lock.verified.json",
+      "sha256": "9be947027b7c300f261d835aa1f73bc0915b03a5a3062d76cb578a15caf6d2f3",
+      "bytes": 1548
+    },
+    {
+      "artifact": "baseline-replay-execution-20261020-1225/replay-attempt-1/run-1/evidence.json",
+      "sha256": "875673252c73c95a974233683b007754c7e8b1b36f678ab3ef4b05b35d2b5b80",
+      "bytes": 46347
+    },
+    {
+      "artifact": "baseline-replay-execution-20261020-1225/replay-attempt-1/run-1/catalog.json",
+      "sha256": "b6fa94f082644985324c5a0866aaeb1f906ac7d7e9b9ce272873ad5102c33880",
+      "bytes": 2785833
+    },
+    {
+      "artifact": "baseline-replay-execution-20261020-1225/replay-attempt-1/run-2/evidence.json",
+      "sha256": "bc02061cfbf463151f2cdf8abf943a3c1260f46fc8e2b44106ae9d23dead2845",
+      "bytes": 16364
+    },
+    {
+      "artifact": "baseline-replay-replacement-20261020/preflight.json",
+      "sha256": "c0501226da80c374c959fd9ede17f52ad692bbdba6e5baa60d69cb083b2974f8",
+      "bytes": 1224
+    },
+    {
+      "artifact": "baseline-replay-replacement-20261020/final-result.json",
+      "sha256": "8d46216a48ae290a0b5df6d109e912e905a7ac312468b65844d9af7e1b82213a",
+      "bytes": 2314
+    },
+    {
+      "artifact": "baseline-replay-replacement-20261020/comparison.json",
+      "sha256": "42ef6ac67e75ff357c6a358b0922efc0569c73c3fd1e904b82d4ce944a04c935",
+      "bytes": 323
+    },
+    {
+      "artifact": "baseline-replay-replacement-20261020/independent-cleanup-verification.json",
+      "sha256": "228e282e1e3b956f788e7cb9641d276a9a8356ed04a40a44b4da4f1953df5a9b",
+      "bytes": 628
+    },
+    {
+      "artifact": "baseline-replay-replacement-20261020/evidence-sha256.json",
+      "sha256": "73f4b11b0d5cd08b854d6155e054d534a5f07080e230489d5576e444ea84c6b1",
+      "bytes": 1021
+    },
+    {
+      "artifact": "baseline-replay-replacement-20261020/run-replacement/evidence.json",
+      "sha256": "6eae6586aedb9c8d80ed2ad9939a3c84f17ffa3973790c1f7995b112d82ff7f6",
+      "bytes": 46347
+    },
+    {
+      "artifact": "baseline-replay-replacement-20261020/run-replacement/catalog.json",
+      "sha256": "b6fa94f082644985324c5a0866aaeb1f906ac7d7e9b9ce272873ad5102c33880",
+      "bytes": 2785833
+    }
+  ],
+  "notEstablished": [
+    "hosted schema parity",
+    "real backup restore",
+    "business data restoration",
+    "functional/security/payment acceptance",
+    "B17",
+    "production GO"
+  ]
+}
