@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 10
     environment: production
     env:
-      REVIEWED_ARTIFACT_SHA: dac2ca1575a71fa51036638b313f7643b03e810d
+      REVIEWED_ARTIFACT_SHA: 5c10ea8b62717f5e1112edd294d59528d0fc114c
       OPERATION: ${{ inputs.operation }}
       EXPECTED_WORKFLOW_SHA: ${{ inputs.expected_workflow_sha }}
     steps:
@@ -46,7 +46,7 @@ jobs:
           test "$(git -C release rev-parse HEAD)" = "$REVIEWED_ARTIFACT_SHA"
           command -v psql
           command -v python3
-          test -f /etc/ssl/certs/ca-certificates.crt
+          echo '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7  release/scripts/production-atomic/certs/prod-ca-2021.crt' | sha256sum --check --status
       - name: One pinned SQL file, then metadata readback; no retries
         shell: bash
         env:
