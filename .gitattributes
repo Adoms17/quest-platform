@@ -1,3 +1,5 @@
 * text=auto eol=lf
 
 scripts/fixtures/shop-stage-six/*.sql -text
+# Preserve exact reviewed atomic SQL bytes, including ledger statement text.
+release/production-atomic/application.sql -text

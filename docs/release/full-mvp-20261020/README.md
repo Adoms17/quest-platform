@@ -8,6 +8,10 @@
 уточняет уже утверждённые цены, transition, seed permissions и stage scheduler.
 
 Status: **DRAFT / NOT DEPLOYABLE / no production GO**. Prepared 2026-10-20.
+Updated 2026-10-21: current main `36b0c7781b4ee2293052a6d5b41a136ce55dc88d`
+is integrated into the PR branch. Both exact-byte SQL rules in `.gitattributes`
+are preserved. The atomic runner inherited from main is not executed by this
+integration; its presence does not authorize inspect, apply or B17.
 Scope includes all implemented App, Admin, Website and Market/SHOP capabilities.
 This package does not activate sales, provision resources, configure credentials,
 change hosted policies, apply SQL, dispatch workers or deploy anything.
@@ -71,11 +75,14 @@ The exact version set was compared with the saved 2026-10-01 history and matched
 The generator uses that persisted set, not a timestamp cutoff. Regeneration never
 refreshes the dated remote evidence.
 
-Stage has three deployed SHOP functions whose source bundles are absent from these
-pinned refs: shop-checkout, shop-reconcile, shop-reconciliation-worker. Recover their
-reviewed source/provenance before including them in a production release. Their
-absence is a release blocker, not an intentional scope exclusion. All implemented
-features remain in scope. Do not invent wrappers or import dirty work to fill it.
+The original pinned inputs lacked the three SHOP entrypoints. PR head
+`ce8f521442dc66d83be39832257cfd6593ac51ca` already includes shop-checkout,
+shop-reconcile and shop-reconciliation-worker, together with the reviewed shared
+sources. On 2026-10-21 all eight UTF-8 source hashes were checked against
+[SHOP-SOURCE-REVIEW.md](SHOP-SOURCE-REVIEW.md) and matched, including the later
+diagnostic worker/handler patch. Source-to-compiled-bundle-to-deployment equivalence
+and full SHOP acceptance remain NOT PROVEN. File presence is not runtime acceptance.
+All implemented features remain in scope; no dirty or unreviewed source is imported.
 UNAPPLIED auth/legal candidates are not imported. Historical tracked candidate
 SQL stays historical source; its presence grants no permission to execute it.
 
@@ -100,8 +107,11 @@ SQL stays historical source; its presence grants no permission to execute it.
    B17 remains NOT PROVEN; no denied test is repeated or treated as passed.
 
 Frontend rollback targets must be retained and compatible with the new schema.
-Known production App version prefix is 6fc5af9e; full ID must be confirmed before
-an actual release. No previous production Admin/Market/Website version is attested.
+The 2026-10-21 read-only production App observation was version
+`bbf31f1b-1ccd-4ebc-a032-0d6aca6bf8c1`, main
+`36b0c7781b4ee2293052a6d5b41a136ce55dc88d`, Ready with 100% traffic.
+Reconfirm before any separately authorized release; this is not this PR's deployment.
+No previous production Admin/Market/Website version is attested here.
 Do not enable their traffic before readiness. After new durable operation formats,
 old handlers may be incompatible: preserve queues/obligations, stop new sends and
 use a compatible correction. No automatic reverse SQL or destructive restore.
