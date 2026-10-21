@@ -46,7 +46,7 @@ jobs:
           test "$(git -C release rev-parse HEAD)" = "$REVIEWED_ARTIFACT_SHA"
           command -v psql
           command -v python3
-          test -f /etc/ssl/certs/ca-certificates.crt
+          echo '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7  release/scripts/production-atomic/certs/prod-ca-2021.crt' | sha256sum --check --status
       - name: One pinned SQL file, then metadata readback; no retries
         shell: bash
         env:

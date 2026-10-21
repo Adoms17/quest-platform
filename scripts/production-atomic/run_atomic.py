@@ -7,7 +7,8 @@ BUNDLE_SHA256 = 'a060c3e9cb87e3e73957b80bda39e913a1a2d2933bbad996020d8971b50bed6
 BUNDLE_BYTES = 2613787
 HOST = 'aws-0-eu-west-1.pooler.supabase.com'
 USER = 'postgres.szjiwamevblkpjmmeonf'
-CA = '/etc/ssl/certs/ca-certificates.crt'
+CA = str(Path(__file__).resolve().parent / 'certs/prod-ca-2021.crt')
+CA_SHA256 = '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7'
 
 def require(ok, message):
     if not ok: raise RuntimeError(message)
@@ -44,7 +45,16 @@ SELECT json_build_object('serverVersion',current_setting('server_version_num')::
   WHERE extname IN ('pg_cron','pg_net','supabase_vault')));
 COMMIT;"""
 
+def verify_ca():
+    try:
+        raw = Path(CA).read_bytes()
+    except OSError:
+        raise RuntimeError('TRUST_STORE_MISSING_NO_TLS_DOWNGRADE') from None
+    require(hashlib.sha256(raw).hexdigest() == CA_SHA256,
+            'TRUST_STORE_HASH_MISMATCH_NO_TLS_DOWNGRADE')
+
 def connection_env(password,readonly):
+    verify_ca()
     # No inherited PGHOST/PGSERVICE/options or user credential files.
     env={k:os.environ[k] for k in ('PATH','LANG','LC_ALL') if k in os.environ}
     env.update(PGHOST=HOST,PGPORT='5432',PGDATABASE='postgres',PGUSER=USER,
