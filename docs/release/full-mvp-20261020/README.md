@@ -51,7 +51,7 @@ existing unit config runs separately in Market CI with a synthetic OFF build.
 ## Review artifacts and precise limitations
 
 - `source-manifest.json`: SHA-256 (UTF-8/LF) for 327 historical migration files,
-  two separate release migrations, six SHOP test fixtures, 14 Edge source
+  two separate release migrations, six SHOP test fixtures, 17 Edge source
   entrypoints and their literal imports, and all four frontend import graphs.
   External imports and incomplete runtime/RPC graph coverage are explicit.
   Public assets, CSS url() dependencies and installed npm packages are not covered
