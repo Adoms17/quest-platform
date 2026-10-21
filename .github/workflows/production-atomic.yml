@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 10
     environment: production
     env:
-      REVIEWED_ARTIFACT_SHA: dac2ca1575a71fa51036638b313f7643b03e810d
+      REVIEWED_ARTIFACT_SHA: 5c10ea8b62717f5e1112edd294d59528d0fc114c
       OPERATION: ${{ inputs.operation }}
       EXPECTED_WORKFLOW_SHA: ${{ inputs.expected_workflow_sha }}
     steps:
