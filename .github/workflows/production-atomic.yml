@@ -1,0 +1,64 @@
+# Manual narrow backend release. Production environment review is mandatory.
+name: Apply reviewed production atomic package
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect connection or apply the approved atomic package
+        required: true
+        default: inspect
+        type: choice
+        options: [inspect, apply]
+      expected_workflow_sha:
+        description: Exact reviewed workflow commit W
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: supabase-production
+  cancel-in-progress: false
+jobs:
+  atomic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    env:
+      REVIEWED_ARTIFACT_SHA: da345515856ab0c270ae185bcf5a7c42f8c589e7
+      OPERATION: ${{ inputs.operation }}
+      EXPECTED_WORKFLOW_SHA: ${{ inputs.expected_workflow_sha }}
+    steps:
+      - name: Pin main and reviewed release before any secret is consumed
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = 'Adoms17/quest-platform'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/main'
+          [[ "$REVIEWED_ARTIFACT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_SHA" = "$EXPECTED_WORKFLOW_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$EXPECTED_WORKFLOW_SHA"
+          git init release
+          git -C release remote add origin https://github.com/Adoms17/quest-platform.git
+          git -C release -c core.hooksPath=/dev/null fetch --depth=1 origin "$REVIEWED_ARTIFACT_SHA"
+          git -C release -c core.hooksPath=/dev/null checkout --detach FETCH_HEAD
+          test "$(git -C release rev-parse HEAD)" = "$REVIEWED_ARTIFACT_SHA"
+          command -v psql
+          command -v python3
+          test -f /etc/ssl/certs/ca-certificates.crt
+      - name: One pinned SQL file, then metadata readback; no retries
+        shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          case "$OPERATION" in
+            inspect) python3 release/scripts/production-atomic/run_atomic.py --inspect ;;
+            apply) python3 release/scripts/production-atomic/run_atomic.py \
+              --apply release/release/production-atomic/application.sql \
+              --receipt "$RUNNER_TEMP/production-atomic-receipt.json" ;;
+            *) exit 1 ;;
+          esac
+# No artifact upload: raw SQL diagnostics/catalog/user data must not become public.
+# Receipt contains allowlisted status/hash/counts only; review before any publication.
