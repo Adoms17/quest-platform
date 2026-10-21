@@ -42,6 +42,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Production runner offline tests
+        run: python3 -m unittest discover -s scripts/production-atomic -p 'test_*.py' -v
+
       - name: Build
         run: npm run build
 

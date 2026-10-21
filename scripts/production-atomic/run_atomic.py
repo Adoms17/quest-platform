@@ -54,7 +54,35 @@ def connection_env(password,readonly):
       PGOPTIONS='-c statement_timeout=30000 -c lock_timeout=2000 -c transaction_timeout=60000 -c idle_in_transaction_session_timeout=10000'+(' -c default_transaction_read_only=on' if readonly else ''))
     return env
 
-def psql(password, *, raw=None, path=None, readonly=True):
+def inspect_diagnostic(stderr):
+    # Untrusted stderr never leaves this function. Only literal allowlisted values do.
+    states = {'28P01':'AUTHENTICATION_FAILED', '28000':'AUTHORIZATION_FAILED',
+              '42501':'QUERY_PERMISSION_DENIED', '42P01':'QUERY_RELATION_MISSING',
+              '42704':'QUERY_OBJECT_MISSING', '22023':'INVALID_PARAMETER',
+              '57014':'QUERY_CANCELLED', '25006':'READ_ONLY_VIOLATION',
+              '53300':'CONNECTION_CAPACITY', '57P03':'SERVER_UNAVAILABLE'}
+    match = re.search(rb'(?:ERROR|FATAL):\s+([A-Z0-9]{5})(?=[:\s]|$)', stderr)
+    if match and match[1].decode() in states:
+        state = match[1].decode()
+        return {'reason':states[state], 'sqlstate':state}
+    categories = (
+        (b'certificate verify failed', 'TLS_CERTIFICATE_VERIFY_FAILED'),
+        (b'does not match host name', 'TLS_HOSTNAME_MISMATCH'),
+        (b'root certificate file', 'TLS_TRUST_STORE_ERROR'),
+        (b'could not translate host name', 'DNS_RESOLUTION_FAILED'),
+        (b'password authentication failed', 'AUTHENTICATION_FAILED'),
+        (b'unsupported startup parameter', 'STARTUP_PARAMETER_REJECTED'),
+        (b'unrecognized configuration parameter', 'STARTUP_PARAMETER_REJECTED'),
+        (b'connection refused', 'CONNECTION_REFUSED'),
+        (b'timeout expired', 'CONNECTION_TIMEOUT'),
+    )
+    lower = stderr.lower()
+    for marker, reason in categories:
+        if marker in lower:
+            return {'reason':reason}
+    return {'reason':'PSQL_FAILURE_UNCLASSIFIED'}
+
+def psql(password, *, raw=None, path=None, readonly=True, diagnostics=False):
     require((raw is None)!=(path is None),'ONE_INPUT_REQUIRED')
     args=['psql','-X','--no-password','-qAt','-v','ON_ERROR_STOP=1','-v','VERBOSITY=sqlstate']
     if path is not None: args+=['-f',str(path)]
@@ -65,6 +93,8 @@ def psql(password, *, raw=None, path=None, readonly=True):
     except OSError:
         return {'ok':False,'uncertain':True,'reason':'CLIENT_TRANSPORT_ERROR_NO_RETRY'}
     if result.returncode:
+        if diagnostics:
+            return {'ok':False, **inspect_diagnostic(result.stderr)}
         # Never emit raw SQL errors or echo queries/data/credentials.
         match=re.search(rb'ERROR:\s+([A-Z0-9]{5})',result.stderr)
         return {'ok':False,'uncertain':True,'reason':'PSQL_ERROR','sqlstate':match[1].decode() if match else None}
@@ -122,8 +152,23 @@ def inspect_connection():
     require(os.environ.get('GITHUB_ACTIONS')=='true' and os.environ.get('GITHUB_REPOSITORY')=='Adoms17/quest-platform','APPROVED_RUNNER_REQUIRED')
     require(os.environ.get('GITHUB_REF')=='refs/heads/main','MAIN_ONLY')
     password=os.environ.get('PGPASSWORD',''); require(bool(password),'EXISTING_SECRET_MISSING')
-    pre=psql(password,raw=PREFLIGHT)
-    require(pre['ok'],'READ_ONLY_CONNECTION_FAILED')
+    pre=psql(password,raw=PREFLIGHT,diagnostics=True)
+    if not pre['ok']:
+        # Revalidate the boundary, including exceptions returned by psql().
+        reasons = {'CLIENT_TIMEOUT_NO_RETRY', 'CLIENT_TRANSPORT_ERROR_NO_RETRY',
+                   'AUTHENTICATION_FAILED', 'AUTHORIZATION_FAILED', 'QUERY_PERMISSION_DENIED',
+                   'QUERY_RELATION_MISSING', 'QUERY_OBJECT_MISSING', 'INVALID_PARAMETER',
+                   'QUERY_CANCELLED', 'READ_ONLY_VIOLATION', 'CONNECTION_CAPACITY',
+                   'SERVER_UNAVAILABLE', 'TLS_CERTIFICATE_VERIFY_FAILED', 'TLS_HOSTNAME_MISMATCH',
+                   'TLS_TRUST_STORE_ERROR', 'DNS_RESOLUTION_FAILED', 'STARTUP_PARAMETER_REJECTED',
+                   'CONNECTION_REFUSED', 'CONNECTION_TIMEOUT', 'PSQL_FAILURE_UNCLASSIFIED'}
+        reason=pre.get('reason')
+        diagnostic={'status':'READ_ONLY_CONNECTION_FAILED',
+                    'reason':reason if reason in reasons else 'PSQL_FAILURE_UNCLASSIFIED'}
+        if pre.get('sqlstate') in {'28P01','28000','42501','42P01','42704','22023','57014','25006','53300','57P03'}:
+            diagnostic['sqlstate']=pre['sqlstate']
+        print(json.dumps(diagnostic,sort_keys=True))
+        raise RuntimeError('READ_ONLY_CONNECTION_FAILED')
     metadata=json.loads(pre['stdout'])
     require(metadata['serverVersion']==170006 and metadata['role']=='postgres' and metadata['database']=='postgres','TARGET_METADATA_DRIFT')
     require(metadata['ledgerCount'] in (99,335),'LEDGER_DRIFT')
