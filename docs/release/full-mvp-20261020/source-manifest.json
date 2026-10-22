@@ -2965,7 +2965,7 @@
         },
         {
           "path": "src/components/OrganizationRecurringConsent.jsx",
-          "sha256": "30b1bfa294aab0b4f75120037f0f4a8d8ccd0dbbae7748a5ba74150f2e034164"
+          "sha256": "6d0201c8bdb7e9786bc3b176e20bc8dbbe67006ee87a0c3e3c43f9bc1e4dc3ee"
         },
         {
           "path": "src/components/ParticipantAvatar.jsx",
@@ -3113,11 +3113,15 @@
         },
         {
           "path": "src/components/RecurringConsent.jsx",
-          "sha256": "f22bdd991e800a0a9814d5634a0372c5c0d61115189414dcc3c0134d36d87238"
+          "sha256": "94aa20a2acdbff6e4beaa17899303e57ae009b74d30bc7c557384a0f554444c8"
         },
         {
           "path": "src/components/RecurringFailureNotice.jsx",
           "sha256": "0cd2199526691a0aa0efb67cbfaafa11ae76fa735c66cdea28e0477067e579d2"
+        },
+        {
+          "path": "src/components/RecurringTerms.jsx",
+          "sha256": "7acf8711d57cbbf22b1126bbf8fae672e507a2fd69975eb8fd05642531f18ab3"
         },
         {
           "path": "src/components/SandboxCheckout.jsx",
@@ -3922,7 +3926,7 @@
       "files": [
         {
           "path": "website/src/Agreement.jsx",
-          "sha256": "cdabb7cc6c5db6f23eb56d1e89ae7176b618ec14764f0f5da1dce8bb5a15d3d8"
+          "sha256": "2da5c9b4f1a16d5d0903503e844ddf311be9783f8aa3a6d87d4834ed78b656ec"
         },
         {
           "path": "website/src/App.jsx",
@@ -3930,7 +3934,7 @@
         },
         {
           "path": "website/src/PaymentTerms.jsx",
-          "sha256": "822f8c21190a1e746959ec254b41d4497d12f5a0a85ab340e99009a1508d4ee5"
+          "sha256": "fa76bf204c13cbf32b18064326ef6320c4d3fc2b22b99180b27bd9cc6b66afe6"
         },
         {
           "path": "website/src/PublicTariffs.jsx",
