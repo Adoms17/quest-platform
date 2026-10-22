@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - staging
+      - codex/full-mvp-production-preparation-20261020
 
 permissions:
   contents: read
@@ -18,6 +19,7 @@ concurrency:
 
 jobs:
   production-billing-sql:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'staging'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -58,6 +60,7 @@ jobs:
         run: npm run test -- scripts/fiscal-recovery-context-isolated.test.js --reporter=verbose
 
   validate:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'staging'))
     runs-on: ubuntu-latest
 
     steps:
@@ -99,3 +102,22 @@ jobs:
 
       - name: End-to-end tests
         run: npm run test:e2e
+
+  recurring-alignment:
+    if: github.event_name == 'pull_request' && github.base_ref == 'codex/full-mvp-production-preparation-20261020' && github.head_ref == 'codex/recurring-alignment-local-20261022' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - name: Consent UI and API regressions (synthetic backend only)
+        run: npm test -- --config vitest.local-alignment.config.js src/components/RecurringConsent.test.jsx src/components/OrganizationRecurringConsent.test.jsx src/components/RecurringFailureNotice.test.jsx src/services/recurringConsentApi.test.js src/services/sandboxCheckoutVisibility.test.js src/pages/OrganizationBilling.test.jsx --reporter=verbose
+      - run: npm run build

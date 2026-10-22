@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { listRecurringConsents, revokeRecurringConsent } from '../services/recurringConsentApi'
+import RecurringTerms from './RecurringTerms'
 
 export default function OrganizationRecurringConsent({ organizationId }) {
  return <ConsentManagement key={organizationId} organizationId={organizationId} />
@@ -25,7 +26,8 @@ function ConsentManagement({ organizationId }) {
  }
  return <section id="recurring-consent-management" aria-label="Управление автопродлением" className="space-y-3 rounded-xl border bg-white p-4">
   <h2 className="text-lg font-semibold">Автопродление</h2>
-  <p>Управление согласиями на тестовое автопродление. Отзыв запрещает следующие списания. Уже начатый платёж требует проверки, оплаченный период сохраняется.</p>
+   <p>Управление согласиями на тестовое автопродление.</p>
+   <RecurringTerms />
   <p>Сохранённое согласие не означает, что автоматические списания сейчас включены.</p>
   {error && <p role="alert">Не удалось обновить согласия. Повторите проверку.</p>}
   {!items && !error && <p role="status">Загружаем согласия…</p>}
