@@ -6,15 +6,16 @@ export default function RecurringConsent(props) {
 }
 function OrderRecurringConsent({ organizationId, orderId, disabled = false }) {
   const [state, setState] = useState(null), [error, setError] = useState(false), [busy, setBusy] = useState(false), [checked, setChecked] = useState(false)
-  const running = useRef(false)
+  const running = useRef(false), requestVersion = useRef(0)
   useEffect(() => {
     let active = true
-    readRecurringConsent(organizationId, orderId).then(data => { if (active) setState(data) }).catch(() => { if (active) setError(true) })
+    const request = ++requestVersion.current
+    readRecurringConsent(organizationId, orderId).then(data => { if (active && request === requestVersion.current) setState(data) }).catch(() => { if (active && request === requestVersion.current) setError(true) })
     return () => { active = false }
   }, [organizationId, orderId])
   async function act(kind) {
     if (running.current || disabled || (kind === 'request' && !checked)) return
-    running.current = true; setBusy(true); setError(false)
+    requestVersion.current++; running.current = true; setBusy(true); setError(false)
     try {
       const data = kind === 'request' ? await requestRecurringConsent(organizationId, orderId) : kind === 'revoke' ? await revokeRecurringConsent(organizationId, orderId, state.consentId) : await readRecurringConsent(organizationId, orderId)
       setState(data); setChecked(false)
