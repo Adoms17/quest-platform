@@ -4,6 +4,19 @@ const api = vi.hoisted(() => ({ readRecurringConsent: vi.fn(), requestRecurringC
 vi.mock('../services/recurringConsentApi', () => api)
 import RecurringConsent from './RecurringConsent'
 beforeEach(() => { vi.resetAllMocks(); api.readRecurringConsent.mockResolvedValue({ state: 'none', canRequest: true }) })
+
+test('повторное открытие отозванного согласия не предлагает новый платёж или отмену начатого', async () => {
+  api.readRecurringConsent.mockResolvedValue({ state: 'revoked', consentId: 'consent', canRequest: false })
+  render(<RecurringConsent organizationId="org" orderId="order" />)
+  await screen.findByText('Согласие отозвано. Следующие списания по нему запрещены. Уже начатый платёж требует проверки.')
+  expect(screen.queryByRole('checkbox')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Сохранить согласие' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Отозвать согласие' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Обновить согласие' }))
+  await waitFor(() => expect(api.readRecurringConsent).toHaveBeenCalledTimes(2))
+  expect(api.requestRecurringConsent).not.toHaveBeenCalled()
+  expect(api.revokeRecurringConsent).not.toHaveBeenCalled()
+})
 test('требует явное согласие и защищает от двойного клика', async () => {
   api.requestRecurringConsent.mockReturnValue(new Promise(() => {}))
   render(<RecurringConsent organizationId="org" orderId="order" />)
@@ -18,7 +31,7 @@ test('показывает сохранённое состояние и отзы
   api.revokeRecurringConsent.mockResolvedValue({ state: 'revoked', consentId: 'consent', canRequest: false })
   render(<RecurringConsent organizationId="org" orderId="order" />)
   fireEvent.click(await screen.findByRole('button', { name: 'Отозвать согласие' }))
-  await screen.findByText('Согласие отозвано. Этот заказ не включает автопродление.')
+  await screen.findByText('Согласие отозвано. Следующие списания по нему запрещены. Уже начатый платёж требует проверки.')
   expect(api.revokeRecurringConsent).toHaveBeenCalledWith('org', 'order', 'consent')
   expect(screen.queryByRole('checkbox')).toBeNull()
 })
