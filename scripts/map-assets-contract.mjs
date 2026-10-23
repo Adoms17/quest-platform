@@ -2,6 +2,11 @@ import assert from 'node:assert/strict'
 
 export const markerFiles = ['marker-icon.png', 'marker-icon-2x.png', 'marker-shadow.png']
 
+// Scan complete artifact text, not a URL allowlist: reject the literal anywhere.
+export function verifyBuiltAssetText(text) {
+  assert.doesNotMatch(text, /cdnjs\.cloudflare\.com/, 'Built asset must not reference cdnjs')
+}
+
 export function verifyLeafletNotice(notice, upstreamLicense) {
   assert.equal(notice.replaceAll('\r\n', '\n'), upstreamLicense.replaceAll('\r\n', '\n'), 'Distributed Leaflet notice must match the complete installed LICENSE')
 }
