@@ -103,6 +103,34 @@ jobs:
       - name: End-to-end tests
         run: npm run test:e2e
 
+  maps-static-assets:
+    if: github.event_name == 'pull_request' && github.base_ref == 'codex/full-mvp-production-preparation-20261020' && github.head_ref == 'codex/maps-static-assets-local-20261023' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: node scripts/production-integration-inventory.mjs
+      - run: node scripts/verify-production-candidate-manifest.js
+      - name: Marker source and notice regression controls
+        run: node --test scripts/map-assets-regression.mjs
+      - name: Synthetic-config build and distributed asset check
+        run: node scripts/check-map-assets-build.mjs
+      - name: Install existing Playwright Chromium runtime
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Localhost marker assets DPR 1 and 2; external requests aborted
+        run: node scripts/check-map-assets-browser.mjs
+      - run: git diff --exit-code && git diff --check
+
   recurring-alignment:
     if: github.event_name == 'pull_request' && github.base_ref == 'codex/full-mvp-production-preparation-20261020' && github.head_ref == 'codex/recurring-alignment-local-20261022' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
