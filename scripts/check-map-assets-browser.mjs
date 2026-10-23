@@ -4,10 +4,11 @@ import { chromium } from '@playwright/test'
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { resolve } from 'node:path'
+import { verifyLeafletNotice } from './map-assets-contract.mjs'
 const files = dir => readdirSync(dir, {withFileTypes:true}).flatMap(x => x.isDirectory() ? files(resolve(dir,x.name)) : [resolve(dir,x.name)])
 const built = files('dist').filter(x => /\.(js|css|html)$/.test(x))
 assert(built.every(x=>!readFileSync(x,'utf8').includes('cdnjs.cloudflare.com')))
-assert.equal(readFileSync('dist/licenses/leaflet-LICENSE.txt','utf8'),readFileSync('node_modules/leaflet/LICENSE','utf8'))
+verifyLeafletNotice(readFileSync('dist/licenses/leaflet-LICENSE.txt','utf8'),readFileSync('node_modules/leaflet/LICENSE','utf8'))
 // Owned synthetic fixture only; no app server, credentials or existing browser profile.
 mkdirSync('.review.local', {recursive:true})
 writeFileSync('.review.local/map.html', '<!doctype html><html><head><meta charset="UTF-8"><title>Synthetic map assets</title><style>.h-64{height:256px}.w-full{width:100%}</style></head><body><div id="root"></div><script type="module" src="/.review.local/map.jsx"></script></body></html>')

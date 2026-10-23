@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 
 export const markerFiles = ['marker-icon.png', 'marker-icon-2x.png', 'marker-shadow.png']
 
+export function verifyLeafletNotice(notice, upstreamLicense) {
+  assert.equal(notice.replaceAll('\r\n', '\n'), upstreamLicense.replaceAll('\r\n', '\n'), 'Distributed Leaflet notice must match the complete installed LICENSE')
+}
+
 // Verify the actual options wiring, not merely the presence of unused imports.
 export function verifyMapAssets(source, notice, upstreamLicense) {
   assert(!/cdnjs\.cloudflare\.com/i.test(source), 'MapPicker must not reference cdnjs')
@@ -12,6 +16,6 @@ export function verifyMapAssets(source, notice, upstreamLicense) {
     assert(imported, `Missing local Leaflet import: ${file}`)
     assert(new RegExp(`\\b${options[index]}\\s*:\\s*${imported[1]}\\s*[,}]`).test(source), `Option must use local import: ${options[index]}`)
   }
-  assert.equal(notice, upstreamLicense, 'Distributed Leaflet notice must match the complete installed LICENSE')
+  verifyLeafletNotice(notice, upstreamLicense)
   assert(upstreamLicense.includes('BSD 2-Clause License') && upstreamLicense.includes('CloudMade') && upstreamLicense.includes('THIS SOFTWARE IS PROVIDED'), 'Unexpected upstream license; review required')
 }

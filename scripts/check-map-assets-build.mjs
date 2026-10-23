@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { resolve } from 'node:path'
 import config from '../vite.config.js'
-import { verifyMapAssets } from './map-assets-contract.mjs'
+import { verifyMapAssets, verifyLeafletNotice } from './map-assets-contract.mjs'
 
 const read = path => readFileSync(path, 'utf8')
 verifyMapAssets(read('src/components/MapPicker.jsx'), read('public/licenses/leaflet-LICENSE.txt'), read('node_modules/leaflet/LICENSE'))
@@ -15,5 +15,5 @@ const files = dir => readdirSync(dir, { withFileTypes: true }).flatMap(item => i
 const compiled = files('dist').filter(path => /\.(js|css|html)$/.test(path))
 assert(compiled.length > 0)
 assert(compiled.every(path => !/cdnjs\.cloudflare\.com/i.test(read(path))), 'Built application must not reference cdnjs')
-assert.equal(read('dist/licenses/leaflet-LICENSE.txt'), read('node_modules/leaflet/LICENSE'))
+verifyLeafletNotice(read('dist/licenses/leaflet-LICENSE.txt'), read('node_modules/leaflet/LICENSE'))
 console.log('PASS: synthetic-config App build, no cdnjs in JS/CSS/HTML, full Leaflet notice distributed')

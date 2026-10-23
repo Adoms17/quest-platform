@@ -17,3 +17,15 @@ test('unused local imports do not hide remote option wiring', () => {
   assert.throws(() => verifyMapAssets(copy, notice, license), /Option must use local import/)
 })
 test('truncated BSD notice is rejected', () => assert.throws(() => verifyMapAssets(source, notice.split('\n').slice(0, 5).join('\n'), license), /complete installed LICENSE/))
+test('LF and CRLF complete notices are equivalent in either direction', () => {
+  const lf = license.replaceAll('\r\n', '\n')
+  const crlf = lf.replaceAll('\n', '\r\n')
+  verifyMapAssets(source, lf, crlf)
+  verifyMapAssets(source, crlf, lf)
+})
+test('changed copyright, whitespace, final newline and bare CR are rejected', () => {
+  const lf = license.replaceAll('\r\n', '\n')
+  for (const changed of [lf.replace('CloudMade', 'Other'), ' ' + lf, lf.slice(0, -1), lf.replace('\n', '\r')]) {
+    assert.throws(() => verifyMapAssets(source, changed, lf), /complete installed LICENSE/)
+  }
+})
