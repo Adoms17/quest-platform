@@ -11,13 +11,14 @@ import {
   finishQuestAttemptAliases,
 } from './db'
 import {
-  startServerQuestAttempt,
+  registerOfflineQuestAttempt,
   submitTaskEvent,
 } from './questApi'
 import { reconcilePendingReceipts } from './syncReceipts'
 import toast from 'react-hot-toast'
 import { isTransportError } from './network'
 import { getUserErrorMessage } from './userErrorMessage'
+import { preserveOfflineReview } from './offlineReview'
 
 export const SYNC_COMPLETE_EVENT = 'quest-sync-complete'
 
@@ -63,14 +64,21 @@ async function getServerAttemptId(
     )
   }
 
-  // Сервер вернёт активную попытку либо создаст новую,
-  // если прежняя уже завершена.
   const resolvedParticipantProfileId =
     localAttempt.participantProfileId || participantProfileId
-  const serverAttempt = await startServerQuestAttempt(
+  // Online-запись может использовать серверный UUID как localId.
+  const knownServerId = localAttempt.serverId ||
+    (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(localId) ? localId : null)
+  const serverAttempt = await registerOfflineQuestAttempt(
     questId,
-    resolvedParticipantProfileId
+    resolvedParticipantProfileId,
+    localId,
+    knownServerId,
+    ...(localAttempt.offlinePermitId ? [localAttempt.offlinePermitId] : [])
   )
+  if (serverAttempt.finished_at) {
+    throw Object.assign(new Error('registered offline attempt finished'), { code: 'P0001' })
+  }
 
   if (
     localAttempt?.serverId !== serverAttempt.id ||
@@ -112,7 +120,7 @@ export async function syncPendingResults(
     }
 
     const pending = await getPendingResults(user.id)
-    const unsynced = pending.filter(record => !record.synced)
+    const unsynced = pending.filter(record => !record.synced && record.reviewState !== 'needs_review')
 
     if (unsynced.length === 0) {
       if (pending.some(record => record.synced === true)) {
@@ -130,7 +138,7 @@ export async function syncPendingResults(
 
     const skippedLegacyEvents =
       unsynced.length - supportedUnsynced.length
-    const receiptPlan = await reconcilePendingReceipts(pending)
+    const receiptPlan = await reconcilePendingReceipts(pending.filter(record => record.reviewState !== 'needs_review'))
     const supportedEvents = receiptPlan.unresolvedEvents
       .sort((left, right) => left.id - right.id)
 
@@ -152,6 +160,8 @@ export async function syncPendingResults(
       receiptPlan.finishedLocalAttemptIds
     )
     let rejectedEvents = 0
+    let reviewEvents = 0
+    let invalidEvents = 0
 
     for (const [localId, records] of groups) {
       const questId = records[0].questId
@@ -196,12 +206,35 @@ export async function syncPendingResults(
       if (serverAttemptId) {
         await markQuestAttemptSynced(localId, serverAttemptId)
       } else {
-        serverAttemptId = await getServerAttemptId(
-          localId,
-          questId,
-          user.id,
-          participantProfileId
-        )
+        try {
+          serverAttemptId = await getServerAttemptId(localId, questId, user.id, participantProfileId)
+        } catch (error) {
+          if ((error?.code === '23505' && error.message === 'offline permit already bound') ||
+            (error?.code === 'P0001' && error.message === 'offline permit conflict requires review')) {
+            const attempt = await getQuestAttempt(localId)
+            if (attempt?.offlinePermitId) {
+              await preserveOfflineReview(questId, participantProfileId, localId, user.id, records, 'needs_review', attempt.offlinePermitId)
+              reviewEvents += records.length
+              continue
+            }
+          }
+          if ((error?.code === '23514' && error.message === 'quest completion limit reached') ||
+            (error?.code === 'P0001' && error.message === 'offline attempt rejected by limit')) {
+            await preserveOfflineReview(questId, participantProfileId, localId, user.id, records, 'invalid_limit')
+            await finishQuestAttemptAliases(localId)
+            await markResultsSynced(records.map(record => record.id))
+            finishedLocalAttemptIds.add(localId)
+            syncedQuestIds.add(questId)
+            syncedEvents += records.length
+            invalidEvents += records.length
+            continue
+          }
+          if (!((error?.code === '23514' && error.message === 'quest is not available') ||
+            (error?.code === 'P0001' && ['offline attempt requires review', 'quest start billing unavailable'].includes(error.message)))) throw error
+          await preserveOfflineReview(questId, participantProfileId, localId, user.id, records)
+          reviewEvents += records.length
+          continue
+        }
       }
 
       const rejectedTaskIds = new Set(
@@ -279,7 +312,13 @@ export async function syncPendingResults(
       }
     }
 
-    if (skippedLegacyEvents > 0) {
+    if (invalidEvents > 0) {
+      toast.error('Офлайн-прохождение сохранено в истории как недействительное: лимит прохождений исчерпан. В статистику оно не включено.', { duration: 7000 })
+    }
+    if (reviewEvents > 0) {
+      window.dispatchEvent(new CustomEvent(SYNC_COMPLETE_EVENT))
+      toast.error('Результаты сохранены на сервере и устройстве, требуется проверка организатора. В итог они пока не засчитаны.', { duration: 7000 })
+    } else if (skippedLegacyEvents > 0) {
       toast.error(
         `Сохранено старых результатов без eventType: ${skippedLegacyEvents}. Они не удалены и требуют повторной обработки.`,
         { duration: 7000 }
@@ -289,13 +328,15 @@ export async function syncPendingResults(
         'Сервер не подтвердил открытие задания. Проверьте код и повторите попытку.',
         { duration: 7000 }
       )
-    } else if (syncedEvents > 0) {
+    } else if (syncedEvents > 0 && invalidEvents === 0) {
       toast.success('Результаты синхронизированы!')
     }
 
     return {
       syncedEvents,
       skippedLegacyEvents,
+      ...(reviewEvents ? { reviewEvents } : {}),
+      ...(invalidEvents ? { invalidEvents } : {}),
     }
   } catch (error) {
     if (!suppressErrorToast) {

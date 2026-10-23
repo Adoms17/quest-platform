@@ -1,0 +1,38 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('support-owner')::uuid,'support-owner@example.test');
+insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('support-owner')::uuid,'owner','platform');
+select set_config('request.jwt.claim.sub',md5('support-owner')::uuid::text,true);
+select set_config('request.jwt.claims',jsonb_build_object('aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',floor(extract(epoch from clock_timestamp())))))::text,true);
+insert into public.billing_plan_versions(id,plan_key,version,display_name,active_quests_limit,team_members_limit)
+select md5('support-v'||n)::uuid,'support_test',n,'Support',1,1 from generate_series(1,2)n;
+insert into public.billing_tariff_timeline(version_id,catalog_version_id,plan_key,effective_at)
+select id,id,plan_key,now()-make_interval(days=>3-version) from public.billing_plan_versions where plan_key='support_test';
+set local role authenticated;
+select is(public.preview_tariff_support_end(md5('support-v1')::uuid)->>'can_schedule','true','заменённая версия доступна');
+select is(public.preview_tariff_support_end(md5('support-v2')::uuid)->>'can_schedule','false','актуальная версия недоступна');
+select throws_ok($t$select public.schedule_tariff_support_end(md5('support-v2')::uuid,now()+interval '31 days',0,md5('s1')::uuid)$t$,'55000',null,'нельзя завершить актуальную версию');
+select throws_ok($t$select public.schedule_tariff_support_end(md5('support-v1')::uuid,now()+interval '29 days',0,md5('s1')::uuid)$t$,'22023',null,'нельзя меньше 30 дней');
+select throws_ok($t$select public.schedule_tariff_support_end(md5('support-v1')::uuid,now()+interval '31 days',1,md5('s1')::uuid)$t$,'40001',null,'устаревший просмотр отклоняется');
+select set_config('test.support',public.schedule_tariff_support_end(md5('support-v1')::uuid,now()+interval '31 days',0,md5('s1')::uuid)::text,true);
+select is(public.schedule_tariff_support_end(md5('support-v1')::uuid,now()+interval '31 days',0,md5('s1')::uuid),current_setting('test.support')::jsonb,'retry идемпотентен');
+select throws_ok($t$select public.schedule_tariff_support_end(md5('support-v1')::uuid,now()+interval '32 days',0,md5('s1')::uuid)$t$,'22023',null,'retry не меняет дату');
+reset role;
+select ok(not platform_private.tariff_allows_renewal(md5('support-v1')::uuid,now()+interval '31 days',true),'автопродление запрещено на границе');
+select ok(platform_private.tariff_allows_renewal(md5('support-v1')::uuid,now()+interval '30 days',true),'до границы старая версия поддерживается');
+select set_config('test.org',(select id::text from public.organizations where personal_owner_id=md5('support-owner')::uuid),true);
+update public.organization_subscriptions set plan_version_id=md5('support-v1')::uuid where organization_id=current_setting('test.org')::uuid;
+set local role authenticated;
+select is(public.get_organization_billing_overview(current_setting('test.org')::uuid)->'support_notice','null'::jsonb,'до окна предупреждение скрыто');
+reset role;
+update public.billing_tariff_timeline set support_ends_at=now()+interval '29 days',support_notice_at=now()-interval '1 day' where version_id=md5('support-v1')::uuid;
+set local role authenticated;
+select is(public.get_organization_billing_overview(current_setting('test.org')::uuid)#>>'{support_notice,ended}','false','в окне предупреждение показано');
+select set_config('request.jwt.claims','{"aal":"aal1"}',true);
+select throws_ok($t$select public.preview_tariff_support_end(md5('support-v1')::uuid)$t$,'42501',null,'просмотр защищён MFA');
+select throws_ok($t$select public.schedule_tariff_support_end(md5('support-v1')::uuid,now()+interval '31 days',0,md5('s1')::uuid)$t$,'42501',null,'retry защищён MFA');
+select set_config('request.jwt.claim.sub',md5('stranger')::uuid::text,true);
+select throws_ok($t$select public.get_organization_billing_overview(current_setting('test.org')::uuid)$t$,'42501',null,'чужая подписка закрыта');
+reset role;
+select ok(not has_table_privilege('authenticated','public.billing_tariff_timeline','update'),'прямое изменение запрещено');
+select * from finish();rollback;

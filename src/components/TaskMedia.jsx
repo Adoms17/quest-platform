@@ -2,6 +2,9 @@ import { getTaskMediaKind } from '../services/taskMedia'
 
 function safeMediaUrl(value) {
   if (typeof value !== 'string' || !value.trim()) return null
+  // Published shop packages embed captured bytes. Only the supported binary media
+  // types are allowed; HTML/SVG and arbitrary data URLs remain unsupported.
+  if (/^data:(?:image\/(?:png|jpeg|webp|gif)|audio\/(?:mpeg|wav|ogg)|video\/(?:mp4|webm));base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return value
   try {
     const url = new URL(value, window.location.origin)
     return ['http:', 'https:', 'blob:'].includes(url.protocol) ? value : null

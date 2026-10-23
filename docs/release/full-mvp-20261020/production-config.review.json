@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "status": "inactive-review-contract",
+  "deployable": false,
+  "notWranglerOrSupabaseConfig": true,
+  "productionProject": "szjiwamevblkpjmmeonf",
+  "salesEnabled": false,
+  "newProviderPostsEnabled": false,
+  "schedulesEnabled": false,
+  "liveStateVerified": false,
+  "components": {
+    "App": {
+      "resource": "quest-platform",
+      "origin": "https://app.qvesta.ru",
+      "build": "npm run build",
+      "publicVariableNames": ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"],
+      "publicValues": null,
+      "artifactHash": null,
+      "blockers": ["production checkout/document configuration and server OFF attestation"]
+    },
+    "Admin": {
+      "resource": null,
+      "origin": null,
+      "build": "npm run build -- --config admin/vite.config.mjs --mode production",
+      "publicVariableNames": ["VITE_ADMIN_SUPABASE_URL", "VITE_ADMIN_SUPABASE_ANON_KEY"],
+      "publicValues": null,
+      "artifactHash": null,
+      "blockers": ["production resource/domain", "exact production origin guard", "approved operator access and MFA"]
+    },
+    "Website": {
+      "proposedResource": "qvesta-website",
+      "proposedOrigin": "https://qvesta.ru",
+      "workingDirectory": "website",
+      "build": "npm run build",
+      "publicVariableNames": ["VITE_PUBLIC_SUPABASE_URL", "VITE_PUBLIC_SUPABASE_ANON_KEY"],
+      "publicValues": null,
+      "artifactHash": null,
+      "blockers": ["resource/domain not provisioned", "public tariff RPC dependency", "legal publication HOLD"]
+    },
+    "Market": {
+      "resource": null,
+      "origin": null,
+      "workingDirectory": "market",
+      "build": "npm run build",
+      "publicVariableNames": ["VITE_APP_ORIGIN", "VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY", "VITE_MARKET_SALES_ENABLED"],
+      "publicValues": null,
+      "artifactHash": null,
+      "blockers": ["production resource/domain", "reviewed production build contract", "SHOP Edge source provenance and RPC dependencies"]
+    },
+    "Edge": {
+      "deployAllowlist": [],
+      "secretValues": null,
+      "blockers": ["exact source bundles and production contracts", "secret names and scope approved per function", "JWT/CORS binding and compatible schema"]
+    },
+    "Schema": {
+      "applyAllowlist": [],
+      "extensionsToInstall": [],
+      "blockers": ["production classification of source inventory", "compatible apply order", "hosted permissions", "restore readiness"]
+    }
+  },
+  "rollback": {
+    "AppKnownVersionPrefix": "6fc5af9e",
+    "AppFullVersionId": null,
+    "AdminMarketWebsitePreviousProductionVersion": null,
+    "rule": "Frontend rollback only to an attested compatible artifact. No automatic reverse SQL, credential rotation, or downgrade of handlers after new durable operation formats.",
+    "backendFailure": "Keep new sales/sends OFF, preserve durable obligations and queues, and use an approved compatible correction or restoration plan."
+  }
+}

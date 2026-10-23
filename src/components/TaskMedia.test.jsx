@@ -4,6 +4,19 @@ import TaskMedia from './TaskMedia'
 import { getTaskMediaKind } from '../services/taskMedia'
 
 describe('TaskMedia', () => {
+  it('renders captured binary materials without fetching original URLs and rejects active data formats', () => {
+    const { container } = render(<TaskMedia media={[
+      { url: 'data:image/png;base64,AAAA', title: 'Captured image' },
+      { url: 'data:audio/wav;base64,AAAA' },
+      { url: 'data:video/webm;base64,AAAA' },
+      { url: 'data:text/html;base64,AAAA' },
+      { url: 'data:image/svg+xml;base64,AAAA' },
+    ]} />)
+    expect(screen.getByRole('img', { name: 'Captured image' })).toHaveAttribute('src', 'data:image/png;base64,AAAA')
+    expect(container.querySelectorAll('figure')).toHaveLength(3)
+    expect(container.querySelector('audio source')).toHaveAttribute('src', 'data:audio/wav;base64,AAAA')
+    expect(container.querySelector('video source')).toHaveAttribute('src', 'data:video/webm;base64,AAAA')
+  })
   it('keeps the unavailable material title and description without requesting its file offline', () => {
     const { container } = render(<TaskMedia isOnline={false} media={[{ url: 'https://media.test/file.jpg', title: 'Фото', description: 'Описание', offline_unavailable: true }]} />)
     expect(screen.getByText('Фото')).toBeInTheDocument()

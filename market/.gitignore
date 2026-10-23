@@ -1,0 +1,5 @@
+qa/browser-results/
+qa/reference-*.png
+qa/library-helpers/
+qa/library-upload-input.json
+qa/library-upload-result.json

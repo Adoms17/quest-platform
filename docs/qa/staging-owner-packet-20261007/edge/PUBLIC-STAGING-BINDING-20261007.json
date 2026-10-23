@@ -1,0 +1,38 @@
+{
+  "observedAtUtc": "2026-10-07T10:21:25.225Z",
+  "scope": "Public unauthenticated HTML/entry assets; only project refs retained, no keys/tokens extracted or saved. Does not prove Cloudflare route-to-worker or future build configuration.",
+  "results": [
+    {
+      "origin": "https://stage.qvesta.ru",
+      "httpStatus": 200,
+      "server": "cloudflare",
+      "publicSupabaseProjectRefs": [
+        "jeugfyaqzfgdvfhdxfht"
+      ],
+      "assets": [
+        {
+          "path": "/assets/index-CRE76MKu.js",
+          "status": 200
+        },
+        {
+          "path": "/registerSW.js",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "origin": "https://stage-admin.qvesta.ru",
+      "httpStatus": 200,
+      "server": "cloudflare",
+      "publicSupabaseProjectRefs": [
+        "jeugfyaqzfgdvfhdxfht"
+      ],
+      "assets": [
+        {
+          "path": "/assets/index-DNnNvk-U.js",
+          "status": 200
+        }
+      ]
+    }
+  ]
+}

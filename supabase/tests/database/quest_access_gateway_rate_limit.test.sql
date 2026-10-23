@@ -46,10 +46,13 @@ select throws_ok(
   'gateway rejects raw or malformed fingerprints'
 );
 
+-- Фикстуру создаёт владелец БД; gateway использует закрытый SECURITY DEFINER RPC.
+reset role;
 insert into public.quest_access_gateway_attempts (key_type, key_hash, attempted_at, succeeded)
 select 'network', repeat('a', 64), now() - interval '1 minute', false
 from generate_series(1, 20);
 
+set local role service_role;
 select is(
   (select error_code from public.redeem_quest_access_code_from_gateway(
     '9a000000-0000-4000-8000-000000000001', 'BAD-CODE', null,
@@ -65,6 +68,7 @@ select ok(
   )),
   'gateway returns a retry delay'
 );
+reset role;
 select is(
   (select count(*) from public.quest_access_gateway_attempts where key_hash = repeat('a', 64)),
   20::bigint,

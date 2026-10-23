@@ -1,7 +1,8 @@
-import { getDownloadedQuestPackages, getLocalParticipantAttempts, getParticipantProfiles, getPendingResults, saveParticipantProfiles, saveQuestToDB, OFFLINE_PACKAGE_VERSION } from './db'
+import { beginParticipantPackageRefresh, getDownloadedQuestPackages, getLocalParticipantAttempts, getParticipantProfiles, getPendingResults, revokeParticipantPackageAccess, saveParticipantProfiles, saveQuestToDB, OFFLINE_PACKAGE_VERSION } from './db'
 import { listMyParticipantProfiles } from './participantGroupApi'
 import { loadParticipantQuest, loadParticipantTasks } from './questApi'
 import { isTransportError } from './network'
+import { isQuestAccessDenied } from './questAccessErrors'
 
 export const PARTICIPANT_DASHBOARD_CHANGED = 'participant-dashboard-changed'
 
@@ -22,7 +23,7 @@ export async function loadParticipantDashboard(userId, signal) {
   }
   if (offline) profiles = await getParticipantProfiles(userId)
   const [packages, attempts, pending] = await Promise.all([
-    getDownloadedQuestPackages(), getLocalParticipantAttempts(userId), getPendingResults(userId),
+    getDownloadedQuestPackages(Date.now(), userId), getLocalParticipantAttempts(userId), getPendingResults(userId),
   ])
   signal?.throwIfAborted()
   const ids = new Set(profiles.map(p => p.participant_profile_id))
@@ -41,6 +42,7 @@ export function packageReadiness(pkg, now = Date.now()) {
     return { key: 'expired', text: 'Нужно обновить доступ онлайн', ready: false }
   }
   if (pkg.is_open === false || Date.parse(pkg.end_at) < now || Date.parse(pkg.start_at) > now) return { key: 'unavailable', text: 'Прохождение сейчас недоступно', ready: false }
+  if (pkg.offlineStartRequiresPermit && !pkg.offlineStartPrepared) return { key: 'needs-permit', text: 'Подготовьте старт онлайн', ready: false }
   if (pkg.offlineMediaFailures?.length) return { key: 'partial', text: 'Пакет неполный', ready: false }
   return { key: 'ready', text: 'Готов офлайн', ready: true }
 }
@@ -65,7 +67,7 @@ export function buildParticipantQuestRows(data, profileId, now = Date.now()) {
     if (!old || String(attempt.updatedAt || '') > String(old.updatedAt || '')) attempts.set(attempt.questId, attempt)
   }
   return [...rows.values()].map(row => ({
-    ...row, profileId, readiness: packageReadiness(row.package, now),
+    ...row, profileId, readiness: packageReadiness(row.package ? { ...row.package, offlineStartPrepared: row.package.offlineStartPrepared || Boolean(row.active_attempt_id || attempts.get(row.id)) } : null, now),
     attempt: data.pending.some(p => p.questId === row.id && p.participantProfileId === profileId && p.eventType === 'finish') ? null
       : row.active_attempt_id ? { serverId: row.active_attempt_id, updatedAt: row.attempt_started_at, remote: true } : attempts.get(row.id) || null,
     pendingCount: data.pending.filter(p => p.questId === row.id && p.participantProfileId === profileId).length,
@@ -74,11 +76,19 @@ export function buildParticipantQuestRows(data, profileId, now = Date.now()) {
 
 export async function downloadParticipantQuest(questId, profileId, signal) {
   if (!navigator.onLine) throw new Error('Для скачивания подключитесь к интернету.')
-  const quest = await loadParticipantQuest(questId, profileId, signal)
-  const tasks = await loadParticipantTasks(questId, profileId, signal)
+  const accessSnapshot = await beginParticipantPackageRefresh(questId, profileId, signal)
+  let quest, tasks
+  try {
+    quest = await loadParticipantQuest(questId, profileId, signal)
+    tasks = await loadParticipantTasks(questId, profileId, signal)
+  } catch (error) {
+    signal?.throwIfAborted()
+    if (isQuestAccessDenied(error)) await revokeParticipantPackageAccess(questId, profileId)
+    throw error
+  }
   signal?.throwIfAborted()
   if (!quest?.id || quest.id !== questId) throw new Error('Не удалось проверить доступ к квесту.')
-  const metadata = await saveQuestToDB(quest, tasks, profileId, signal)
+  const metadata = await saveQuestToDB(quest, tasks, profileId, signal, accessSnapshot)
   window.dispatchEvent(new Event(PARTICIPANT_DASHBOARD_CHANGED))
   return metadata
 }

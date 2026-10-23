@@ -1,0 +1,18 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('description-sales')::uuid,'description-sales@example.test');
+insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('description-sales')::uuid,'sales','platform');
+select set_config('request.jwt.claim.sub',md5('description-sales')::uuid::text,true);
+select set_config('request.jwt.claims','{"aal":"aal2"}',true);
+select set_config('test.source',(select id::text from public.billing_plan_versions where plan_key='pro' and version=1),true);
+set local role authenticated;
+select set_config('test.description',public.save_platform_tariff_draft(md5('desc-command')::uuid,md5('desc-draft')::uuid,current_setting('test.source')::uuid,0,'Pro',5,3,14,'Campaign')::text,true);
+select is(current_setting('test.description')::jsonb->>'description','Campaign','description saved');
+select is(public.save_platform_tariff_draft(md5('desc-command')::uuid,md5('desc-draft')::uuid,current_setting('test.source')::uuid,0,'Pro',5,3,14,'Campaign'),current_setting('test.description')::jsonb,'retry idempotent');
+select throws_ok($t$select public.save_platform_tariff_draft(md5('desc-command')::uuid,md5('desc-draft')::uuid,current_setting('test.source')::uuid,0,'Pro',5,3,14,'Other')$t$,'22023','command conflict','description part of command identity');
+select is(public.save_platform_tariff_draft(md5('desc-update')::uuid,md5('desc-draft')::uuid,current_setting('test.source')::uuid,1,'Pro',6,3,14)->>'description','Campaign','old client preserves description');
+select is(public.save_platform_tariff_draft(md5('desc-clear')::uuid,md5('desc-draft')::uuid,current_setting('test.source')::uuid,2,'Pro',6,3,14,'')->>'description','','description can be cleared');
+select throws_ok($t$select public.save_platform_tariff_draft(md5('desc-long')::uuid,md5('desc-draft')::uuid,current_setting('test.source')::uuid,3,'Pro',6,3,14,repeat('x',501))$t$,'22023','invalid tariff draft','description bounded');
+reset role;
+select * from finish();
+rollback;

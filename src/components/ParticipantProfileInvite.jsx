@@ -37,12 +37,12 @@ export default function ParticipantProfileInvite({ profile, invitationKind = 'su
     try { await navigator.clipboard.writeText(result.link); setNotice('Ссылка скопирована') }
     catch { setNotice('Не удалось скопировать автоматически. Выделите ссылку в поле и скопируйте вручную.') }
   }
-  return <section aria-label={claiming ? 'Привязка аккаунта' : 'Приглашение взрослого'} className="space-y-3 rounded-xl border bg-white p-4">
-    <h2 className="text-lg font-semibold">{claiming ? 'Связать профиль с аккаунтом' : 'Пригласить взрослого'}</h2>
+  return <section aria-label={claiming ? 'Привязка аккаунта' : 'Приглашение куратора'} className="space-y-3 rounded-xl border bg-white p-4">
+    <h2 className="text-lg font-semibold">{claiming ? 'Связать профиль с аккаунтом' : 'Пригласить куратора'}</h2>
     <p className="text-sm">Профиль: {profile.display_name}</p>
     {!result ? <>
       <p className="text-sm text-gray-600">Ссылка действует семь дней и подходит только аккаунту с указанным email. Передайте её получателю самостоятельно.</p>
-      <p className="text-sm text-gray-600">{claiming ? 'Получатель свяжет этот профиль со своим аккаунтом. Профиль и его история сохранятся; завершённые прохождения, доступы и группы текущего профиля получателя будут объединены с ним. Активное прохождение получателю потребуется сначала завершить.' : 'После принятия взрослый получит контроль над профилем: доступ к квестам, истории и прохождению от имени участника.'}</p>
+      <p className="text-sm text-gray-600">{claiming ? 'Получатель свяжет этот профиль со своим аккаунтом. Профиль и его история сохранятся; завершённые прохождения, доступы и группы текущего профиля получателя будут объединены с ним. Активное прохождение получателю потребуется сначала завершить.' : 'После принятия куратор получит контроль над профилем: доступ к квестам, истории и прохождению от имени участника.'}</p>
       <form onSubmit={submit}><fieldset disabled={saving || uncertain} className="min-w-0 space-y-3">
         <label className="block"><span className="mb-1 block font-medium">Email получателя</span><input required type="email" value={email} onChange={event => setEmail(event.target.value)} className="w-full rounded-lg border p-3" /></label>
         <button disabled={!email.trim()} className="rounded-lg bg-blue-600 px-4 py-3 text-white disabled:opacity-50">{saving ? 'Создание…' : 'Создать приглашение'}</button>

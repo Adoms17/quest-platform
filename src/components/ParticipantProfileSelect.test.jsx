@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ParticipantProfileSelect from './ParticipantProfileSelect'
 import { listMyParticipantProfiles } from '../services/participantGroupApi'
@@ -35,7 +35,7 @@ describe('ParticipantProfileSelect', () => {
     />)
 
     expect(await screen.findByRole('option', { name: 'Соня' })).toBeInTheDocument()
-    expect(saveParticipantProfiles).toHaveBeenCalledWith('adult-1', profiles)
+    expect(saveParticipantProfiles).toHaveBeenCalledWith('adult-1', profiles, expect.any(AbortSignal))
   })
 
   it('includes profiles controlled through group leadership and identifies their owner', async () => {
@@ -55,7 +55,7 @@ describe('ParticipantProfileSelect', () => {
     expect(await screen.findByRole('option', {
       name: 'Соня · владелец: Алексей · adult@example.test',
     })).toBeInTheDocument()
-    expect(saveParticipantProfiles).toHaveBeenCalledWith('leader-1', profiles)
+    expect(saveParticipantProfiles).toHaveBeenCalledWith('leader-1', profiles, expect.any(AbortSignal))
   })
 
   it('uses cached profiles when the network is unavailable', async () => {
@@ -82,7 +82,7 @@ describe('ParticipantProfileSelect', () => {
     ))
   })
 
-  it('keeps an already downloaded profile usable without a populated cache', async () => {
+  it('rejects fallback profiles without verified actor membership', async () => {
     listMyParticipantProfiles.mockRejectedValue(new TypeError('Failed to fetch'))
     getParticipantProfiles.mockResolvedValue([])
 
@@ -99,8 +99,16 @@ describe('ParticipantProfileSelect', () => {
     />)
 
     const select = await screen.findByRole('combobox', { name: 'Кто будет проходить квест?' })
-    await waitFor(() => expect(select).toBeEnabled())
-    expect(screen.getByRole('option', { name: 'Сохранённый профиль' })).toBeInTheDocument()
-    fireEvent.change(select, { target: { value: 'child-legacy' } })
+    await screen.findByText('Профили не сохранены на этом устройстве. Подключитесь к интернету один раз.')
+    expect(select).toBeDisabled()
+    expect(screen.queryByRole('option', { name: 'Сохранённый профиль' })).not.toBeInTheDocument()
+  })
+
+  it('does not fall back to cached membership after an authoritative denial', async () => {
+    listMyParticipantProfiles.mockRejectedValue({ code: '42501', message: 'access denied' })
+    render(<ParticipantProfileSelect value="child-1" onChange={vi.fn()} userId="adult-1" />)
+    await screen.findByText('Профили не сохранены на этом устройстве. Подключитесь к интернету один раз.')
+    expect(getParticipantProfiles).not.toHaveBeenCalled()
+    expect(saveParticipantProfiles).toHaveBeenCalledWith('adult-1', [], expect.any(AbortSignal))
   })
 })

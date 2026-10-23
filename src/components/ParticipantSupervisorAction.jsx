@@ -11,7 +11,7 @@ export default function ParticipantSupervisorAction({ profileId, member, onRefre
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const restore = member.can_restore === true
   if (!restore && member.can_revoke !== true) return null
-  const label = restore ? 'Восстановить мой доступ' : member.is_self ? 'Отказаться от доступа к профилю' : 'Отозвать доступ взрослого'
+  const label = restore ? 'Восстановить мой доступ' : member.is_self ? 'Отказаться от доступа к профилю' : 'Отозвать доступ куратора'
   const submit = async () => {
     if (pending.current || error) return
     pending.current = true; setSaving(true)

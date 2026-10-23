@@ -9,14 +9,16 @@ const mocks = vi.hoisted(() => ({
   markResultsSynced: vi.fn(),
   clearSyncedResults: vi.fn(),
   updateQuestSyncDate: vi.fn(),
-  startServerQuestAttempt: vi.fn(),
+  registerOfflineQuestAttempt: vi.fn(),
   submitTaskEvent: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   finishQuestAttemptAliases: vi.fn(),
   clearFinishedQuestAttempts: vi.fn(),
   reconcilePendingReceipts: vi.fn(),
+  preserveOfflineReview: vi.fn(),
 }))
+vi.mock('./offlineReview', () => ({ preserveOfflineReview: mocks.preserveOfflineReview }))
 
 vi.mock('../supabaseClient', () => ({
   supabase: {
@@ -37,7 +39,7 @@ vi.mock('./db', () => ({
 }))
 
 vi.mock('./questApi', () => ({
-  startServerQuestAttempt: mocks.startServerQuestAttempt,
+  registerOfflineQuestAttempt: mocks.registerOfflineQuestAttempt,
   submitTaskEvent: mocks.submitTaskEvent,
 }))
 
@@ -88,7 +90,7 @@ describe('syncPendingResults', () => {
       accepted: true,
       opened: true,
     })
-    mocks.startServerQuestAttempt.mockResolvedValue({
+    mocks.registerOfflineQuestAttempt.mockResolvedValue({
       id: 'attempt-1',
     })
     mocks.finishQuestAttemptAliases.mockResolvedValue(undefined)
@@ -103,6 +105,20 @@ describe('syncPendingResults', () => {
       syncedQuestIds: [],
       finishedLocalAttemptIds: [],
     }))
+  })
+
+  it('при отказе по лимиту очищает очередь только после сохранения архива; retry не отправляет ответы в статистику', async () => {
+    mocks.getPendingResults.mockResolvedValue([event({})])
+    mocks.registerOfflineQuestAttempt.mockRejectedValueOnce({ code: '23514', message: 'quest completion limit reached' })
+      .mockRejectedValueOnce({ code: 'P0001', message: 'offline attempt rejected by limit' })
+    mocks.preserveOfflineReview.mockRejectedValueOnce(new Error('lost response')).mockResolvedValueOnce(undefined)
+    await expect(syncPendingResults(session)).rejects.toThrow('lost response')
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+    expect(mocks.clearSyncedResults).not.toHaveBeenCalled()
+    await expect(syncPendingResults(session)).resolves.toMatchObject({ invalidEvents: 1 })
+    expect(mocks.markResultsSynced).toHaveBeenCalledWith([1])
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+    expect(mocks.toastSuccess).not.toHaveBeenCalled()
   })
 
   it('submits every event in local insertion order without task deduplication', async () => {
@@ -171,7 +187,7 @@ describe('syncPendingResults', () => {
     await expect(syncPendingResults(session))
       .rejects.toThrow('другому пользователю')
 
-    expect(mocks.startServerQuestAttempt).not.toHaveBeenCalled()
+    expect(mocks.registerOfflineQuestAttempt).not.toHaveBeenCalled()
     expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
   })
 
@@ -200,8 +216,8 @@ describe('syncPendingResults', () => {
       false,
       'profile-child'
     )
-    expect(mocks.startServerQuestAttempt)
-      .toHaveBeenCalledWith('quest-1', 'profile-child')
+    expect(mocks.registerOfflineQuestAttempt)
+      .toHaveBeenCalledWith('quest-1', 'profile-child', 'local-1', null)
   })
 
   it('does not combine participant profiles in one local attempt', async () => {
@@ -218,7 +234,7 @@ describe('syncPendingResults', () => {
     await expect(syncPendingResults(session))
       .rejects.toThrow('разных профилей участников')
 
-    expect(mocks.startServerQuestAttempt).not.toHaveBeenCalled()
+    expect(mocks.registerOfflineQuestAttempt).not.toHaveBeenCalled()
     expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
   })
 
@@ -270,22 +286,60 @@ describe('syncPendingResults', () => {
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
-  it('rebinds pending events when the previous server attempt finished', async () => {
+  it('сохраняет pending завершённой попытки без перепривязки', async () => {
     mocks.getPendingResults.mockResolvedValue([event({})])
-    mocks.startServerQuestAttempt.mockResolvedValue({
-      id: 'attempt-2',
+    mocks.registerOfflineQuestAttempt.mockResolvedValue({
+      id: 'attempt-1', finished_at: '2026-09-15T00:00:00Z',
     })
 
+    await expect(syncPendingResults(session)).rejects.toThrow('registered offline attempt finished')
+    expect(mocks.markQuestAttemptSynced).not.toHaveBeenCalled()
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+    expect(mocks.clearSyncedResults).not.toHaveBeenCalled()
+  })
+  it('отказ регистрации удалённой попытки сохраняет pending', async () => {
+    mocks.getPendingResults.mockResolvedValue([event({})])
+    mocks.registerOfflineQuestAttempt.mockRejectedValueOnce({ code: 'P0001', message: 'registered offline attempt removed' })
+    await expect(syncPendingResults(session)).rejects.toMatchObject({ code: 'P0001' })
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+    expect(mocks.clearSyncedResults).not.toHaveBeenCalled()
+  })
+
+  it('конфликт offline-разрешения сохраняет очередь и локальную привязку', async () => {
+    mocks.getPendingResults.mockResolvedValue([event({})])
+    mocks.registerOfflineQuestAttempt.mockRejectedValueOnce({ code: '23505', message: 'offline permit already bound' })
+    await expect(syncPendingResults(session)).rejects.toMatchObject({ code: '23505' })
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+    expect(mocks.markQuestAttemptSynced).not.toHaveBeenCalled()
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+    expect(mocks.clearSyncedResults).not.toHaveBeenCalled()
+    expect(mocks.clearFinishedQuestAttempts).not.toHaveBeenCalled()
+  })
+
+  it.each(['offline permit already bound', 'offline permit conflict requires review'])('архивирует конфликт permit и его повтор: %s', async message => {
+    const records = [event({})]
+    mocks.getPendingResults.mockResolvedValue(records)
+    mocks.getQuestAttempt.mockResolvedValue({ localId: 'local-1', userId: 'user-1', offlinePermitId: 'permit-1' })
+    mocks.registerOfflineQuestAttempt.mockRejectedValueOnce({ code: message.includes('requires') ? 'P0001' : '23505', message })
+    mocks.preserveOfflineReview.mockResolvedValue(undefined)
     await syncPendingResults(session)
+    expect(mocks.preserveOfflineReview).toHaveBeenCalledWith('quest-1', 'user-1', 'local-1', 'user-1', records, 'needs_review', 'permit-1')
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
+    expect(mocks.markQuestAttemptSynced).not.toHaveBeenCalled()
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+  })
 
-    expect(mocks.markQuestAttemptSynced)
-      .toHaveBeenCalledWith('local-1', 'attempt-2')
-
-    expect(mocks.submitTaskEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        questAttemptId: 'attempt-2',
-      })
-    )
+  it('сбой архивации конфликта не подтверждает и не удаляет события', async () => {
+    mocks.getPendingResults.mockResolvedValue([event({})])
+    mocks.getQuestAttempt.mockResolvedValue({ localId: 'local-1', userId: 'user-1', offlinePermitId: 'permit-1' })
+    mocks.registerOfflineQuestAttempt.mockRejectedValueOnce({ code: '23505', message: 'offline permit already bound' })
+    mocks.preserveOfflineReview.mockRejectedValueOnce(new Error('lost archive response'))
+    await expect(syncPendingResults(session)).rejects.toThrow('lost archive response')
+    expect(mocks.markResultsSynced).not.toHaveBeenCalled()
+    expect(mocks.clearSyncedResults).not.toHaveBeenCalled()
+    expect(mocks.submitTaskEvent).not.toHaveBeenCalled()
   })
 
   it('does not retry a server validation error', async () => {
@@ -380,7 +434,7 @@ describe('syncPendingResults', () => {
 
     await syncPendingResults(session)
 
-    expect(mocks.startServerQuestAttempt).not.toHaveBeenCalled()
+    expect(mocks.registerOfflineQuestAttempt).not.toHaveBeenCalled()
     expect(mocks.markQuestAttemptSynced)
       .toHaveBeenCalledWith('local-1', 'attempt-original')
     expect(mocks.submitTaskEvent).toHaveBeenCalledWith(

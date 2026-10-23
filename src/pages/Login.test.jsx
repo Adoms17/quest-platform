@@ -41,6 +41,29 @@ describe('Login', () => {
     expect(mocks.signInWithPassword).not.toHaveBeenCalled()
   })
 
+  it('opens recovery without a password and returns to sign-in with password cleared', () => {
+    render(<Login setSession={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('Пароль'), { target: { value: 'Synthetic-only-123!' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Забыли пароль?' }))
+    expect(screen.queryByLabelText('Пароль')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Отправить ссылку' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Вернуться ко входу' }))
+    expect(screen.getByLabelText('Пароль')).toHaveValue('')
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled()
+  })
+
+  it('signs in normally after recovery', async () => {
+    const session = { user: { id: 'synthetic-user' } }
+    const setSession = vi.fn()
+    mocks.signInWithPassword.mockResolvedValue({ data: { session }, error: null })
+    render(<Login setSession={setSession} />)
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'buyer@example.test' } })
+    fireEvent.change(screen.getByLabelText('Пароль'), { target: { value: 'Synthetic-only-123!' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Войти' }))
+    await waitFor(() => expect(setSession).toHaveBeenCalledWith(session))
+    expect(mocks.navigate).toHaveBeenCalledWith('/home')
+  })
+
   it('requires a name and matching passwords during registration', () => {
     render(<Login setSession={vi.fn()} />)
     fireEvent.click(screen.getByRole('tab', { name: 'Регистрация' }))

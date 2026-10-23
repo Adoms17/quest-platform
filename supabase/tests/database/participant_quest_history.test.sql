@@ -54,9 +54,10 @@ select throws_ok(
 
 reset role;
 set local role anon;
+-- Отказ может произойти до тела RPC: default EXECUTE grants зависят от окружения.
 select throws_ok(
   $$select * from public.get_participant_quest_history('9d200000-0000-4000-8000-000000000001')$$,
-  '42501', 'participant history access denied',
+  '42501', null,
   'anonymous users cannot read participant history'
 );
 

@@ -1,4 +1,5 @@
 export function getTaskMediaKind(url, contentType = '') {
+  if (!contentType && typeof url === 'string' && url.startsWith('data:')) contentType = url.slice(5, url.indexOf(';'))
   if (contentType.startsWith('video/')) return 'video'
   if (contentType.startsWith('audio/')) return 'audio'
   if (contentType.startsWith('image/')) return 'image'

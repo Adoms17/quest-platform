@@ -5,7 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AppToaster from './components/Toaster'
 import Navbar from './components/Navbar'
 import QuestWorkspaceNav from './components/QuestWorkspaceNav'
-import { getAppEntry, getLoginDestination } from './services/appNavigation'
+import { getAppEntry } from './services/appNavigation'
 import LazyRouteErrorBoundary from './components/LazyRouteErrorBoundary'
 import { selectAuthSession } from './services/authSession'
 import { isTransportError } from './services/network'
@@ -19,10 +19,14 @@ import {
   PARTICIPANT_MODE_CHANGED_EVENT,
 } from './services/participantMode'
 import ParticipantModeBar from './components/ParticipantModeBar'
+import { useAccountActivity } from './hooks/useAccountActivity'
 
 const ParticipantQuests = lazy(() => import('./pages/ParticipantQuests'))
-const Login = lazy(() => import('./pages/Login'))
+const Login = lazy(() => import('./components/LoginEntry'))
 const QuestList = lazy(() => import('./pages/QuestList'))
+const ShopPurchases = lazy(() => import('./pages/ShopPurchases'))
+const ShopCheckout = lazy(() => import('./pages/ShopCheckout'))
+const ShopOrder = lazy(() => import('./pages/ShopOrder'))
 const QuestCreate = lazy(() => import('./pages/QuestCreate'))
 const QuestEdit = lazy(() => import('./pages/QuestEdit'))
 const QuestPlay = lazy(() => import('./pages/QuestPlay'))
@@ -31,6 +35,7 @@ const Downloads = lazy(() => import('./pages/Downloads'))
 const TaskManager = lazy(() => import('./pages/TaskManager'))
 const TaskForm = lazy(() => import('./pages/TaskForm'))
 const OrganizationTeam = lazy(() => import('./pages/OrganizationTeam'))
+const OrganizationBilling = lazy(() => import('./pages/OrganizationBilling'))
 const AcceptOrganizationInvitation = lazy(() => import('./pages/AcceptOrganizationInvitation'))
 const QuestAccess = lazy(() => import('./pages/QuestAccess'))
 const RedeemQuestAccess = lazy(() => import('./pages/RedeemQuestAccess'))
@@ -88,14 +93,10 @@ function Layout({ children, session }) {
   )
 }
 
-function LoginRedirect({ session }) {
-  const location = useLocation()
-  return <Navigate to={getLoginDestination(location.state?.from, session.user.id)} replace />
-}
-
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  useAccountActivity(session?.user?.id)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -176,16 +177,15 @@ function App() {
         <LazyRouteErrorBoundary>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
           <Routes>
+        <Route path="/organization/shop/offers/:offerId" element={<ProtectedRoute session={session}><Layout session={session}><ShopCheckout session={session} /></Layout></ProtectedRoute>} />
+        <Route path="/organization/shop/orders/:orderId" element={<ProtectedRoute session={session}><Layout session={session}><ShopOrder session={session} /></Layout></ProtectedRoute>} />
+        <Route path="/organization/purchases" element={<ProtectedRoute session={session}><Layout session={session}><ShopPurchases session={session} /></Layout></ProtectedRoute>} />
         <Route path="/home" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantQuests key={session?.user?.id} session={session} home /></Layout></ProtectedRoute>} />
         <Route path="/my-quests" element={<ProtectedRoute session={session}><Layout session={session}><ParticipantQuests key={session?.user?.id} session={session} /></Layout></ProtectedRoute>} />
         <Route
           path="/login"
           element={
-            session ? (
-              <LoginRedirect session={session} />
-            ) : (
-              <Login setSession={setSession} />
-            )
+            <Login session={session} setSession={setSession} />
           }
         />
         <Route
@@ -277,6 +277,10 @@ function App() {
               </Layout>
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/organization/billing"
+          element={<ProtectedRoute session={session}><Layout session={session}><OrganizationBilling session={session} /></Layout></ProtectedRoute>}
         />
         <Route
           path="/organization/team"

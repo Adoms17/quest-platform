@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../supabaseClient'
+import { createOrganizationQuest } from '../services/questCreationApi'
 import toast from 'react-hot-toast'
 import { useOrganization } from '../contexts/useOrganization'
 import { getUserErrorMessage } from '../services/userErrorMessage'
 
 export default function QuestCreate({ session }) {
+  const submitting = useRef(false)
   const navigate = useNavigate()
   const { currentOrganization, loadingOrganizations } = useOrganization()
   const [title, setTitle] = useState('')
@@ -59,6 +60,7 @@ export default function QuestCreate({ session }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (submitting.current) return
     if (!title.trim()) {
       toast.error('Введите название')
       return
@@ -76,11 +78,9 @@ export default function QuestCreate({ session }) {
     }
 
     setLoading(true)
-    const { data, error } = await supabase
-      .from('quests')
-      .insert({
-        creator_id: session.user.id,
-        organization_id: currentOrganization.id,
+    submitting.current = true
+    try {
+      const questId = await createOrganizationQuest(session.user.id, currentOrganization.id, {
         title: title.trim(),
         description: description.trim() || null,
         cover_image_url: coverImageUrl.trim() || null,
@@ -96,15 +96,14 @@ export default function QuestCreate({ session }) {
         allow_late_offline_answers: allowLateOfflineAnswers,
         task_navigation_mode: taskNavigationMode,
       })
-      .select()
-
-    if (error) {
-      toast.error(getUserErrorMessage(error, 'Не удалось создать квест.'))
-    } else {
       toast.success('Квест создан!')
-      navigate(`/quests/${data[0].id}/edit`)
+      navigate(`/quests/${questId}/edit`)
+    } catch (error) {
+      toast.error(getUserErrorMessage(error, 'Не удалось создать квест.'))
+    } finally {
+      submitting.current = false
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   if (loadingOrganizations) {
