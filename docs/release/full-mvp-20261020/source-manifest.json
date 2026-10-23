@@ -2925,7 +2925,7 @@
         },
         {
           "path": "src/components/MapPicker.jsx",
-          "sha256": "677bc95c22e632baa65eb15b09dcf8814f3e7e2724f58f57af7ecbe7456d57c0"
+          "sha256": "cb9417b2e65a279f6e4523a64b0efd208915b49541077d962db82ef32c952f1f"
         },
         {
           "path": "src/components/MonthlyParticipantUsage.jsx",
@@ -3705,6 +3705,9 @@
         "idb",
         "idb-keyval",
         "leaflet",
+        "leaflet/dist/images/marker-icon-2x.png",
+        "leaflet/dist/images/marker-icon.png",
+        "leaflet/dist/images/marker-shadow.png",
         "leaflet/dist/leaflet.css",
         "qrcode",
         "react",
