@@ -31,7 +31,7 @@ function Invitations({ actorId, profileId }) {
     {message && <p role="status">{message}</p>}
     <div className="space-y-3">{catalog.items.map(item => <article key={item.id} className="space-y-2 rounded-xl border bg-white p-4">
       <h2 className="break-all font-semibold">{item.email}</h2>
-      <p className="text-sm text-gray-600">{item.invitation_kind === 'claim' ? 'Отдельный аккаунт' : 'Контролирующий взрослый'}</p>
+      <p className="text-sm text-gray-600">{item.invitation_kind === 'claim' ? 'Отдельный аккаунт' : 'Куратор'}</p>
       <p>{({ pending: 'Ожидает принятия', accepted: 'Принято', revoked: 'Отозвано', expired: 'Срок истёк' })[item.display_status] || 'Статус недоступен'}</p>
       <p className="text-sm text-gray-500">Срок: {new Date(item.expires_at).toLocaleString('ru-RU')}</p>
       {item.display_status === 'pending' && (links[item.id] ? <div className="flex flex-wrap items-center gap-4"><button type="button" onClick={async () => {

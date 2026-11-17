@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - staging
+      - codex/full-mvp-production-preparation-20261020
 
 permissions:
   contents: read
@@ -17,7 +18,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  production-billing-sql:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'staging'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Verify candidate manifest
+        run: node scripts/verify-production-candidate-manifest.js
+      - name: Prepare isolated database images
+        run: |
+          docker pull supabase/postgres:17.6.1.165
+          docker pull supabase/gotrue:v2.196.0
+          docker pull supabase/storage-api:v1.70.3
+      - name: Full historical schema and environment isolation
+        env:
+          QVESTA_TEST_PRODUCTION_BASELINE: '1'
+        run: npm run test -- scripts/production-baseline-migrations.test.js
+      - name: Accepted response loss with durable retry
+        env:
+          QVESTA_TEST_PRODUCTION_BASELINE: '1'
+          QVESTA_TEST_ACCEPTED_RESPONSE_LOSS: '1'
+          QVESTA_TEST_ACCOUNT_ACTIVITY: '0'
+        run: npm run test -- scripts/production-baseline-migrations.test.js --reporter=verbose
+      - name: Recovery A with durable evidence and exact replay
+        env:
+          QVESTA_TEST_PRODUCTION_BASELINE: '1'
+          QVESTA_TEST_RECOVERY_A: '1'
+          QVESTA_TEST_ACCEPTED_RESPONSE_LOSS: '0'
+          QVESTA_TEST_ACCOUNT_ACTIVITY: '0'
+        run: npm run test -- scripts/production-baseline-migrations.test.js --reporter=verbose
+      - name: Recovery context R isolated database validation
+        timeout-minutes: 10
+        env:
+          QVESTA_TEST_RECOVERY_CONTEXT: '1'
+        run: npm run test -- scripts/fiscal-recovery-context-isolated.test.js --reporter=verbose
+
   validate:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'staging'))
     runs-on: ubuntu-latest
 
     steps:
@@ -29,6 +72,12 @@ jobs:
         with:
           node-version: 22.x
           cache: npm
+
+      - name: Verify production billing candidate manifest
+        run: node scripts/verify-production-candidate-manifest.js
+
+      - name: Verify inactive full MVP source inventory
+        run: node scripts/production-integration-inventory.mjs
 
       - name: Install dependencies
         run: npm ci
@@ -53,3 +102,50 @@ jobs:
 
       - name: End-to-end tests
         run: npm run test:e2e
+
+  maps-static-assets:
+    if: github.event_name == 'pull_request' && github.base_ref == 'codex/full-mvp-production-preparation-20261020' && github.head_ref == 'codex/maps-static-assets-local-20261023' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: node scripts/production-integration-inventory.mjs
+      - run: node scripts/verify-production-candidate-manifest.js
+      - name: Marker source and notice regression controls
+        run: node --test scripts/map-assets-regression.mjs
+      - name: Synthetic-config build and distributed asset check
+        run: node scripts/check-map-assets-build.mjs
+      - name: Install existing Playwright Chromium runtime
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Localhost marker assets DPR 1 and 2; external requests aborted
+        run: node scripts/check-map-assets-browser.mjs
+      - run: git diff --exit-code && git diff --check
+
+  recurring-alignment:
+    if: github.event_name == 'pull_request' && github.base_ref == 'codex/full-mvp-production-preparation-20261020' && github.head_ref == 'codex/recurring-alignment-local-20261022' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - name: Consent UI and API regressions (synthetic backend only)
+        run: npm test -- --config vitest.local-alignment.config.js src/components/RecurringConsent.test.jsx src/components/OrganizationRecurringConsent.test.jsx src/components/RecurringFailureNotice.test.jsx src/services/recurringConsentApi.test.js src/services/sandboxCheckoutVisibility.test.js src/pages/OrganizationBilling.test.jsx --reporter=verbose
+      - run: npm run build

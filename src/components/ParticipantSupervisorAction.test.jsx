@@ -10,10 +10,10 @@ function setup(member={id:'u1',username:'Взрослый',can_revoke:true}) {
   return {...view,refresh}
 }
 it('не показывает запрещённые действия',()=>{setup({id:'u1'});expect(screen.queryByRole('button')).toBeNull()})
-it('отмена не вызывает RPC',()=>{setup();fireEvent.click(screen.getByText('Отозвать доступ взрослого'));fireEvent.click(screen.getByText('Отмена'));expect(api.revokeParticipantSupervisor).not.toHaveBeenCalled()})
+it('отмена не вызывает RPC',()=>{setup();fireEvent.click(screen.getByText('Отозвать доступ куратора'));fireEvent.click(screen.getByText('Отмена'));expect(api.revokeParticipantSupervisor).not.toHaveBeenCalled()})
 it('отправляет один отзыв и обновляет список после ответа',async()=>{
  let finish;api.revokeParticipantSupervisor.mockImplementation(()=>new Promise(resolve=>{finish=resolve}))
- const {refresh}=setup();fireEvent.click(screen.getByText('Отозвать доступ взрослого'))
+ const {refresh}=setup();fireEvent.click(screen.getByText('Отозвать доступ куратора'))
  const button=screen.getByText('Подтвердить действие');fireEvent.click(button);fireEvent.click(button)
  expect(api.revokeParticipantSupervisor).toHaveBeenCalledTimes(1);expect(api.revokeParticipantSupervisor).toHaveBeenCalledWith('p1','u1')
  await act(async()=>finish());expect(refresh).toHaveBeenCalledTimes(1)
@@ -28,12 +28,12 @@ it.each([
 })
 it('после ошибки требует проверки связей',async()=>{
  api.revokeParticipantSupervisor.mockRejectedValue(new Error('network'));const {refresh}=setup()
- fireEvent.click(screen.getByText('Отозвать доступ взрослого'));fireEvent.click(screen.getByText('Подтвердить действие'))
+ fireEvent.click(screen.getByText('Отозвать доступ куратора'));fireEvent.click(screen.getByText('Подтвердить действие'))
  await screen.findByRole('alert');expect(screen.queryByText('Подтвердить действие')).toBeNull()
  fireEvent.click(screen.getByText('Проверить связи'));expect(refresh).toHaveBeenCalledTimes(1)
 })
 it('после ухода не обновляет другой экран',async()=>{
  let finish;api.revokeParticipantSupervisor.mockImplementation(()=>new Promise(resolve=>{finish=resolve}))
- const {refresh,unmount}=setup();fireEvent.click(screen.getByText('Отозвать доступ взрослого'));fireEvent.click(screen.getByText('Подтвердить действие'))
+ const {refresh,unmount}=setup();fireEvent.click(screen.getByText('Отозвать доступ куратора'));fireEvent.click(screen.getByText('Подтвердить действие'))
  unmount();await act(async()=>finish());expect(refresh).not.toHaveBeenCalled()
 })

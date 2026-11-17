@@ -16,10 +16,28 @@ import {
   loadParticipantQuestSummary,
   loadQuestEntryStatus,
   startServerQuestAttempt,
+  registerOfflineQuestAttempt,
   submitTaskEvent,
 } from './questApi'
 
 describe('questApi', () => {
+  it('при наличии права выбирает только новый RPC и не повторяет через legacy при отказе', async () => {
+    rpc.mockResolvedValue({ error: { code: '42501' } })
+    await expect(registerOfflineQuestAttempt('q','p','local',null,'permit')).rejects.toMatchObject({ code: '42501' })
+    expect(rpc).toHaveBeenCalledTimes(1)
+    expect(rpc).toHaveBeenCalledWith('register_permitted_offline_attempt', { p_quest_id: 'q', p_participant_profile_id: 'p', p_local_attempt_id: 'local', p_permit_id: 'permit' })
+  })
+
+  it('передаёт стабильный local ID и известную серверную попытку', async () => {
+    const data = { id: 'attempt', quest_id: 'quest', participant_profile_id: 'profile', finished_at: null }
+    rpc.mockResolvedValue({ data, error: null })
+    await expect(registerOfflineQuestAttempt('quest','profile','local','attempt')).resolves.toEqual(data)
+    expect(rpc).toHaveBeenCalledWith('register_offline_quest_attempt', { p_quest_id: 'quest', p_participant_profile_id: 'profile', p_local_attempt_id: 'local', p_existing_attempt_id: 'attempt' })
+  })
+  it('не принимает регистрацию другого профиля', async () => {
+    rpc.mockResolvedValue({ data: { id: 'attempt', quest_id: 'quest', participant_profile_id: 'other' }, error: null })
+    await expect(registerOfflineQuestAttempt('quest','profile','local')).rejects.toThrow('Некорректная регистрация')
+  })
   it('routes recorded offline events through the late-delivery policy', async () => {
     rpc.mockResolvedValue({ data: { accepted: true }, error: null })
     await submitTaskEvent({ questAttemptId: 'attempt', taskId: 'task', clientEventId: 'event', eventType: 'answer', offlineRecordedAt: '2026-01-01T00:00:00Z' })

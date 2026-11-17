@@ -11,6 +11,109 @@ on:
         options:
           - dry-run
           - deploy
+          - reconcile
+          - reconcile-order
+          - admin-dry-run
+          - admin-deploy
+          - admin-catalog-dry-run
+          - admin-catalog-deploy
+          - tariff-release-dry-run
+          - tariff-release-deploy
+          - payments-release-dry-run
+          - payments-release-deploy
+          - recurring-dry-run
+          - recurring-apply
+          - recurring-notice-dry-run
+          - recurring-notice-apply
+          - recurring-scope-dry-run
+          - recurring-scope-apply
+          - future-discount-dry-run
+          - future-discount-apply
+          - recurring-consents-dry-run
+          - recurring-consents-apply
+          - payment-processing-dry-run
+          - payment-processing-apply
+          - payment-details-dry-run
+          - payment-details-apply
+          - order-schedule-dry-run
+          - order-schedule-apply
+          - order-signature-dry-run
+          - order-signature-apply
+          - organization-quests-dry-run
+          - organization-quests-apply
+          - organization-statistics-dry-run
+          - organization-statistics-apply
+          - public-tariffs-dry-run
+          - public-tariffs-apply
+          - receipt-probe-create-payment
+          - receipt-settlement-create-payment
+          - settlement-probe-inspect
+          - receipt-before-settlement-refund
+          - receipt-settle-remainder
+          - receipt-after-settlement-refund
+          - receipt-probe-refund-a
+          - receipt-probe-refund-b
+          - receipt-probe-inspect
+          - receipt-probe-preflight
+          - receipts-dry-run
+          - receipts-apply
+          - receipts-functions-deploy
+          - reconcile-compatible-functions-deploy
+          - subscription-model-dry-run
+          - subscription-model-apply
+          - subscription-model-functions-deploy
+          - subscription-balances-dry-run
+          - subscription-balances-apply
+          - subscription-balances-functions-deploy
+          - subscription-acceptance-dry-run
+          - subscription-acceptance-apply
+          - subscription-acceptance-functions-deploy
+          - subscription-settlement-fixture-preview
+          - subscription-settlement-fixture-provision
+          - subscription-settlement-schedule-preview
+          - subscription-settlement-schedule-provision
+          - subscription-settlement-schedule-enable
+          - subscription-settlement-schedule-disable
+          - subscription-settlement-recover-existing
+          - subscription-settlement-dry-run
+          - subscription-settlement-apply
+          - subscription-full-refund-body-dry-run
+          - subscription-full-refund-body-apply
+          - subscription-full-refund-body-fixture-preview
+          - subscription-full-refund-body-fixture-provision
+          - subscription-full-refund-body-offer-preview
+          - subscription-full-refund-body-offer-provision
+          - subscription-full-refund-preview
+          - subscription-full-refund-provision
+          - subscription-acceptance-fixture-preview
+          - subscription-acceptance-fixture-provision
+          - subscription-acceptance-fiscal-reconcile
+          - subscription-acceptance-fiscal-dispatch
+          - purchase-documents-dry-run
+          - purchase-documents-apply
+          - purchase-documents-fixture
+          - subscription-refunds-dry-run
+          - subscription-refunds-apply
+          - order-vault-configure
+          - recurring-disabled-smoke
+          - recurring-acceptance-run
+      expected_sha:
+        description: Approved full staging SHA for reconcile-compatible-functions-deploy
+        required: false
+        type: string
+      sandbox_order_id:
+        description: Exact sandbox order UUID for reconcile-order
+        type: string
+        required: false
+      recurring_organization_id:
+        description: Explicit sandbox organization UUID for one recurring acceptance run
+        type: string
+        required: false
+      deploy_sandbox:
+        description: Publish test billing Edge Functions (staging only)
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -21,6 +124,7 @@ concurrency:
 
 jobs:
   migrate:
+    if: inputs.operation == 'dry-run' || inputs.operation == 'deploy'
     runs-on: ubuntu-latest
     environment: staging
     env:
@@ -54,6 +158,16 @@ jobs:
       - name: Link staging project
         run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
+      - name: Verify test billing shop before migrations
+        if: inputs.operation == 'deploy' && inputs.deploy_sandbox
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+        run: |
+          node -e "if (!/^[a-f0-9]{64}$/.test(process.env.YOOKASSA_SANDBOX_WORKER_TOKEN ?? '')) process.exit(1)"
+          node scripts/verify-sandbox-shop.mjs
+
       - name: Preview migrations
         if: inputs.operation == 'dry-run'
         run: npx supabase db push --dry-run
@@ -73,3 +187,2234 @@ jobs:
       - name: Deploy quest code gateway
         if: inputs.operation == 'deploy'
         run: npx supabase functions deploy redeem-quest-code --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Publish disabled sandbox functions
+        if: inputs.operation == 'deploy' && inputs.deploy_sandbox
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+        run: |
+          npx supabase secrets set YOOKASSA_SANDBOX_ENABLED=false YOOKASSA_SANDBOX_SHOP_ID="$YOOKASSA_SANDBOX_SHOP_ID" YOOKASSA_SANDBOX_SECRET_KEY="$YOOKASSA_SANDBOX_SECRET_KEY" --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase secrets set YOOKASSA_SANDBOX_WORKER_TOKEN="$YOOKASSA_SANDBOX_WORKER_TOKEN" --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-checkout --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-reconcile-order --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy yookassa-sandbox-webhook --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Enable verified sandbox after publication
+        if: inputs.operation == 'deploy' && inputs.deploy_sandbox
+        run: npx supabase secrets set YOOKASSA_SANDBOX_ENABLED=true --project-ref "$SUPABASE_PROJECT_ID"
+
+  reconcile:
+    if: inputs.operation == 'reconcile'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment: staging
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+      - name: Reconcile test payments and refunds
+        env:
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+        run: node scripts/run-stage-billing-worker.mjs
+
+  reconcile-order:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'reconcile-order'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+      - name: Reconcile exactly one sandbox order (no refunds)
+        env:
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+          SANDBOX_ORDER_ID: ${{ inputs.sandbox_order_id }}
+        run: node scripts/run-stage-billing-worker.mjs --order
+  admin-migrate:
+    if: inputs.operation == 'payments-release-dry-run' || inputs.operation == 'payments-release-deploy' || inputs.operation == 'tariff-release-dry-run' || inputs.operation == 'tariff-release-deploy' || inputs.operation == 'admin-dry-run' || inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-dry-run' || inputs.operation == 'admin-catalog-deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate target and credentials
+        run: |
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Check exact pending migration set
+        env:
+          ADMIN_OPERATION: ${{ inputs.operation }}
+        run: |
+          if [[ "$ADMIN_OPERATION" == payments-release-* ]]; then
+            node scripts/check-admin-stage-migrations.mjs --payments-release
+          elif [[ "$ADMIN_OPERATION" == tariff-release-* ]]; then
+            node scripts/check-admin-stage-migrations.mjs --tariff-release
+          elif [[ "$ADMIN_OPERATION" == admin-catalog-* ]]; then
+            node scripts/check-admin-stage-migrations.mjs --catalog
+          else
+            node scripts/check-admin-stage-migrations.mjs
+          fi
+      - name: Preview admin migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Apply only admin migrations
+        if: inputs.operation == 'admin-deploy' || inputs.operation == 'admin-catalog-deploy' || inputs.operation == 'tariff-release-deploy' || inputs.operation == 'payments-release-deploy'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify administrative RLS and RPC
+        if: inputs.operation == 'admin-deploy'
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform*.test.sql
+
+      - name: Verify tariff catalog RLS without re-running owner bootstrap
+        if: inputs.operation == 'admin-catalog-deploy'
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_tariff_catalog.test.sql
+
+      - name: Verify tariff release RPC and permissions
+        if: inputs.operation == 'tariff-release-deploy'
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/billing_discount*.test.sql supabase/tests/database/billing_trial_full_price*.test.sql supabase/tests/database/billing_trial_timeline.test.sql supabase/tests/database/platform_tariff_support_end.test.sql supabase/tests/database/platform_tariff_source_version.test.sql
+
+      - name: Verify campaign catalog and personal codes with scoped fixtures
+        if: inputs.operation == 'tariff-release-deploy'
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_discount*.test.sql
+
+      - name: Verify payment catalog and refund permissions
+        if: inputs.operation == 'payments-release-deploy'
+        run: npx supabase test db --linked --project-ref "$SUPABASE_PROJECT_ID" supabase/tests/database/platform_payment_catalog.test.sql supabase/tests/database/billing_refunded_duplicate.test.sql
+
+  recurring-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'recurring-dry-run' || inputs.operation == 'recurring-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = recurring-dry-run || test "$OPERATION" = recurring-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-release
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'recurring-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-release
+      - name: Apply recurring migrations
+        if: inputs.operation == 'recurring-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'recurring-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-release --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'No functions, schedules, frontend flags or recurring enablement changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  recurring-acceptance-run:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'recurring-acceptance-run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+      ACCEPTANCE_ORGANIZATION_ID: ${{ inputs.recurring_organization_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm test -- scripts/run-stage-recurring-worker.test.js scripts/verify-disabled-recurring.test.js --maxWorkers=1
+      - name: Validate explicit scope and worker credential
+        run: |
+          node -e "if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(process.env.ACCEPTANCE_ORGANIZATION_ID ?? '') || !/^[a-f0-9]{64}$/.test(process.env.YOOKASSA_SANDBOX_WORKER_TOKEN ?? '')) process.exit(1)"
+      - name: Disable before setting acceptance scope
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECURRING_ENABLED=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Select only the acceptance organization
+        run: npx supabase secrets set "YOOKASSA_SANDBOX_RECURRING_ORGANIZATION_ID=$ACCEPTANCE_ORGANIZATION_ID" --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Enable bounded acceptance
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECURRING_ENABLED=true --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Run once without automatic retry
+        run: node scripts/run-stage-recurring-worker.mjs
+      - name: Always disable after acceptance
+        if: always()
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECURRING_ENABLED=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Verify disabled state
+        if: always()
+        run: node scripts/verify-disabled-recurring.mjs
+
+  recurring-disabled-smoke:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'recurring-disabled-smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging
+    env:
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm test -- scripts/verify-disabled-recurring.test.js --maxWorkers=1
+      - name: Disable recurring before authenticated smoke
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECURRING_ENABLED=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Verify disabled endpoint without logging secrets
+        run: node scripts/verify-disabled-recurring.mjs
+  recurring-notice-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'recurring-notice-dry-run' || inputs.operation == 'recurring-notice-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = recurring-notice-dry-run || test "$OPERATION" = recurring-notice-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-notice
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'recurring-notice-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-notice
+      - name: Apply recurring migrations
+        if: inputs.operation == 'recurring-notice-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'recurring-notice-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-notice --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'No functions, schedules, frontend flags or recurring enablement changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  recurring-scope-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'recurring-scope-dry-run' || inputs.operation == 'recurring-scope-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = recurring-scope-dry-run || test "$OPERATION" = recurring-scope-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-scope
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'recurring-scope-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-scope
+      - name: Apply recurring migrations
+        if: inputs.operation == 'recurring-scope-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'recurring-scope-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-scope --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'No functions, schedules, frontend flags or recurring enablement changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  future-discount-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'future-discount-dry-run' || inputs.operation == 'future-discount-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = future-discount-dry-run || test "$OPERATION" = future-discount-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --future-discount
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'future-discount-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --future-discount
+      - name: Apply recurring migrations
+        if: inputs.operation == 'future-discount-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'future-discount-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --future-discount --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'No functions, schedules, frontend flags or recurring enablement changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  recurring-consents-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'recurring-consents-dry-run' || inputs.operation == 'recurring-consents-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = recurring-consents-dry-run || test "$OPERATION" = recurring-consents-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-consents
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'recurring-consents-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-consents
+      - name: Apply recurring migrations
+        if: inputs.operation == 'recurring-consents-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'recurring-consents-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --recurring-consents --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'No functions, schedules, frontend flags or recurring enablement changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  payment-processing-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'payment-processing-dry-run' || inputs.operation == 'payment-processing-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = payment-processing-dry-run || test "$OPERATION" = payment-processing-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --payment-processing
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'payment-processing-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --payment-processing
+      - name: Apply recurring migrations
+        if: inputs.operation == 'payment-processing-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'payment-processing-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --payment-processing --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'No functions, schedules, frontend flags or recurring enablement changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  payment-details-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'payment-details-dry-run' || inputs.operation == 'payment-details-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = payment-details-dry-run || test "$OPERATION" = payment-details-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --payment-details
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'payment-details-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --payment-details
+      - name: Apply recurring migrations
+        if: inputs.operation == 'payment-details-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'payment-details-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --payment-details --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'No functions, schedules, frontend flags or recurring enablement changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  order-schedule-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'order-schedule-dry-run' || inputs.operation == 'order-schedule-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = order-schedule-dry-run || test "$OPERATION" = order-schedule-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --order-schedule
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'order-schedule-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --order-schedule
+      - name: Apply recurring migrations
+        if: inputs.operation == 'order-schedule-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'order-schedule-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --order-schedule --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Only disabled order schedule foundation installed; no tokens, orders or enablement configured.' >> "$GITHUB_STEP_SUMMARY"
+
+  order-signature-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'order-signature-dry-run' || inputs.operation == 'order-signature-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = order-signature-dry-run || test "$OPERATION" = order-signature-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact recurring migration set
+        run: node scripts/check-admin-stage-migrations.mjs --order-signature
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'order-signature-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --order-signature
+      - name: Apply recurring migrations
+        if: inputs.operation == 'order-signature-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'order-signature-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --order-signature --require-applied
+      - name: Record scope
+        run: |
+          echo "Recurring migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Only disabled order schedule foundation installed; no tokens, orders or enablement configured.' >> "$GITHUB_STEP_SUMMARY"
+
+  order-vault-configure:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'order-vault-configure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm test -- scripts/configure-stage-scheduler-vault.test.js --maxWorkers=1
+      - name: Configure disabled stage scheduler Vault secret
+        env:
+          SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+        run: node scripts/configure-stage-scheduler-vault.mjs
+
+  organization-quests-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'organization-quests-dry-run' || inputs.operation == 'organization-quests-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = organization-quests-dry-run || test "$OPERATION" = organization-quests-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact quest registry migration
+        run: node scripts/check-admin-stage-migrations.mjs --organization-quests
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'organization-quests-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --organization-quests
+      - name: Apply quest registry migration
+        if: inputs.operation == 'organization-quests-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'organization-quests-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --organization-quests --require-applied
+      - name: Record scope
+        run: |
+          echo "Quest registry migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Only quest registry permission and read RPC installed; no payments or frontend deployed.' >> "$GITHUB_STEP_SUMMARY"
+
+  organization-statistics-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'organization-statistics-dry-run' || inputs.operation == 'organization-statistics-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = organization-statistics-dry-run || test "$OPERATION" = organization-statistics-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test migration history guard
+        run: npm test -- scripts/check-admin-stage-migrations.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact participants and statistics migrations
+        run: node scripts/check-admin-stage-migrations.mjs --organization-statistics
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history before applying
+        if: inputs.operation == 'organization-statistics-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --organization-statistics
+      - name: Apply participants and statistics migrations
+        if: inputs.operation == 'organization-statistics-apply'
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'organization-statistics-apply'
+        run: node scripts/check-admin-stage-migrations.mjs --organization-statistics --require-applied
+      - name: Record scope
+        run: |
+          echo "Participants and statistics migration operation completed for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Participants read RPC, server activity tracking and statistics RPC installed; frontend release follows separately.' >> "$GITHUB_STEP_SUMMARY"
+
+  subscription-refunds-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-refunds-dry-run' || inputs.operation == 'subscription-refunds-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-refunds-dry-run || test "$OPERATION" = subscription-refunds-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-refund-stage-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact refund migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/refund-migrations.json"
+          node scripts/check-refund-stage-release.mjs "$RUNNER_TEMP/refund-migrations.json"
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history and apply refund migrations
+        if: inputs.operation == 'subscription-refunds-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/refund-migrations.json"
+          node scripts/check-refund-stage-release.mjs "$RUNNER_TEMP/refund-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'subscription-refunds-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/refund-migrations.json"
+          node scripts/check-refund-stage-release.mjs "$RUNNER_TEMP/refund-migrations.json" --require-applied
+      - name: Publish refund functions with new operations disabled
+        if: inputs.operation == 'subscription-refunds-apply' && inputs.deploy_sandbox
+        run: |
+          npx supabase secrets set ADMIN_SUBSCRIPTION_REFUNDS_ENABLED=false --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy admin-subscription-refund-prepare --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy admin-subscription-refund --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Record release scope
+        env:
+          OPERATION: ${{ inputs.operation }}
+          PUBLISH_FUNCTIONS: ${{ inputs.deploy_sandbox }}
+        run: |
+          echo "Refund operation: $OPERATION; commit: $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo "Function publication requested: $PUBLISH_FUNCTIONS (apply only)." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Function publication disables new subscription refunds, including on reruns. Enable only during separate controlled acceptance. Existing reconciliation remains available. Admin and website are not deployed.' >> "$GITHUB_STEP_SUMMARY"
+
+  public-tariffs-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'public-tariffs-dry-run' || inputs.operation == 'public-tariffs-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = public-tariffs-dry-run || test "$OPERATION" = public-tariffs-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-public-tariff-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact public tariff migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/public-tariff-migrations.json"
+          node scripts/check-public-tariff-release.mjs "$RUNNER_TEMP/public-tariff-migrations.json"
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history and apply public tariff migrations
+        if: inputs.operation == 'public-tariffs-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/public-tariff-migrations.json"
+          node scripts/check-public-tariff-release.mjs "$RUNNER_TEMP/public-tariff-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'public-tariffs-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/public-tariff-migrations.json"
+          node scripts/check-public-tariff-release.mjs "$RUNNER_TEMP/public-tariff-migrations.json" --require-applied
+
+  purchase-documents-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'purchase-documents-dry-run' || inputs.operation == 'purchase-documents-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = purchase-documents-dry-run || test "$OPERATION" = purchase-documents-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-document-stage-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact document migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/document-migrations.json"
+          node scripts/check-document-stage-release.mjs "$RUNNER_TEMP/document-migrations.json"
+      - name: Preview migrations
+        run: npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --dry-run
+      - name: Recheck history and apply document migrations
+        if: inputs.operation == 'purchase-documents-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/document-migrations.json"
+          node scripts/check-document-stage-release.mjs "$RUNNER_TEMP/document-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'purchase-documents-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/document-migrations.json"
+          node scripts/check-document-stage-release.mjs "$RUNNER_TEMP/document-migrations.json" --require-applied
+
+  purchase-documents-fixture:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'purchase-documents-fixture'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Prepare non-binding stage acceptance fixture
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-document-fixture.sql
+
+  receipts-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'receipts-dry-run' || inputs.operation == 'receipts-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = receipts-dry-run || test "$OPERATION" = receipts-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-receipt-stage-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-receipt-stage-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+      - name: Preview migrations
+        run: |
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-receipt-stage-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+      - name: Recheck history and apply receipt migrations
+        if: inputs.operation == 'receipts-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-receipt-stage-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-receipt-stage-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'receipts-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-receipt-stage-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+
+  receipts-functions:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipts-functions-deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = receipts-functions-deploy
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-receipt-stage-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-receipt-stage-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable receipt rollout flags
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy compatible sandbox functions
+        run: |
+          npx supabase functions deploy sandbox-checkout --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-recurring --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy admin-sandbox-refund --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy admin-subscription-refund --project-ref "$SUPABASE_PROJECT_ID"
+
+  subscription-model-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-model-dry-run' || inputs.operation == 'subscription-model-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-model-dry-run || test "$OPERATION" = subscription-model-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-model-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+      - name: Preview migrations
+        run: |
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+      - name: Disable receipt rollout flags before apply
+        if: inputs.operation == 'subscription-model-apply'
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Recheck history and apply receipt migrations
+        if: inputs.operation == 'subscription-model-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'subscription-model-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+
+  subscription-model-functions:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'subscription-model-functions-deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-model-functions-deploy
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-model-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-model-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable receipt rollout flags
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy compatible sandbox functions
+        run: |
+          npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+
+  subscription-balances-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-balances-dry-run' || inputs.operation == 'subscription-balances-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-balances-dry-run || test "$OPERATION" = subscription-balances-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-balances-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-balances-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+      - name: Preview migrations
+        run: |
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-balances-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+      - name: Disable receipt rollout flags before apply
+        if: inputs.operation == 'subscription-balances-apply'
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_RECONCILIATION=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Recheck history and apply receipt migrations
+        if: inputs.operation == 'subscription-balances-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-balances-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-balances-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'subscription-balances-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-balances-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+
+  subscription-balances-functions:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'subscription-balances-functions-deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-balances-functions-deploy
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-balances-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-balances-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable receipt rollout flags
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_RECONCILIATION=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy compatible sandbox functions
+        run: |
+          npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy admin-subscription-fiscal-refund --project-ref "$SUPABASE_PROJECT_ID"
+
+  subscription-settlement-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-settlement-dry-run' || inputs.operation == 'subscription-settlement-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-settlement-dry-run || test "$OPERATION" = subscription-settlement-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-settlement-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-settlement-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+      - name: Preview migrations
+        run: |
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-settlement-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+      - name: Disable receipt rollout flags before apply
+        if: inputs.operation == 'subscription-settlement-apply'
+        run: npx supabase secrets set YOOKASSA_SANDBOX_SETTLEMENT_ORDER_ENABLED=false YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_RECONCILIATION=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Stop existing exact-order schedule before apply
+        if: inputs.operation == 'subscription-settlement-apply'
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/disable-stage-subscription-settlement.sql
+      - name: Recheck history and apply receipt migrations
+        if: inputs.operation == 'subscription-settlement-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-settlement-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-settlement-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'subscription-settlement-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-settlement-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+
+      - name: Publish disabled exact-order settlement function
+        if: inputs.operation == 'subscription-settlement-apply'
+        run: npx supabase functions deploy sandbox-subscription-settlement-order --project-ref "$SUPABASE_PROJECT_ID"
+
+  subscription-full-refund-body-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-full-refund-body-dry-run' || inputs.operation == 'subscription-full-refund-body-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-full-refund-body-dry-run || test "$OPERATION" = subscription-full-refund-body-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-full-refund-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-full-refund-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+      - name: Preview migrations
+        run: |
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-full-refund-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+      - name: Disable receipt rollout flags before apply
+        if: inputs.operation == 'subscription-full-refund-body-apply'
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_RECONCILIATION=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy compatible functions before new refund bodies
+        if: inputs.operation == 'subscription-full-refund-body-apply'
+        run: |
+          npx supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy admin-subscription-fiscal-refund --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy sandbox-subscription-fiscal-order --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Recheck history and apply receipt migrations
+        if: inputs.operation == 'subscription-full-refund-body-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-full-refund-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-full-refund-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'subscription-full-refund-body-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-full-refund-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+
+  subscription-acceptance-migrate:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-acceptance-dry-run' || inputs.operation == 'subscription-acceptance-apply')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-acceptance-dry-run || test "$OPERATION" = subscription-acceptance-apply
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-acceptance-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-acceptance-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+      - name: Preview migrations
+        run: |
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-acceptance-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+      - name: Disable receipt rollout flags before apply
+        if: inputs.operation == 'subscription-acceptance-apply'
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_RECONCILIATION=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Recheck history and apply receipt migrations
+        if: inputs.operation == 'subscription-acceptance-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-acceptance-release.mjs "$RUNNER_TEMP/receipt-migrations.json"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --dry-run > "$RUNNER_TEMP/receipt-preview.txt" 2>&1
+          node scripts/check-subscription-acceptance-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --preview "$RUNNER_TEMP/receipt-preview.txt"
+          npx supabase db push --linked --project-ref "$SUPABASE_PROJECT_ID" --skip-vault --include-all --yes
+      - name: Verify history after apply
+        if: inputs.operation == 'subscription-acceptance-apply'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-acceptance-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+
+  subscription-acceptance-functions:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'subscription-acceptance-functions-deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate operation and target
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test "$OPERATION" = subscription-acceptance-functions-deploy
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+      - name: Test release guard
+        run: npm test -- scripts/check-subscription-acceptance-release.test.js --maxWorkers=1
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Validate exact receipt migrations and checksums
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-acceptance-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable receipt rollout flags
+        run: npx supabase secrets set YOOKASSA_SANDBOX_RECEIPTS_REQUIRED=false YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_RECONCILIATION=false YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy compatible sandbox functions
+        run: |
+          npx supabase functions deploy sandbox-subscription-fiscal-order --project-ref "$SUPABASE_PROJECT_ID"
+          npx supabase functions deploy admin-fiscal-acceptance-prepare --project-ref "$SUPABASE_PROJECT_ID"
+
+  subscription-acceptance-fixture:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-acceptance-fixture-preview' || inputs.operation == 'subscription-acceptance-fixture-provision')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate stage target
+        run: test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require complete acceptance schema
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-acceptance-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable preparation before provisioning
+        if: inputs.operation == 'subscription-acceptance-fixture-provision'
+        run: npx supabase secrets set ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Preview fixture with rollback
+        if: inputs.operation == 'subscription-acceptance-fixture-preview'
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("scripts/stage-fiscal-acceptance-fixture.sql","utf8"); if(!/commit;\s*$/.test(s))throw Error("Missing transaction end"); fs.writeFileSync(process.env.RUNNER_TEMP+"/fiscal-fixture-preview.sql",s.replace(/commit;\s*$/,"rollback;\n"));'
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/fiscal-fixture-preview.sql"
+      - name: Provision fixture without preparing payment
+        if: inputs.operation == 'subscription-acceptance-fixture-provision'
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-fiscal-acceptance-fixture.sql
+
+
+  subscription-full-refund:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-full-refund-preview' || inputs.operation == 'subscription-full-refund-provision')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate stage target
+        run: test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require complete acceptance schema
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-acceptance-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable preparation before provisioning
+        if: inputs.operation == 'subscription-full-refund-provision'
+        run: npx supabase secrets set ADMIN_SUBSCRIPTION_REFUNDS_ENABLED=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Preview fixture with rollback
+        if: inputs.operation == 'subscription-full-refund-preview'
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("scripts/stage-full-refund-organization.sql","utf8"); if(!/commit;\s*$/.test(s))throw Error("Missing transaction end"); fs.writeFileSync(process.env.RUNNER_TEMP+"/fiscal-fixture-preview.sql",s.replace(/commit;\s*$/,"rollback;\n"));'
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/fiscal-fixture-preview.sql"
+      - name: Provision fixture without preparing payment
+        if: inputs.operation == 'subscription-full-refund-provision'
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-full-refund-organization.sql
+
+
+  subscription-full-refund-body-fixture:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-full-refund-body-fixture-preview' || inputs.operation == 'subscription-full-refund-body-fixture-provision')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate stage target
+        run: test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require complete acceptance schema
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-full-refund-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable preparation before provisioning
+        if: inputs.operation == 'subscription-full-refund-body-fixture-provision'
+        run: npx supabase secrets set ADMIN_SUBSCRIPTION_REFUNDS_ENABLED=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Preview fixture with rollback
+        if: inputs.operation == 'subscription-full-refund-body-fixture-preview'
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("scripts/stage-full-refund-body-organization.sql","utf8"); if(!/commit;\s*$/.test(s))throw Error("Missing transaction end"); fs.writeFileSync(process.env.RUNNER_TEMP+"/fiscal-fixture-preview.sql",s.replace(/commit;\s*$/,"rollback;\n"));'
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/fiscal-fixture-preview.sql"
+      - name: Provision fixture without preparing payment
+        if: inputs.operation == 'subscription-full-refund-body-fixture-provision'
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-full-refund-body-organization.sql
+
+
+  subscription-full-refund-body-offer:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-full-refund-body-offer-preview' || inputs.operation == 'subscription-full-refund-body-offer-provision')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate stage target
+        run: test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require complete acceptance schema
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-full-refund-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable preparation before provisioning
+        if: inputs.operation == 'subscription-full-refund-body-offer-provision'
+        run: npx supabase secrets set ADMIN_SUBSCRIPTION_REFUNDS_ENABLED=false ADMIN_SUBSCRIPTION_FISCAL_REFUNDS_ENABLED=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Preview fixture with rollback
+        if: inputs.operation == 'subscription-full-refund-body-offer-preview'
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("scripts/stage-full-refund-body-offer.sql","utf8"); if(!/commit;\s*$/.test(s))throw Error("Missing transaction end"); fs.writeFileSync(process.env.RUNNER_TEMP+"/fiscal-fixture-preview.sql",s.replace(/commit;\s*$/,"rollback;\n"));'
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/fiscal-fixture-preview.sql"
+      - name: Provision fixture without preparing payment
+        if: inputs.operation == 'subscription-full-refund-body-offer-provision'
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-full-refund-body-offer.sql
+
+
+  subscription-acceptance-fiscal-run:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-acceptance-fiscal-reconcile' || inputs.operation == 'subscription-acceptance-fiscal-dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+      SANDBOX_ORDER_ID: ${{ inputs.sandbox_order_id }}
+      FISCAL_DISPATCH: ${{ inputs.operation == 'subscription-acceptance-fiscal-dispatch' && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Verify exact paid acceptance order before enabling
+        run: |
+          node scripts/run-stage-fiscal-order.mjs --preflight "$RUNNER_TEMP/fiscal-target.sql"
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/fiscal-target.sql"
+      - name: Enable only isolated fiscal worker
+        run: |
+          npx supabase secrets set YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ORDER_ID="$SANDBOX_ORDER_ID" YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=true YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH="$FISCAL_DISPATCH" --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Run once without automatic retry
+        env:
+          YOOKASSA_SANDBOX_WORKER_TOKEN: ${{ secrets.YOOKASSA_SANDBOX_WORKER_TOKEN }}
+        run: node scripts/run-stage-fiscal-order.mjs
+      - name: Close isolated worker even after failure
+        if: always()
+        run: npx supabase secrets set YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+
+  receipt-probe-preflight:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-probe-preflight'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout exact workflow revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Test sandbox verification and receipt arithmetic without credentials
+        run: npm test -- supabase/functions/_shared/yookassaSandboxHttp.test.js supabase/functions/_shared/receiptQuantityProbe.test.js --maxWorkers=2
+      - name: Verify only the approved test shop with GET
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: |
+          node -e "if (process.env.YOOKASSA_SANDBOX_SHOP_ID !== '1467641') process.exit(1)"
+          node scripts/verify-sandbox-shop.mjs
+
+  receipt-probe-create-payment:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-probe-create-payment'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test probe without credentials
+        run: npm test -- scripts/receipt-payment-probe.test.js scripts/run-receipt-payment-probe.test.js --maxWorkers=2
+      - name: Prepare encrypted immutable request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-payment-probe.mjs prepare
+      - name: Persist request before any payment POST
+        id: journal
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-65b56025-7260-40de-a54e-81a8d074f358-request
+          path: ${{ runner.temp }}/receipt-probe-request.enc.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Verify sandbox and submit one test payment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_ARTIFACT_ID: ${{ steps.journal.outputs.artifact-id }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-payment-probe.mjs send
+      - name: Persist sanitized outcome
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-65b56025-7260-40de-a54e-81a8d074f358-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/receipt-probe-result.json
+          if-no-files-found: ignore
+          overwrite: false
+          retention-days: 90
+
+  receipt-probe-inspect:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-probe-inspect'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test read-only inspection without credentials
+        run: npm test -- scripts/inspect-receipt-probe.test.js --maxWorkers=2
+      - name: Read the fixed sandbox payment and receipts
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/run-receipt-probe-inspection.mjs
+      - name: Preserve sanitized inspection
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-inspection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/receipt-probe-inspection.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+
+  receipt-probe-refund-a:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-probe-refund-a'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test probe without credentials
+        run: npm test -- scripts/receipt-refund-a-probe.test.js scripts/run-receipt-refund-a-probe.test.js scripts/inspect-receipt-probe.test.js --maxWorkers=2
+      - name: Prepare encrypted immutable request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-refund-a-probe.mjs prepare
+      - name: Persist request before any refund POST
+        id: journal
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-7b33467b-e94f-45b8-baa7-382ed5d97378-refund-a-request
+          path: ${{ runner.temp }}/receipt-refund-a-request.enc.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Verify current sandbox state and submit refund A
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_ARTIFACT_ID: ${{ steps.journal.outputs.artifact-id }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-refund-a-probe.mjs send
+      - name: Inspect payment and receipts after the attempt
+        if: always() && steps.journal.outcome == 'success'
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/run-receipt-probe-inspection.mjs
+      - name: Persist sanitized outcome
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-7b33467b-e94f-45b8-baa7-382ed5d97378-refund-a-result-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/receipt-refund-a-result.json
+            ${{ runner.temp }}/receipt-probe-inspection.json
+          if-no-files-found: ignore
+          overwrite: false
+          retention-days: 90
+
+  receipt-probe-refund-b:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-probe-refund-b'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test probe without credentials
+        run: npm test -- scripts/receipt-refund-b-probe.test.js scripts/run-receipt-refund-b-probe.test.js scripts/inspect-receipt-probe.test.js --maxWorkers=2
+      - name: Prepare encrypted immutable request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-refund-b-probe.mjs prepare
+      - name: Persist request before any refund POST
+        id: journal
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-d59fbe93-04cd-4b58-beb8-b52c8c310afa-refund-b-request
+          path: ${{ runner.temp }}/receipt-refund-b-request.enc.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Verify current sandbox state and submit refund B
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_ARTIFACT_ID: ${{ steps.journal.outputs.artifact-id }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-refund-b-probe.mjs send
+      - name: Inspect payment and receipts after the attempt
+        if: always() && steps.journal.outcome == 'success'
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/run-receipt-probe-inspection.mjs
+      - name: Persist sanitized outcome
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-d59fbe93-04cd-4b58-beb8-b52c8c310afa-refund-b-result-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/receipt-refund-b-result.json
+            ${{ runner.temp }}/receipt-probe-inspection.json
+          if-no-files-found: ignore
+          overwrite: false
+          retention-days: 90
+
+  receipt-settlement-create-payment:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-settlement-create-payment'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test probe without credentials
+        run: npm test -- scripts/receipt-settlement-payment-probe.test.js scripts/run-receipt-settlement-payment-probe.test.js scripts/receipt-settlement-scenario.test.js --maxWorkers=2
+      - name: Prepare encrypted immutable request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-settlement-payment-probe.mjs prepare
+      - name: Persist request before any payment POST
+        id: journal
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-settlement-probe-b1489c5b-810e-450f-b8d0-56ab3bd2c568-request
+          path: ${{ runner.temp }}/receipt-settlement-probe-request.enc.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Verify sandbox and submit one test payment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_ARTIFACT_ID: ${{ steps.journal.outputs.artifact-id }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-settlement-payment-probe.mjs send
+      - name: Persist sanitized outcome
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-settlement-probe-b1489c5b-810e-450f-b8d0-56ab3bd2c568-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/receipt-settlement-probe-result.json
+          if-no-files-found: ignore
+          overwrite: false
+          retention-days: 90
+
+  settlement-probe-inspect:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'settlement-probe-inspect'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test read-only inspection without credentials
+        run: npm test -- scripts/inspect-settlement-probe.test.js --maxWorkers=2
+      - name: Read the fixed sandbox payment and receipts
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/run-settlement-probe-inspection.mjs
+      - name: Preserve sanitized inspection
+        uses: actions/upload-artifact@v7
+        with:
+          name: settlement-probe-inspection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/settlement-probe-inspection.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+
+  receipt-before-settlement-refund:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-before-settlement-refund'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test probe without credentials
+        run: npm test -- scripts/receipt-before-settlement-probe.test.js scripts/run-receipt-before-settlement-probe.test.js scripts/inspect-settlement-probe.test.js --maxWorkers=2
+      - name: Prepare encrypted immutable request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-before-settlement-probe.mjs prepare
+      - name: Persist request before any refund POST
+        id: journal
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-00fda7a3-46ba-4e17-969f-8b4a5de6ef2e-refund-before-settlement-request
+          path: ${{ runner.temp }}/receipt-before-settlement-request.enc.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Verify current sandbox state and submit refund before settlement
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_ARTIFACT_ID: ${{ steps.journal.outputs.artifact-id }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-before-settlement-probe.mjs send
+      - name: Inspect payment and receipts after the attempt
+        if: always() && steps.journal.outcome == 'success'
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/run-settlement-probe-inspection.mjs
+      - name: Persist sanitized outcome
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-00fda7a3-46ba-4e17-969f-8b4a5de6ef2e-refund-before-settlement-result-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/receipt-before-settlement-result.json
+            ${{ runner.temp }}/settlement-probe-inspection.json
+          if-no-files-found: ignore
+          overwrite: false
+          retention-days: 90
+
+  receipt-settle-remainder:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-settle-remainder'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test probe without credentials
+        run: npm test -- scripts/receipt-settle-remainder-probe.test.js scripts/run-receipt-settle-remainder-probe.test.js scripts/inspect-settlement-probe.test.js --maxWorkers=2
+      - name: Prepare encrypted immutable request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-settle-remainder-probe.mjs prepare
+      - name: Persist request before any receipt POST
+        id: journal
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-17c5969e-1be1-4594-a468-61c015886cb4-settle-remainder-request
+          path: ${{ runner.temp }}/receipt-settle-remainder-request.enc.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Verify current sandbox state and submit remaining prepayment receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_ARTIFACT_ID: ${{ steps.journal.outputs.artifact-id }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-settle-remainder-probe.mjs send
+      - name: Inspect payment and receipts after the attempt
+        if: always() && steps.journal.outcome == 'success'
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/run-settlement-probe-inspection.mjs
+      - name: Persist sanitized outcome
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-17c5969e-1be1-4594-a468-61c015886cb4-settle-remainder-result-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/receipt-settle-remainder-result.json
+            ${{ runner.temp }}/settlement-probe-inspection.json
+          if-no-files-found: ignore
+          overwrite: false
+          retention-days: 90
+
+  receipt-after-settlement-refund:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'receipt-after-settlement-refund'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Test probe without credentials
+        run: npm test -- scripts/receipt-after-settlement-probe.test.js scripts/run-receipt-after-settlement-probe.test.js scripts/inspect-settlement-probe.test.js --maxWorkers=2
+      - name: Prepare encrypted immutable request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-after-settlement-probe.mjs prepare
+      - name: Persist request before any refund POST
+        id: journal
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-5ce6aa64-204e-409a-8776-60b35206e2d9-refund-after-settlement-request
+          path: ${{ runner.temp }}/receipt-after-settlement-request.enc.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Verify current sandbox state and submit refund after settlement
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_ARTIFACT_ID: ${{ steps.journal.outputs.artifact-id }}
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          YOOKASSA_SANDBOX_RECEIPT_EMAIL: ${{ secrets.YOOKASSA_SANDBOX_RECEIPT_EMAIL }}
+        run: node scripts/run-receipt-after-settlement-probe.mjs send
+      - name: Inspect payment and receipts after the attempt
+        if: always() && steps.journal.outcome == 'success'
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+        run: node scripts/run-settlement-probe-inspection.mjs
+      - name: Persist sanitized outcome
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-probe-5ce6aa64-204e-409a-8776-60b35206e2d9-refund-after-settlement-result-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/receipt-after-settlement-result.json
+            ${{ runner.temp }}/settlement-probe-inspection.json
+          if-no-files-found: ignore
+          overwrite: false
+          retention-days: 90
+
+  subscription-settlement-schedule:
+    if: github.ref == 'refs/heads/staging' && startsWith(inputs.operation, 'subscription-settlement-schedule-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    concurrency:
+      group: stage-subscription-settlement-schedule
+      cancel-in-progress: false
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+      SANDBOX_ORDER_ID: ${{ inputs.sandbox_order_id }}
+      OPERATION: ${{ inputs.operation }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run test -- scripts/subscription-settlement-schedule.test.js scripts/check-subscription-settlement-release.test.js
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require complete schema except emergency disable
+        if: inputs.operation != 'subscription-settlement-schedule-disable'
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-settlement-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Prepare validated operation
+        run: node scripts/subscription-settlement-schedule.mjs "${OPERATION#subscription-settlement-schedule-}" "$RUNNER_TEMP/settlement-schedule.sql"
+      - name: Close runtime before mutations
+        if: inputs.operation != 'subscription-settlement-schedule-preview'
+        run: npx supabase secrets set YOOKASSA_SANDBOX_SETTLEMENT_ORDER_ENABLED=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Verify target before enabling runtime
+        if: inputs.operation == 'subscription-settlement-schedule-enable'
+        run: |
+          node scripts/subscription-settlement-schedule.mjs preview "$RUNNER_TEMP/settlement-preview.sql"
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/settlement-preview.sql"
+          npx supabase secrets set "YOOKASSA_SANDBOX_SETTLEMENT_ORDER_ID=$SANDBOX_ORDER_ID" YOOKASSA_SANDBOX_SETTLEMENT_ORDER_ENABLED=true --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Apply atomic schedule operation
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/settlement-schedule.sql"
+      - name: Close runtime after unsuccessful mutation
+        if: (failure() || cancelled()) && inputs.operation != 'subscription-settlement-schedule-preview'
+        run: npx supabase secrets set YOOKASSA_SANDBOX_SETTLEMENT_ORDER_ENABLED=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Close schedule after unsuccessful mutation
+        if: (failure() || cancelled()) && inputs.operation != 'subscription-settlement-schedule-preview'
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/disable-stage-subscription-settlement.sql
+
+  subscription-settlement-fixture:
+    if: github.ref == 'refs/heads/staging' && (inputs.operation == 'subscription-settlement-fixture-preview' || inputs.operation == 'subscription-settlement-fixture-provision')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Validate stage target
+        run: test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require complete acceptance schema
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-settlement-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Disable preparation before provisioning
+        if: inputs.operation == 'subscription-settlement-fixture-provision'
+        run: npx supabase secrets set YOOKASSA_SANDBOX_SETTLEMENT_ORDER_ENABLED=false ADMIN_FISCAL_ACCEPTANCE_PREPARE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_ENABLED=false YOOKASSA_SANDBOX_FISCAL_ACCEPTANCE_DISPATCH=false --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Preview fixture with rollback
+        if: inputs.operation == 'subscription-settlement-fixture-preview'
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("scripts/stage-subscription-settlement-fixture.sql","utf8"); if(!/commit;\s*$/.test(s))throw Error("Missing transaction end"); fs.writeFileSync(process.env.RUNNER_TEMP+"/fiscal-fixture-preview.sql",s.replace(/commit;\s*$/,"rollback;\n"));'
+          npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file "$RUNNER_TEMP/fiscal-fixture-preview.sql"
+      - name: Provision fixture without preparing payment
+        if: inputs.operation == 'subscription-settlement-fixture-provision'
+        run: npx supabase db query --linked --project-ref "$SUPABASE_PROJECT_ID" --file scripts/stage-subscription-settlement-fixture.sql
+
+  subscription-settlement-recover-existing:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'subscription-settlement-recover-existing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    concurrency:
+      group: stage-subscription-settlement-schedule
+      cancel-in-progress: false
+    env:
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm test -- scripts/recover-stage-settlement.test.js
+      - run: npx supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Require corrected schema
+        run: |
+          npx supabase migration list --linked --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/receipt-migrations.json"
+          node scripts/check-subscription-settlement-release.mjs "$RUNNER_TEMP/receipt-migrations.json" --require-applied
+      - name: Recover existing receipt using provider GET only
+        env:
+          YOOKASSA_SANDBOX_SHOP_ID: ${{ secrets.YOOKASSA_SANDBOX_SHOP_ID }}
+          YOOKASSA_SANDBOX_SECRET_KEY: ${{ secrets.YOOKASSA_SANDBOX_SECRET_KEY }}
+          SANDBOX_ORDER_ID: ${{ inputs.sandbox_order_id }}
+        run: node scripts/recover-stage-settlement.mjs
+
+  reconcile-compatible-functions:
+    if: github.ref == 'refs/heads/staging' && inputs.operation == 'reconcile-compatible-functions-deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      SUPABASE_PROJECT_ID: jeugfyaqzfgdvfhdxfht
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - name: Require approved commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$EXPECTED_SHA" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$SUPABASE_PROJECT_ID" = jeugfyaqzfgdvfhdxfht
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm test -- supabase/functions/_shared --maxWorkers=1
+      - name: Disable sandbox and all reconcile dispatch paths
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          npx --no-install supabase secrets set \
+            YOOKASSA_SANDBOX_ENABLED=false \
+            YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_DISPATCH=false \
+            YOOKASSA_SANDBOX_SETTLEMENT_DISPATCH=false \
+            YOOKASSA_SANDBOX_SUBSCRIPTION_FISCAL_RECONCILIATION=false \
+            YOOKASSA_SANDBOX_SETTLEMENT_RECONCILIATION=false \
+            YOOKASSA_SANDBOX_RECEIPT_RECONCILIATION=false \
+            --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy only sandbox-reconcile
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npx --no-install supabase functions deploy sandbox-reconcile --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Record completion and remaining acceptance
+        run: |
+          echo "Released sandbox-reconcile from $GITHUB_SHA with sandbox disabled." >> "$GITHUB_STEP_SUMMARY"
+          echo 'No SQL, cron changes, provider requests or automatic re-enable performed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Secret update success does not prove old invocations drained. Verify deployed code, disabled runtime and quiescence before SQL guard/pin.' >> "$GITHUB_STEP_SUMMARY"

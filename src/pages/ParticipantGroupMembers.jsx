@@ -5,6 +5,7 @@ import { usePeopleCatalog } from '../hooks/usePeopleCatalog'
 import ParticipantGroupAddMember from '../components/ParticipantGroupAddMember'
 import ParticipantGroupInvite from '../components/ParticipantGroupInvite'
 import ParticipantGroupRole from '../components/ParticipantGroupRole'
+import ParticipantAvatar from '../components/ParticipantAvatar'
 
 export default function ParticipantGroupMembers({ session }) {
   const { groupId } = useParams()
@@ -36,7 +37,8 @@ function GroupMembers({ actorId, groupId }) {
     </div>}
     {!catalog.loading && !catalog.error && <p role="status" className="text-sm text-gray-500">{catalog.items.length ? `Загружено: ${catalog.items.length}` : search ? 'Участники не найдены.' : 'Нет доступных профилей в этой группе.'}</p>}
     <div className="space-y-3">{catalog.items.map(member => <article key={member.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4">
-      <div className="min-w-0 flex-1"><h2 className="font-semibold">{member.display_name}</h2><p className="mt-1 text-sm text-gray-500">{member.is_current_user ? 'Мой профиль · ' : ''}{member.member_role === 'leader' ? 'Руководитель группы' : 'Участник группы'}</p></div>
+      <ParticipantAvatar profileId={member.id} path={member.avatar_path} name={member.display_name}/>
+      <div className="min-w-0 flex-1"><h2 className="font-semibold">{member.display_name}</h2>{member.nickname&&<p className="text-sm">Никнейм: {member.nickname}</p>}<p className="mt-1 text-sm text-gray-500">{member.is_current_user ? 'Мой профиль · ' : ''}{member.member_role === 'leader' ? 'Руководитель группы' : 'Участник группы'}</p></div>
       <Link to={`/participants/group/profiles/${encodeURIComponent(member.id)}`} aria-label={`Открыть профиль: ${member.display_name}`} className="rounded-lg border px-3 py-3 text-blue-700">Открыть</Link>
       {catalog.group?.can_manage && <ParticipantGroupRole key={`${member.id}:${member.member_role}`} groupId={groupId} member={member} onRefresh={() => { setMessage(''); setRevision(n => n + 1) }} />}
       {catalog.group?.can_manage && <ParticipantGroupExit groupId={groupId} member={member} onRefresh={() => { setMessage('Состав обновляется.'); setRevision(n => n + 1) }} />}

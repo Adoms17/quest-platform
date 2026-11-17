@@ -1,4 +1,5 @@
 import AppBrand from '../components/AppBrand'
+import RecoveryRequest from '../components/RecoveryRequest'
 import { getLoginDestination } from '../services/appNavigation'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -10,7 +11,7 @@ import { withAuthTimeout } from '../services/authRequest'
 export default function Login({ setSession }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [mode, setMode] = useState('signin')
+  const [mode, setMode] = useState(() => new URLSearchParams(location.search).get('recovery') === 'request' ? 'recovery' : 'signin')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -19,6 +20,7 @@ export default function Login({ setSession }) {
 
   const switchMode = nextMode => {
     setMode(nextMode)
+    setPassword('')
     setPasswordConfirmation('')
   }
 
@@ -79,6 +81,7 @@ export default function Login({ setSession }) {
     <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
       <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow-md">
         <h1 className="flex justify-center text-2xl font-bold"><AppBrand /></h1>
+        {mode === 'recovery' ? <RecoveryRequest auth={supabase.auth} onBack={() => switchMode('signin')} /> : <>
         <div className="mt-6 grid grid-cols-2 rounded-lg bg-gray-100 p-1" role="tablist" aria-label="Режим авторизации">
           <button type="button" role="tab" aria-selected={mode === 'signin'} onClick={() => switchMode('signin')} className={`rounded-md px-3 py-2 ${mode === 'signin' ? 'bg-white font-medium shadow-sm' : 'text-gray-600'}`}>Вход</button>
           <button type="button" role="tab" aria-selected={mode === 'signup'} onClick={() => switchMode('signup')} className={`rounded-md px-3 py-2 ${mode === 'signup' ? 'bg-white font-medium shadow-sm' : 'text-gray-600'}`}>Регистрация</button>
@@ -90,6 +93,8 @@ export default function Login({ setSession }) {
           {mode === 'signup' && <label className="block"><span className="text-sm font-medium">Повторите пароль</span><input required type="password" autoComplete="new-password" value={passwordConfirmation} onChange={event => setPasswordConfirmation(event.target.value)} className="mt-1 w-full rounded-lg border p-3" /></label>}
           <button disabled={loading} className="w-full rounded-lg bg-blue-600 p-3 text-white hover:bg-blue-700 disabled:opacity-50">{loading ? 'Подождите…' : mode === 'signup' ? 'Зарегистрироваться' : 'Войти'}</button>
         </form>
+        {mode === 'signin' && <button type="button" className="mt-4 text-blue-600" onClick={() => switchMode('recovery')}>Забыли пароль?</button>}
+        </>}
       </div>
     </div>
   )

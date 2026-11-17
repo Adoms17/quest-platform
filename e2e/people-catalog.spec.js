@@ -102,7 +102,7 @@ test('UX05: server lists, retry and management on demand', async ({ page }, test
   await expect(page.getByRole('heading', { name: 'Новое имя', exact: true })).toBeVisible()
   await page.locator('html').evaluate(element => { element.style.fontSize = '' })
   await expect(page.getByText('Имя профиля сохранено', { exact: true })).toBeHidden({ timeout: 10000 })
-  await expect(page.getByRole('link', { name: 'Контролирующие взрослые', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Кураторы', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Обновить профиль', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Новое имя', exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'К списку людей', exact: true }).scrollIntoViewIfNeeded()

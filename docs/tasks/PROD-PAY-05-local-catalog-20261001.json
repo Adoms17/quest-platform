@@ -1,0 +1,327 @@
+{
+  "columns": {
+    "md5": "9e3d4f92db73d6a1d0a3a5f33f0e2ec7",
+    "count": 237
+  },
+  "indexes": {
+    "md5": "6b28be439b8c55cc2d2dc91c80c22a96",
+    "count": 74
+  },
+  "policies": {
+    "md5": "35efb0b3ef55ec98efb6c66472a12d01",
+    "count": 32
+  },
+  "triggers": {
+    "md5": "04ea44712abbef61269d97beed9dda0c",
+    "count": 18
+  },
+  "functions": {
+    "md5": "b86c04f530074dfd843faac8350bf019",
+    "count": 108
+  },
+  "relations": {
+    "md5": "075a58f38bebb0cd2f699ae45af4cbaa",
+    "count": 31
+  },
+  "acl_summary": [
+    {
+      "role": "PUBLIC",
+      "count": 7,
+      "grantor": "postgres",
+      "category": "function_acl",
+      "privilege": "EXECUTE"
+    },
+    {
+      "role": "anon",
+      "count": 46,
+      "grantor": "postgres",
+      "category": "function_acl",
+      "privilege": "EXECUTE"
+    },
+    {
+      "role": "authenticated",
+      "count": 90,
+      "grantor": "postgres",
+      "category": "function_acl",
+      "privilege": "EXECUTE"
+    },
+    {
+      "role": "postgres",
+      "count": 108,
+      "grantor": "postgres",
+      "category": "function_acl",
+      "privilege": "EXECUTE"
+    },
+    {
+      "role": "service_role",
+      "count": 106,
+      "grantor": "postgres",
+      "category": "function_acl",
+      "privilege": "EXECUTE"
+    },
+    {
+      "role": "anon",
+      "count": 15,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "anon",
+      "count": 13,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "anon",
+      "count": 15,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "MAINTAIN"
+    },
+    {
+      "role": "anon",
+      "count": 15,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "anon",
+      "count": 19,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "anon",
+      "count": 15,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "anon",
+      "count": 15,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "anon",
+      "count": 17,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "anon",
+      "count": 4,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "USAGE"
+    },
+    {
+      "role": "authenticated",
+      "count": 16,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "authenticated",
+      "count": 14,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "authenticated",
+      "count": 16,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "MAINTAIN"
+    },
+    {
+      "role": "authenticated",
+      "count": 16,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "authenticated",
+      "count": 25,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "authenticated",
+      "count": 16,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "authenticated",
+      "count": 16,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "authenticated",
+      "count": 18,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "authenticated",
+      "count": 4,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "USAGE"
+    },
+    {
+      "role": "postgres",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "postgres",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "postgres",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "MAINTAIN"
+    },
+    {
+      "role": "postgres",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "postgres",
+      "count": 31,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "postgres",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "postgres",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "postgres",
+      "count": 31,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "postgres",
+      "count": 4,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "USAGE"
+    },
+    {
+      "role": "service_role",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "DELETE"
+    },
+    {
+      "role": "service_role",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "INSERT"
+    },
+    {
+      "role": "service_role",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "MAINTAIN"
+    },
+    {
+      "role": "service_role",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "REFERENCES"
+    },
+    {
+      "role": "service_role",
+      "count": 31,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "SELECT"
+    },
+    {
+      "role": "service_role",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "TRIGGER"
+    },
+    {
+      "role": "service_role",
+      "count": 27,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "TRUNCATE"
+    },
+    {
+      "role": "service_role",
+      "count": 31,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "UPDATE"
+    },
+    {
+      "role": "service_role",
+      "count": 4,
+      "grantor": "postgres",
+      "category": "relation_acl",
+      "privilege": "USAGE"
+    }
+  ],
+  "constraints": {
+    "md5": "86f6598299df4e37cbba3e2aabb9b466",
+    "count": 161
+  },
+  "function_acl": {
+    "md5": "0f288c64f80cbee98a4a8de2ed3d314a",
+    "count": 357
+  },
+  "relation_acl": {
+    "md5": "6c452a5a74337250089ed66958c2366f",
+    "count": 725
+  }
+}

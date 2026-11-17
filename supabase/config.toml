@@ -385,6 +385,9 @@ deno_version = 2
 [functions.redeem-quest-code]
 verify_jwt = true
 
+[functions.participant-avatar]
+verify_jwt = true
+
 [edge_runtime.secrets]
 QUEST_ACCESS_FINGERPRINT_SECRET = "env(QUEST_ACCESS_FINGERPRINT_SECRET)"
 
@@ -415,3 +418,24 @@ enabled = false
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+[functions.yookassa-sandbox-webhook]
+verify_jwt = false
+
+[functions.sandbox-reconcile]
+verify_jwt = false
+
+[functions.sandbox-recurring]
+verify_jwt = false
+
+[functions.sandbox-reconcile-order]
+verify_jwt = false
+
+[functions.sandbox-subscription-fiscal-order]
+verify_jwt = false
+
+[functions.admin-fiscal-acceptance-prepare]
+verify_jwt = true
+
+[functions.sandbox-subscription-settlement-order]
+verify_jwt = false

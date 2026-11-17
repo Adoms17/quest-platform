@@ -1,0 +1,169 @@
+{
+  "observedAtUtc": "2026-10-07T10:23:07.1301292+00:00",
+  "tool": "temporary npm exec wrangler@4.148.0; existing OAuth; no login/token extraction",
+  "accountId": "066c29c6d781068dc847c35a9d858a2a",
+  "operations": [
+    "whoami --json",
+    "deployments list --name <each staging worker> --json",
+    "versions view <current/previous version> --name <staging worker> --json"
+  ],
+  "workers": [
+    {
+      "worker": "quest-platform-staging",
+      "observedAtUtc": "2026-10-07T13:20:42.696735+03:00",
+      "current": {
+        "deploymentId": "97f8c2ee-f48e-43b4-9336-5cbc214532de",
+        "versionId": "7ac24890-1936-4b57-bd5e-edbb1c8058ba",
+        "createdOn": "2026-10-05T22:44:36.647451Z",
+        "source": "wrangler",
+        "annotationKeys": [
+          "workers/triggered_by"
+        ],
+        "bindings": [],
+        "runtime": {
+          "assets": {
+            "not_found_handling": "single-page-application",
+            "serve_directly": true,
+            "raw_run_worker_first": false,
+            "base_path": "/"
+          },
+          "compatibility_date": "2026-09-04",
+          "usage_model": "standard"
+        },
+        "scriptHandlers": null,
+        "resourceKeys": [
+          "script",
+          "script_runtime",
+          "bindings"
+        ]
+      },
+      "previous": {
+        "deploymentId": "ea737e50-5881-42ec-8f8a-2729f3cd0c8f",
+        "versionId": "050594a3-b56f-4e66-8ece-4df40577a8ef",
+        "createdOn": "2026-10-04T20:46:59.546512Z",
+        "source": "wrangler",
+        "annotationKeys": [
+          "workers/triggered_by"
+        ],
+        "bindings": [],
+        "runtime": {
+          "assets": {
+            "not_found_handling": "single-page-application",
+            "serve_directly": true,
+            "raw_run_worker_first": false,
+            "base_path": "/"
+          },
+          "compatibility_date": "2026-09-04",
+          "usage_model": "standard"
+        },
+        "scriptHandlers": null,
+        "resourceKeys": [
+          "script",
+          "script_runtime",
+          "bindings"
+        ]
+      }
+    },
+    {
+      "worker": "qvesta-admin-stage",
+      "observedAtUtc": "2026-10-07T13:20:52.3266577+03:00",
+      "current": {
+        "deploymentId": "268a6f6f-73d0-469d-9737-3e3ade289b03",
+        "versionId": "ae0b83e3-88f8-4e78-a4e2-206e4e7bccd2",
+        "createdOn": "2026-10-05T22:44:00.789278Z",
+        "source": "wrangler",
+        "annotationKeys": [
+          "workers/triggered_by"
+        ],
+        "bindings": [],
+        "runtime": {
+          "assets": {
+            "not_found_handling": "single-page-application",
+            "headers": {
+              "version": 2,
+              "rules": {
+                "/*": {
+                  "set": {
+                    "cache-control": "no-store",
+                    "content-security-policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src https://jeugfyaqzfgdvfhdxfht.supabase.co; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; worker-src 'none'",
+                    "permissions-policy": "camera=(), microphone=(), geolocation=()",
+                    "referrer-policy": "no-referrer",
+                    "x-content-type-options": "nosniff",
+                    "x-frame-options": "DENY",
+                    "x-robots-tag": "noindex, nofollow, noarchive"
+                  },
+                  "unset": []
+                }
+              }
+            },
+            "raw_headers": "/*\n  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src https://jeugfyaqzfgdvfhdxfht.supabase.co; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; worker-src 'none'\n  X-Frame-Options: DENY\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  X-Robots-Tag: noindex, nofollow, noarchive\n  Cache-Control: no-store\n",
+            "serve_directly": true,
+            "raw_run_worker_first": false,
+            "base_path": "/"
+          },
+          "compatibility_date": "2026-09-18",
+          "usage_model": "standard"
+        },
+        "scriptHandlers": null,
+        "resourceKeys": [
+          "script",
+          "script_runtime",
+          "bindings"
+        ]
+      },
+      "previous": {
+        "deploymentId": "64a2ef82-d11a-4445-bd94-b4ea895421e3",
+        "versionId": "0c445130-2ce0-4057-b645-43d238b069c6",
+        "createdOn": "2026-10-03T11:17:52.68741Z",
+        "source": "wrangler",
+        "annotationKeys": [
+          "workers/triggered_by"
+        ],
+        "bindings": [],
+        "runtime": {
+          "assets": {
+            "not_found_handling": "single-page-application",
+            "headers": {
+              "version": 2,
+              "rules": {
+                "/*": {
+                  "set": {
+                    "cache-control": "no-store",
+                    "content-security-policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src https://jeugfyaqzfgdvfhdxfht.supabase.co; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; worker-src 'none'",
+                    "permissions-policy": "camera=(), microphone=(), geolocation=()",
+                    "referrer-policy": "no-referrer",
+                    "x-content-type-options": "nosniff",
+                    "x-frame-options": "DENY",
+                    "x-robots-tag": "noindex, nofollow, noarchive"
+                  },
+                  "unset": []
+                }
+              }
+            },
+            "raw_headers": "/*\n  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src https://jeugfyaqzfgdvfhdxfht.supabase.co; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; worker-src 'none'\n  X-Frame-Options: DENY\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  X-Robots-Tag: noindex, nofollow, noarchive\n  Cache-Control: no-store\n",
+            "serve_directly": true,
+            "raw_run_worker_first": false,
+            "base_path": "/"
+          },
+          "compatibility_date": "2026-09-18",
+          "usage_model": "standard"
+        },
+        "scriptHandlers": null,
+        "resourceKeys": [
+          "script",
+          "script_runtime",
+          "bindings"
+        ]
+      }
+    }
+  ],
+  "unverified": [
+    "connected repository and branch",
+    "autodeploy/preview triggers",
+    "custom-domain-to-Worker API mapping",
+    "future build environment binding"
+  ],
+  "limitations": "Wrangler CLI lacks generic Builds/custom-domain GET command; init --from-dash is unsupported for Workers with Assets. No unsupported credential bridge or token export attempted.",
+  "remoteMutations": "NONE",
+  "rollbackExecuted": false
+}

@@ -1,0 +1,176 @@
+{
+  "compared_at": "2026-10-01T12:50:38.648Z",
+  "normalization": "CRLF to LF",
+  "results": [
+    {
+      "slug": "admin-fiscal-acceptance-prepare",
+      "matched": 3,
+      "differences": []
+    },
+    {
+      "slug": "admin-sandbox-refund",
+      "matched": 9,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/settlementHttp.js",
+          "deployed_sha256": "4cc66f23396dc39762d21da3d1b12c1a64405865e3b0cbecace02bb7c9831f55",
+          "local_sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "file": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "deployed_sha256": "a49f1f19497ec644662445892e8cc76f79fa08e66bb2fc8babaee6093bd3ba20",
+          "local_sha256": "f3495ec2e9174f179c92aa4b923ca0c1e22bd9f6c2086c420ce870bbb94277f5"
+        }
+      ]
+    },
+    {
+      "slug": "admin-subscription-fiscal-refund",
+      "matched": 10,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/settlementHttp.js",
+          "deployed_sha256": "4cc66f23396dc39762d21da3d1b12c1a64405865e3b0cbecace02bb7c9831f55",
+          "local_sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        }
+      ]
+    },
+    {
+      "slug": "admin-subscription-refund",
+      "matched": 8,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/settlementHttp.js",
+          "deployed_sha256": "4cc66f23396dc39762d21da3d1b12c1a64405865e3b0cbecace02bb7c9831f55",
+          "local_sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "file": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "deployed_sha256": "a49f1f19497ec644662445892e8cc76f79fa08e66bb2fc8babaee6093bd3ba20",
+          "local_sha256": "f3495ec2e9174f179c92aa4b923ca0c1e22bd9f6c2086c420ce870bbb94277f5"
+        }
+      ]
+    },
+    {
+      "slug": "admin-subscription-refund-prepare",
+      "matched": 6,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/subscriptionRefundEndpoint.js",
+          "deployed_sha256": "3bd6600d71247d6abef45e34bb8b2db4d884d464f54f1489578f639fffafec48",
+          "local_sha256": "a511818a0e54da700dda0f5008433d7fb7332ee482be65649f5076f878470524"
+        },
+        {
+          "file": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "deployed_sha256": "828e0940cd4753ade5f20836d424c3ad50a11959217b82fa91f1da6473cacbbc",
+          "local_sha256": "f3495ec2e9174f179c92aa4b923ca0c1e22bd9f6c2086c420ce870bbb94277f5"
+        }
+      ]
+    },
+    {
+      "slug": "sandbox-checkout",
+      "matched": 8,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/settlementHttp.js",
+          "deployed_sha256": "4cc66f23396dc39762d21da3d1b12c1a64405865e3b0cbecace02bb7c9831f55",
+          "local_sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "file": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "deployed_sha256": "a49f1f19497ec644662445892e8cc76f79fa08e66bb2fc8babaee6093bd3ba20",
+          "local_sha256": "f3495ec2e9174f179c92aa4b923ca0c1e22bd9f6c2086c420ce870bbb94277f5"
+        }
+      ]
+    },
+    {
+      "slug": "sandbox-reconcile",
+      "matched": 17,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/prepaymentSettlementFlow.js",
+          "deployed_sha256": "04a0c12c9c4698388b9c83076fed781cc0ff73ab7c3c2f6e84704d061769e799",
+          "local_sha256": "e5a6a4f9d44f0082536e0366d79793a9d5c9bd61528b1926d9a0c2efe9ff6a5b"
+        },
+        {
+          "file": "supabase/functions/_shared/settlementHttp.js",
+          "deployed_sha256": "4cc66f23396dc39762d21da3d1b12c1a64405865e3b0cbecace02bb7c9831f55",
+          "local_sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "file": "supabase/functions/_shared/settlementReconciliation.js",
+          "deployed_sha256": "55335992353b50de55fb06826b4588cfc3f61949e2bfab0485424296892d9f70",
+          "local_sha256": "7db241e17c964d879bea48ae86b61f31e7124ff7a4c8ab53165107ee3fb4f7ce"
+        }
+      ]
+    },
+    {
+      "slug": "sandbox-reconcile-order",
+      "matched": 4,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/sandboxOrderWorkerHandler.js",
+          "deployed_sha256": "30c2a83d221da4f8fe2d20e753e5ebd699fefcc9010b4087734f216b10ce6f71",
+          "local_sha256": "37b5089c13a866c0587bb0cd2e6343b3cc172da127e176effa6597b5cbe3deb3"
+        },
+        {
+          "file": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "deployed_sha256": "828e0940cd4753ade5f20836d424c3ad50a11959217b82fa91f1da6473cacbbc",
+          "local_sha256": "f3495ec2e9174f179c92aa4b923ca0c1e22bd9f6c2086c420ce870bbb94277f5"
+        }
+      ]
+    },
+    {
+      "slug": "sandbox-recurring",
+      "matched": 9,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/settlementHttp.js",
+          "deployed_sha256": "4cc66f23396dc39762d21da3d1b12c1a64405865e3b0cbecace02bb7c9831f55",
+          "local_sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        },
+        {
+          "file": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "deployed_sha256": "a49f1f19497ec644662445892e8cc76f79fa08e66bb2fc8babaee6093bd3ba20",
+          "local_sha256": "f3495ec2e9174f179c92aa4b923ca0c1e22bd9f6c2086c420ce870bbb94277f5"
+        }
+      ]
+    },
+    {
+      "slug": "sandbox-subscription-fiscal-order",
+      "matched": 9,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/settlementHttp.js",
+          "deployed_sha256": "4cc66f23396dc39762d21da3d1b12c1a64405865e3b0cbecace02bb7c9831f55",
+          "local_sha256": "7bf508159f39e5ab46129e91af1889fccf3d9c918ed50713e299f0ba37501c7c"
+        }
+      ]
+    },
+    {
+      "slug": "sandbox-subscription-settlement-order",
+      "matched": 11,
+      "differences": []
+    },
+    {
+      "slug": "yookassa-sandbox-webhook",
+      "matched": 2,
+      "differences": [
+        {
+          "file": "supabase/functions/_shared/sandboxReconciliation.js",
+          "deployed_sha256": "87933b860e39850351e1fe89eb803b2bb1c5a655c650e43eb3cbd9cbee978fb0",
+          "local_sha256": "e38ca38b92c934866f13151d53f4eccf076dced2e5dbfa75655276622f63a087"
+        },
+        {
+          "file": "supabase/functions/_shared/sandboxRefundReconciliation.js",
+          "deployed_sha256": "07c9f12e76e84b5527591f46a245a275c22cbb15ed39291555e0449984a1cfbe",
+          "local_sha256": "2604db05b491e100d4c39c9300e198cae5ca00dff83c05bccaea1b35d7c9a083"
+        },
+        {
+          "file": "supabase/functions/_shared/yookassaSandboxHttp.js",
+          "deployed_sha256": "828e0940cd4753ade5f20836d424c3ad50a11959217b82fa91f1da6473cacbbc",
+          "local_sha256": "f3495ec2e9174f179c92aa4b923ca0c1e22bd9f6c2086c420ce870bbb94277f5"
+        }
+      ]
+    }
+  ]
+}

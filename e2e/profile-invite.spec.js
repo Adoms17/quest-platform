@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('UX05: приглашение взрослого из карточки без общей загрузки', async ({ page }, testInfo) => {
+test('UX05: приглашение куратора из карточки без общей загрузки', async ({ page }, testInfo) => {
   test.setTimeout(60000)
   const user = { id: '00000000-0000-4000-8000-000000000010', email: 'demo@example.test', aud: 'authenticated', role: 'authenticated' }
   const requests = [], creates = []
@@ -23,11 +23,11 @@ test('UX05: приглашение взрослого из карточки бе
     await route.fulfill({ json: data })
   })
   await page.goto('/participants/group/profiles/p1')
-  await page.getByRole('button', { name: 'Пригласить взрослого', exact: true }).click()
-  const form = page.getByRole('region', { name: 'Приглашение взрослого' })
+  await page.getByRole('button', { name: 'Пригласить куратора', exact: true }).click()
+  const form = page.getByRole('region', { name: 'Приглашение куратора' })
   await form.getByRole('button', { name: 'Отмена', exact: true }).click()
   expect(creates).toHaveLength(0)
-  await page.getByRole('button', { name: 'Пригласить взрослого', exact: true }).click()
+  await page.getByRole('button', { name: 'Пригласить куратора', exact: true }).click()
   await form.getByLabel('Email получателя').fill('recipient@example.test')
   await page.setViewportSize({ width: 360, height: 640 })
   await page.locator('html').evaluate(el => { el.style.fontSize = '200%' })

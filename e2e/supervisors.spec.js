@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-test('UX05: каталог взрослых', async ({ page }, testInfo) => {
+test('UX05: каталог кураторов', async ({ page }, testInfo) => {
   test.setTimeout(90000)
   const user = { id: '00000000-0000-4000-8000-000000000010', email: 'demo@example.test', aud: 'authenticated', role: 'authenticated' }
   const requests = []
@@ -24,7 +24,7 @@ test('UX05: каталог взрослых', async ({ page }, testInfo) => {
     await route.fulfill({ json: data })
   })
   await page.goto('/participants/group/profiles/p1')
-  await page.getByRole('link', { name: 'Контролирующие взрослые', exact: true }).click()
+  await page.getByRole('link', { name: 'Кураторы', exact: true }).click()
   await expect(page.locator('article')).toHaveCount(25)
   await expect(page.getByText('Доступ отозван', { exact: true })).toBeVisible()
   await expect(page.locator('article').nth(1)).toContainText('Контроль активен')
@@ -36,7 +36,7 @@ test('UX05: каталог взрослых', async ({ page }, testInfo) => {
   await page.locator('html').evaluate(el => { el.style.fontSize = '200%' })
   expect(await page.evaluate(() => document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1)
   await page.locator('html').evaluate(el => { el.style.fontSize = '' })
-  await page.getByRole('heading', { name: 'Контролирующие взрослые', exact: true }).scrollIntoViewIfNeeded()
+  await page.getByRole('heading', { name: 'Кураторы', exact: true }).scrollIntoViewIfNeeded()
   await page.screenshot({ path: testInfo.outputPath('supervisors.png'), scale: 'css' })
   denied = true
   await page.getByRole('button', { name: 'Обновить связи' }).click()

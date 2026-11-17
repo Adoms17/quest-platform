@@ -51,6 +51,11 @@ function HistoryResults({ participantProfileId }) {
       )}
 
       {!loading && history.map(attempt => {
+        if (attempt.outcome === 'invalid_limit') return <article key={attempt.quest_attempt_id} className="rounded-xl border bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold">{attempt.quest_title}</h2>
+          <p className="mt-2 font-medium text-amber-800">Недействительное прохождение — лимит исчерпан</p>
+          <p className="mt-1 text-sm text-gray-600">Получено: {formatDate(attempt.started_at)}. Офлайн-результаты сохранены в истории, но не включены в статистику.</p>
+        </article>
         const total = attempt.total_tasks || 0
         const processed = (attempt.completed_tasks || 0) + (attempt.failed_tasks || 0)
         const percent = total > 0

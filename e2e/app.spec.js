@@ -97,6 +97,7 @@ test('keeps offline quest packages isolated by participant after reload', async 
   await page.evaluate(async () => {
     const db = await import('/src/services/db.js')
     await db.clearAllLocalData()
+    await db.saveParticipantProfiles('actor-a', [{ participant_profile_id: 'profile-a', relationship: 'self' }])
     await db.saveQuestToDB({
       id: 'offline-quest',
       title: 'Offline quest',
@@ -109,14 +110,16 @@ test('keeps offline quest packages isolated by participant after reload', async 
   const result = await page.evaluate(async () => {
     const db = await import('/src/services/db.js')
     return {
-      own: await db.getQuestFromDB('offline-quest', 'profile-a'),
-      other: await db.getQuestFromDB('offline-quest', 'profile-b'),
+      own: await db.getQuestFromDB('offline-quest', 'profile-a', 'actor-a'),
+      other: await db.getQuestFromDB('offline-quest', 'profile-b', 'actor-a'),
+      foreignActor: await db.getQuestFromDB('offline-quest', 'profile-a', 'actor-b'),
       packages: await db.getDownloadedQuestPackages(),
     }
   })
 
   expect(result.own?.title).toBe('Offline quest')
   expect(result.other).toBeNull()
+  expect(result.foreignActor).toBeNull()
   expect(result.packages).toHaveLength(1)
   expect(result.packages[0]).toMatchObject({
     participantProfileId: 'profile-a',
@@ -271,18 +274,21 @@ test('upgrades IndexedDB without losing offline or pending data', async ({ page 
     return upgradedState
   })
 
-  expect(result.version).toBe(11)
+  expect(result.version).toBe(15)
   expect(result.hasPackageVersionIndex).toBe(true)
   expect(result.hasParticipantProfilesStore).toBe(true)
   expect(result.hasOfflineAssetsStore).toBe(true)
   expect(result.quest?.title).toBe('Saved quest')
   expect(result.attempt).toMatchObject({
     localId: 'attempt-before-upgrade',
+    offlinePermitId: null,
     participantProfileId: 'child-1',
     synced: false,
   })
   expect(result.pending).toMatchObject({
     clientEventId: 'event-before-upgrade',
+    reviewState: null,
+    reviewReceiptId: null,
     participantProfileId: 'child-1',
     synced: false,
   })

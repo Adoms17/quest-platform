@@ -1,0 +1,36 @@
+name: Market CI
+
+on:
+  pull_request:
+    branches: [main, staging]
+    paths: ['market/**', 'src/services/shopMoney.js', 'package.json', 'package-lock.json', '.github/workflows/market-ci.yml']
+  push:
+    branches: [main, staging]
+    paths: ['market/**', 'src/services/shopMoney.js', 'package.json', 'package-lock.json', '.github/workflows/market-ci.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  market:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+        working-directory: market
+      - run: npm test
+        working-directory: market
+      - name: Build isolated catalog with sales disabled
+        run: npm run build
+        working-directory: market
+        env:
+          VITE_APP_ORIGIN: http://127.0.0.1:4173
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_ANON_KEY: test-anon-key
+          VITE_MARKET_SALES_ENABLED: 'false'

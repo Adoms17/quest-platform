@@ -23,7 +23,7 @@ function Storage({ session }) {
   const refresh = useCallback(() => setRevision(value => value + 1), [])
   useEffect(() => {
     let active = true
-    Promise.all([getDownloadedQuestPackages(), getParticipantProfiles(userId), getPendingResults(userId), getLocalParticipantAttempts(userId)]).then(([packages, profiles, pending, attempts]) => {
+    Promise.all([getDownloadedQuestPackages(Date.now(), userId), getParticipantProfiles(userId), getPendingResults(userId), getLocalParticipantAttempts(userId)]).then(([packages, profiles, pending, attempts]) => {
       const ids = new Set([...profiles.map(p => p.participant_profile_id), ...attempts.map(a => a.participantProfileId || a.userId)])
       if (active) setState({ packages: packages.filter(p => ids.has(p.participantProfileId)), profiles, pending: pending.filter(p => !p.synced), loading: false, error: false })
     }).catch(() => { if (active) setState(old => ({ ...old, loading: false, error: true })) })
@@ -59,7 +59,8 @@ function Storage({ session }) {
     <p className="mb-5 text-slate-600">Материалы этого аккаунта на устройстве: {bytes(items.reduce((sum, item) => sum + (item.packageSizeBytes || 0), 0))}. Общий пакет нескольких профилей посчитан один раз.</p>
     {state.error && <p role="alert">Не удалось прочитать хранилище. <button onClick={refresh} className="text-blue-700">Повторить</button></p>}
     {state.pending.length > 0 && <section className="participant-pending" aria-label="Ожидающие события">
-      <h2>Ожидают отправки: {state.pending.length}</h2>
+      <h2>Ожидают отправки: {state.pending.filter(item => item.reviewState !== 'needs_review').length}</h2>
+      {state.pending.some(item => item.reviewState === 'needs_review') && <p>Требуют проверки организатора: {state.pending.filter(item => item.reviewState === 'needs_review').length}. Сохранены на сервере и этом устройстве; в результат не засчитаны.</p>}
       <p className="mt-1 text-sm font-normal">Открытия заданий, ответы и завершения. События сохраняются до подтверждения сервера, даже если материалы или доступ больше недоступны.</p>
       <button className="participant-download mt-3" onClick={sync} disabled={syncing || !navigator.onLine}>{syncing ? 'Отправляем…' : 'Отправить сейчас'}</button>
       {!navigator.onLine && <p className="mt-2 text-sm font-normal">Отправка возобновится после подключения к интернету.</p>}

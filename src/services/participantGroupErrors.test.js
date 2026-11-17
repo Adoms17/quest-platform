@@ -3,7 +3,7 @@ import { getParticipantGroupErrorMessage } from './participantGroupErrors'
 
 describe('getParticipantGroupErrorMessage', () => {
   it.each([
-    ['last participant supervisor cannot be revoked', 'Нельзя отозвать доступ последнего контролирующего взрослого'],
+    ['last participant supervisor cannot be revoked', 'Нельзя отозвать доступ последнего куратора'],
     ['participant profile is not orphaned', 'Восстановление не требуется'],
     ['participant supervision denied', 'У вас нет доступа к управлению этим профилем'],
     ['participant group leader requires account', 'Руководителем группы может быть только профиль с собственным аккаунтом'],

@@ -1,0 +1,21 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('scope-sales')::uuid,'scope-sales@example.test');
+insert into public.platform_access_assignments(user_id,role_key,scope_kind) values(md5('scope-sales')::uuid,'sales','platform');
+insert into public.billing_plan_versions(id,plan_key,version,display_name,active_quests_limit,team_members_limit) values(md5('scope-source-a')::uuid,'scope_a',1,'A',1,1),(md5('scope-source-b')::uuid,'scope_b',1,'B',1,1);
+insert into public.platform_tariff_drafts(id,source_version_id,display_name,active_quests_limit,team_members_limit,trial_duration_days)
+select md5('scope-draft-'||n)::uuid,md5('scope-source-a')::uuid,'A',1,1,14 from generate_series(1,27)n;
+insert into public.platform_tariff_drafts(id,source_version_id,display_name,active_quests_limit,team_members_limit,trial_duration_days) values(md5('scope-other')::uuid,md5('scope-source-b')::uuid,'B',1,1,14);
+select set_config('request.jwt.claim.sub',md5('scope-sales')::uuid::text,true);
+select set_config('request.jwt.claims','{"aal":"aal2"}',true);
+set local role authenticated;
+select set_config('test.scope',public.read_platform_tariff_drafts(md5('scope-source-a')::uuid)::text,true);
+select is(jsonb_array_length(current_setting('test.scope')::jsonb->'items'),25,'source filtering before pagination');
+select ok(not exists(select 1 from jsonb_array_elements(current_setting('test.scope')::jsonb->'items') x where x->>'source_version_id'<>md5('scope-source-a')::uuid::text),'other source excluded');
+select is(jsonb_array_length(public.read_platform_tariff_drafts(md5('scope-source-a')::uuid,(current_setting('test.scope')::jsonb->>'next_cursor')::uuid)->'items'),2,'remaining source drafts on next page');
+select is(jsonb_array_length(public.read_platform_tariff_drafts(md5('scope-source-b')::uuid)->'items'),1,'independent source list');
+select set_config('request.jwt.claims','{"aal":"aal1"}',true);
+select throws_ok($t$select public.read_platform_tariff_drafts(md5('scope-source-a')::uuid)$t$,'42501','platform access denied','MFA still required');
+reset role;
+select * from finish();
+rollback;

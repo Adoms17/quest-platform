@@ -1,0 +1,25 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values(md5('discount-owner')::uuid,'discount-owner@example.test');
+select set_config('request.jwt.claim.sub',md5('discount-owner')::uuid::text,true);
+select set_config('test.org',(select id::text from public.organizations where personal_owner_id=auth.uid()),true);
+insert into public.billing_discount_codes(id,organization_id,plan_key,code_hash,discount_bps,eligible_periods,period_months,activate_before,issuer_id,issue_command_id)
+values(md5('discount-code')::uuid,current_setting('test.org')::uuid,'pro',repeat('a',64),10000,2,1,now()+interval '1 day',auth.uid(),md5('discount-command')::uuid);
+select ok((select relrowsecurity from pg_class where oid='public.billing_discount_codes'::regclass),'RLS включён');
+select ok(not has_table_privilege('authenticated','public.billing_discount_codes','select'),'пользователь не читает коды');
+select ok(not has_table_privilege('authenticated','public.billing_discount_codes','insert'),'пользователь не назначает себе скидку');
+select ok(not has_table_privilege('service_role','public.billing_discount_codes','insert'),'прямой серверный insert закрыт до команд выпуска');
+select ok(not has_function_privilege('authenticated','platform_private.calculate_discount_amount(bigint,integer)','execute'),'калькулятор не является публичным API');
+select is(platform_private.calculate_discount_amount(10000,2500)->>'amount_minor','7500','скидка 25 процентов');
+select is(platform_private.calculate_discount_amount(10000,10000)->>'amount_minor','0','100 процентов без доплаты');
+select is(platform_private.calculate_discount_amount(10000,10000)->>'requires_payment','false','нулевая сумма не требует денежного платежа');
+select is(platform_private.calculate_discount_amount(199,5000)->>'discount_amount_minor','100','округление скидки до копейки');
+select is(platform_private.calculate_discount_amount(9007199254740991,10000)->>'amount_minor','0','максимальная сумма без переполнения');
+select throws_ok($t$select platform_private.calculate_discount_amount(-1,10000)$t$,'22023','invalid discount calculation','отрицательная сумма запрещена');
+select throws_ok($t$select platform_private.calculate_discount_amount(100,10001)$t$,'22023','invalid discount calculation','скидка больше 100 процентов запрещена');
+select throws_ok($t$update public.billing_discount_codes set discount_bps=5000 where id=md5('discount-code')::uuid$t$,'55000','billing plan versions are immutable','выданные условия неизменяемы');
+select throws_ok($t$insert into public.billing_discount_codes(organization_id,plan_key,code_hash,discount_bps,eligible_periods,period_months,activate_before,issuer_id,issue_command_id) values(current_setting('test.org')::uuid,'missing_discount_plan',repeat('b',64),10000,2,1,now()+interval '1 day',auth.uid(),gen_random_uuid())$t$,'23514','unknown discount plan','неизвестный тариф не принимается');
+select is((select count(*) from public.billing_trial_usage where organization_id=current_setting('test.org')::uuid),0::bigint,'основа скидок не расходует trial');
+select is((select count(*) from public.billing_trial_access where organization_id=current_setting('test.org')::uuid),0::bigint,'запись кода не выдаёт доступ');
+select * from finish();
+rollback;

@@ -9,6 +9,7 @@ import { isAbortError } from '../services/requestCancellation'
 import ParticipantQuestProfilePicker from './ParticipantQuestProfilePicker'
 import ParticipantResume from './ParticipantResume'
 import AppIcon from './AppIcon'
+import PrepareOfflineStart from './PrepareOfflineStart'
 
 let rememberedProfile = null
 export default function ParticipantDashboard({ userId, home, requestedProfile = '' }) {
@@ -63,7 +64,7 @@ export default function ParticipantDashboard({ userId, home, requestedProfile = 
       <ParticipantQuestProfilePicker profiles={profiles} value={profileId} onChange={chooseProfile} />
       {data.offline && <p role="status" className="mb-4 text-sm text-amber-800">Нет соединения с сервером. Показаны сохранённые материалы; доступ проверяется по локальному сроку.</p>}
       {home && <ParticipantResume key={`${profileId}:${data.offline}`} rows={started} offline={data.offline} profileName={profileName} />}
-      {data.pending.length > 0 && <Link to="/downloads" className="participant-pending"><span className="flex items-center gap-3"><AppIcon name="clock" />Ожидают отправки: {data.pending.length}</span><small>События всех участников этого аккаунта. Сохранены на устройстве.</small></Link>}
+      {data.pending.length > 0 && <Link to="/downloads" className="participant-pending"><span className="flex items-center gap-3"><AppIcon name="clock" />Ожидают отправки: {data.pending.filter(item => item.reviewState !== 'needs_review').length}</span><small>События всех участников этого аккаунта. Сохранены на устройстве. {data.pending.some(item => item.reviewState === 'needs_review') && 'Часть результатов сохранена на сервере и требует проверки организатора.'}</small></Link>}
     </>}
     <Link className="participant-code" to="/access/code"><AppIcon name="key" />Ввести код квеста</Link>
     <div className="mb-4 mt-6 flex flex-wrap items-center justify-between gap-3">
@@ -83,7 +84,8 @@ export default function ParticipantDashboard({ userId, home, requestedProfile = 
         <p className={`participant-readiness is-${row.readiness.key}`}>{row.readiness.text}</p>
         {!row.remote && <p className="text-xs text-slate-600">Сохранён на устройстве. Текущий доступ проверится при открытии.</p>}
         {row.readiness.key === 'partial' && <p className="text-xs text-amber-800">Часть материалов недоступна. Подробности — в хранилище.</p>}
-        {row.pendingCount > 0 && <p className="text-xs text-amber-800">Ожидают отправки: {row.pendingCount}</p>}
+        {!row.attempt && <PrepareOfflineStart questId={row.id} profileId={profileId} userId={userId} />}
+        {row.pendingCount > 0 && <p className="text-xs text-amber-800">Сохранённые события: {row.pendingCount}</p>}
       </div>
       {row.readiness.key !== 'ready' && <button className="participant-download" disabled={Boolean(downloading) || data.offline} onClick={() => download(row)}>{downloading === row.id ? 'Скачиваем…' : row.package ? 'Обновить' : 'Скачать'}</button>}
     </li>)}</ul>

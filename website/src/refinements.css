@@ -1,0 +1,41 @@
+/* Match the selected desktop mock's heavier type and readable supporting copy. */
+.demo-progress{font-size:14px;color:#2468c9!important;font-weight:700}
+.quest-demo .field input{display:block;width:100%;margin-top:10px;border:1px solid #bac8db;border-radius:10px;padding:14px;background:white;color:#10183f}
+.quest-demo h2:focus{outline:none}
+.demo-restart{margin-top:15px;color:var(--blue)}
+.step-example>strong{font-size:14px}
+.step-example ul{list-style:none;padding:0;margin:12px 0}
+.step-example li{display:flex;gap:10px;align-items:center;font-size:13px;margin:10px 0;line-height:1.5;color:#465174}
+.step-example .icon{width:18px;height:18px}
+.step-example .text-button{color:var(--blue);font-weight:700;font-size:13px;text-align:left}
+.audience-links button{min-width:0}
+@media(min-width:761px){.audience-links button{gap:10px;font-size:17px}.audience-links .icon{width:25px;height:25px}}
+@media(min-width:1151px){
+ .hero h1{font-size:82px;line-height:1.055;letter-spacing:-4px}
+ .header nav{font-size:18px}
+ .entry{font-size:18px}
+ .hero .button{font-size:19px}
+ .hero .lead{font-size:26px}
+ .phone{width:305px;height:455px;left:20px;transform:rotate(7deg)}
+ .phone:hover{transform:rotate(7deg) translateY(-6px)}
+ .benefits{font-size:13px}
+ .how>h2{font-size:54px;font-weight:800;letter-spacing:-2px}
+ .section-lead{font-size:24px}
+ .steps h3{font-size:26px;font-weight:800}
+ .steps article>p{font-size:18px;margin-left:86px}
+ .mini label,.rows button,.mini-text,.text-button{font-size:14px}
+ .mini input{font-size:13px}
+ .ai h2{font-size:35px;font-weight:800;letter-spacing:-1.4px}
+ .ai p:not(.eyebrow){font-size:20px}
+}
+.close{width:44px;height:44px;align-items:center;justify-content:center}
+.soon{background:#2468c9}
+.text-button{min-height:44px}
+.steps article:has(.text-button) .mini{padding-top:16px;padding-bottom:9px}
+@media(max-width:760px){
+ .actions .button{font-size:14px;padding-left:13px;padding-right:13px}
+ .actions .button .icon{display:none}
+ .benefits{font-size:11px}
+ .hero-visual{height:515px}
+ .how>h2{font-weight:800}
+}

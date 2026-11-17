@@ -1,0 +1,114 @@
+{
+  "target": "jeugfyaqzfgdvfhdxfht",
+  "function": "participant-avatar",
+  "version": 1,
+  "startedAtUtc": "2026-10-07T10:13:10.194Z",
+  "finishedAtUtc": "2026-10-07T10:13:12.491Z",
+  "authentication": "none or fixed deliberately invalid token; no credentials used",
+  "results": [
+    {
+      "name": "POST no authorization, allowed origin",
+      "status": 401,
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": null,
+        "access-control-allow-headers": "authorization, x-client-info, apikey",
+        "vary": "Accept-Encoding",
+        "cache-control": null,
+        "content-type": "application/json"
+      },
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}"
+    },
+    {
+      "name": "POST invalid JWT, allowed origin",
+      "status": 401,
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": null,
+        "access-control-allow-headers": "authorization, x-client-info, apikey",
+        "vary": "Accept-Encoding",
+        "cache-control": null,
+        "content-type": "application/json"
+      },
+      "body": "{\"code\":\"UNAUTHORIZED_INVALID_JWT_FORMAT\",\"message\":\"Invalid JWT\"}"
+    },
+    {
+      "name": "GET no authorization, allowed origin",
+      "status": 401,
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": null,
+        "access-control-allow-headers": "authorization, x-client-info, apikey",
+        "vary": "Accept-Encoding",
+        "cache-control": null,
+        "content-type": "application/json"
+      },
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}"
+    },
+    {
+      "name": "PATCH no authorization, allowed origin",
+      "status": 401,
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": null,
+        "access-control-allow-headers": "authorization, x-client-info, apikey",
+        "vary": "Accept-Encoding",
+        "cache-control": null,
+        "content-type": "application/json"
+      },
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}"
+    },
+    {
+      "name": "OPTIONS allowed origin",
+      "status": 204,
+      "headers": {
+        "access-control-allow-origin": "https://stage.qvesta.ru",
+        "access-control-allow-methods": "POST, OPTIONS",
+        "access-control-allow-headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-qvesta-device-id, x-profile-id, x-upload-id, x-profile-revision",
+        "vary": "Accept-Encoding, Origin",
+        "cache-control": "no-store",
+        "content-type": null
+      },
+      "body": ""
+    },
+    {
+      "name": "OPTIONS disallowed origin",
+      "status": 403,
+      "headers": {
+        "access-control-allow-origin": null,
+        "access-control-allow-methods": null,
+        "access-control-allow-headers": null,
+        "vary": "Accept-Encoding, Origin",
+        "cache-control": "no-store",
+        "content-type": "application/json"
+      },
+      "body": "{\"error\":\"origin_denied\"}"
+    },
+    {
+      "name": "POST disallowed origin, no authorization",
+      "status": 401,
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": null,
+        "access-control-allow-headers": "authorization, x-client-info, apikey",
+        "vary": "Accept-Encoding",
+        "cache-control": null,
+        "content-type": "application/json"
+      },
+      "body": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}"
+    },
+    {
+      "name": "OPTIONS no origin",
+      "status": 204,
+      "headers": {
+        "access-control-allow-origin": null,
+        "access-control-allow-methods": null,
+        "access-control-allow-headers": null,
+        "vary": "Accept-Encoding, Origin",
+        "cache-control": "no-store",
+        "content-type": null
+      },
+      "body": ""
+    }
+  ]
+}

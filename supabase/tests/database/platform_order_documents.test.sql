@@ -1,0 +1,24 @@
+-- Appended to the paid checkout fixture inside its transaction.
+reset role;
+select set_config('request.jwt.claim.sub',md5('discount-checkout-owner')::uuid::text,true);
+select set_config('test.payment',platform_private.prepare_discount_payment((current_setting('test.atomic')::jsonb->>'order_id')::uuid)::text,true);
+insert into public.billing_sandbox_orders select (jsonb_populate_record(null::public.billing_sandbox_orders,to_jsonb(o)||jsonb_build_object('id',md5('legacy-order')::uuid,'command_id',md5('legacy-command')::uuid,'idempotency_key',md5('legacy-key')::uuid,'state','finished'))).* from public.billing_sandbox_orders o where id=current_setting('test.payment')::uuid;
+select set_config('request.jwt.claims',jsonb_build_object('sub',auth.uid(),'aal','aal2')::text,true);
+set local role authenticated;
+select throws_ok($t$select public.read_platform_order_documents(current_setting('test.org')::uuid,current_setting('test.payment')::uuid)$t$,'42501',null,'workspace owner without staff role denied');
+reset role;
+insert into public.platform_access_assignments(user_id,role_key,scope_kind,organization_id) values(auth.uid(),'sales','organization',current_setting('test.org')::uuid);
+set local role authenticated;
+select is(public.read_platform_order_documents(current_setting('test.org')::uuid,md5('legacy-order')::uuid),null::jsonb,'legacy order has no fabricated receipt');
+select is(public.read_platform_order_documents(current_setting('test.org')::uuid,current_setting('test.payment')::uuid)->'documents'->0->>'id','atomic-agreement','reads original accepted edition after new publication');
+select is(public.read_platform_order_documents(current_setting('test.org')::uuid,current_setting('test.payment')::uuid,'atomic-agreement')->'document'->>'body','Synthetic agreement','opens accepted historical text');
+select throws_ok($t$select public.read_platform_order_documents(current_setting('test.org')::uuid,current_setting('test.payment')::uuid,'atomic-new')$t$,'42501',null,'unaccepted document denied');
+select throws_ok($t$select public.read_platform_order_documents(gen_random_uuid(),current_setting('test.payment')::uuid)$t$,'42501',null,'other workspace denied');
+select throws_ok($t$select public.read_platform_order_documents(current_setting('test.org')::uuid,gen_random_uuid())$t$,'42501',null,'unknown order denied');
+select set_config('request.jwt.claims',jsonb_build_object('sub',auth.uid(),'aal','aal1')::text,true);
+select throws_ok($t$select public.read_platform_order_documents(current_setting('test.org')::uuid,current_setting('test.payment')::uuid)$t$,'42501',null,'AAL1 denied');
+reset role;
+set local role anon;
+select throws_ok($t$select public.read_platform_order_documents(current_setting('test.org')::uuid,current_setting('test.payment')::uuid)$t$,'42501',null,'anonymous denied');
+reset role;
+select ok((select count(*)>0 from public.platform_payment_read_events),'successful reads audited');
