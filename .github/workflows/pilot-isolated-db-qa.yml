@@ -1,0 +1,36 @@
+name: Pilot isolated database QA
+
+on:
+  push:
+    branches:
+      - codex/pilot-isolated-db-qa-20261117
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-isolated-db:
+    if: github.repository == 'Adoms17/quest-platform' && github.ref == 'refs/heads/codex/pilot-isolated-db-qa-20261117'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify local Docker engine and prepare pinned fixture images
+        run: |
+          test -z "${DOCKER_HOST:-}${DOCKER_CONTEXT:-}"
+          test "$(docker context show)" = default
+          test "$(docker context inspect default --format '{{.Endpoints.docker.Host}}')" = unix:///var/run/docker.sock
+          docker pull supabase/postgres:17.6.1.165
+          docker pull supabase/gotrue:v2.196.0
+          docker pull supabase/storage-api:v1.70.3
+      - name: Run exactly the seven pilot cases in a disposable database
+        env:
+          QVESTA_TEST_PILOT_ISOLATED: '1'
+        run: npm run test -- scripts/production-baseline-migrations.test.js --reporter=verbose --testNamePattern='production baseline 99 migrations'

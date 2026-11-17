@@ -1,7 +1,10 @@
 // @vitest-environment node
 import {test,expect} from 'vitest'
 import {spawn,spawnSync} from 'node:child_process'
-import {readFileSync,readdirSync,writeFileSync} from 'node:fs'
+import {mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} from 'node:fs'
+import {tmpdir} from 'node:os'
+import {basename,join} from 'node:path'
+import {fileURLToPath} from 'node:url'
 import {randomUUID,randomBytes} from 'node:crypto'
 import {buildStageBillingGuard} from './build-stage-billing-guard.js'
 import {guardCatalogSql,buildGuardAdoption} from './build-billing-guard-adoption.js'
@@ -13,7 +16,8 @@ import {prepareRecoveryA} from './verify-fiscal-recovery-a.js'
 const recoveryAEnabled=process.env.QVESTA_TEST_RECOVERY_A==='1'
 const acceptedResponseLossEnabled=process.env.QVESTA_TEST_ACCEPTED_RESPONSE_LOSS==='1'||recoveryAEnabled
 const accountActivityEnabled=process.env.QVESTA_TEST_ACCOUNT_ACTIVITY==='1'
-const enabled=process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'||accountActivityEnabled||acceptedResponseLossEnabled
+const pilotIsolated=process.env.QVESTA_TEST_PILOT_ISOLATED==='1'
+const enabled=pilotIsolated||process.env.QVESTA_TEST_PRODUCTION_BASELINE==='1'||accountActivityEnabled||acceptedResponseLossEnabled
 const releaseMigrations=[
  '20261006010000_participant_profile_identity.sql',
  '20261006020000_record_account_activity.sql',
@@ -220,6 +224,43 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   expect(sql('select count(*) from cron.job where active').trim()).toBe('0')
   expect(sql('select count(*) from public.billing_sandbox_orders').trim()).toBe('0')
   expect(sql('select count(*) from public.platform_access_assignments').trim()).toBe('0')
+  if(pilotIsolated){
+   inspect(databaseId,'none')
+   console.log('PILOT_SCHEMA_READY '+applied.length)
+   const expected=new Map([
+    ['questCreation.integration.test.js',2],
+    ['offlineStartPermits.integration.test.js',2],
+    ['offlineEventReview.integration.test.js',3],
+   ])
+   const directory=mkdtempSync(join(tmpdir(),'qvesta-pilot-tests-'))
+   const report=join(directory,'results.json')
+   try{
+    const cwd=fileURLToPath(new URL('../',import.meta.url))
+    const runner=join(cwd,'node_modules','vitest','vitest.mjs')
+    const child=spawnSync(process.execPath,[runner,'run','--maxWorkers=1','--reporter=json',
+     '--outputFile='+report,...[...expected.keys()].map(file=>'src/services/'+file)],{
+     cwd,windowsHide:true,encoding:'utf8',timeout:240000,maxBuffer:4*1024*1024,
+     env:{PATH:process.env.PATH,HOME:process.env.HOME,CI:'true',
+      RUN_LOCAL_QUOTA_E2E:'1',QVESTA_PILOT_DB_ID:databaseId},
+    })
+    expect(child.error?.code||null,'pilot Vitest process error').toBeNull()
+    const result=JSON.parse(readFileSync(report,'utf8'))
+    expect(result.testResults,'exactly the three required suites').toHaveLength(expected.size)
+    const seen=new Set()
+    for(const suite of result.testResults){
+     const file=basename(suite.name)
+     expect(expected.has(file)&&!seen.has(file),'expected unique suite '+file).toBe(true)
+     seen.add(file)
+     expect(suite.assertionResults,'exact count in '+file).toHaveLength(expected.get(file))
+     console.log('PILOT_SUITE '+file+' '+suite.assertionResults.map(test=>test.status).join(','))
+    }
+    expect(result.numTotalTests).toBe(7)
+    expect(result.numPassedTests,'all seven pilot cases passed').toBe(7)
+    expect(child.status,'pilot Vitest exit').toBe(0)
+   }finally{
+    rmSync(directory,{recursive:true,force:true})
+   }
+  }else{
   if(accountActivityEnabled){
    await verifyAccountActivity({sql,databaseId})
   }else{
@@ -899,6 +940,7 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   }
   }
   }
+  }
  }catch(error){failures.push(error)}finally{
   // IDs came only from successful creates in this invocation. -v removes their
   // anonymous image volumes; no volume prune, named-volume delete or name lookup.
@@ -907,5 +949,6 @@ test.skipIf(!enabled)('production baseline 99 migrations preserves existing orga
   }
  }
  if(failures.length)throw new AggregateError(failures,'Disposable baseline test or cleanup failed')
- if(acceptedResponseLossEnabled)expect(acceptedResponseLossVerified,'accepted-response-loss branch must execute').toBe(true)
-},acceptedResponseLossEnabled?600000:180000)
+ if(pilotIsolated)console.log('PILOT_ISOLATED_DB_CLEANUP_OK')
+ if(!pilotIsolated&&acceptedResponseLossEnabled)expect(acceptedResponseLossVerified,'accepted-response-loss branch must execute').toBe(true)
+},pilotIsolated?750000:acceptedResponseLossEnabled?600000:180000)

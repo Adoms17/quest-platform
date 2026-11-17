@@ -5,9 +5,11 @@ import { expect, test } from 'vitest'
 
 // Только явно запрошенный тест локального контейнера; без URL и секретов.
 const enabled = process.env.RUN_LOCAL_QUOTA_E2E === '1'
+const pilotDatabaseId = process.env.QVESTA_PILOT_DB_ID || ''
+if (enabled && !/^[a-f0-9]{64}$/.test(pilotDatabaseId)) throw Error('Pilot QA requires the verified full disposable database ID')
 function sql(query) {
   return new Promise((resolve, reject) => {
-    const child = spawn('docker', ['exec', '-i', 'supabase_db_quest-platform',
+    const child = spawn('docker', ['exec', '-i', pilotDatabaseId,
       'psql', '-X', '-U', 'postgres', '-d', 'postgres', '-At', '-v', 'ON_ERROR_STOP=1'], { windowsHide: true })
     let output = ''
     let error = ''
